@@ -1,0 +1,8 @@
+(executables
+ (names main)
+ (libraries ptt.core cmdliner))
+
+(install
+ (section bin)
+ (package ptt)
+ (files (main.exe as ptt)))

@@ -1,0 +1,12 @@
+(menhir
+ (flags --strict --explain --interpret-show-cst --table)
+ (modules grammar))
+
+(ocamllex lex)
+
+(library
+ (name Core)
+ (libraries menhirLib)
+ (preprocess (pps ppx_deriving.std))
+ (flags (:standard -w -9-32-37))
+ (public_name ptt.core))

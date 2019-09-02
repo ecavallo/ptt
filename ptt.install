@@ -1,0 +1,72 @@
+lib: [
+  "_build/install/default/lib/ptt/META"
+  "_build/install/default/lib/ptt/core/Core.a" {"core/Core.a"}
+  "_build/install/default/lib/ptt/core/Core.cma" {"core/Core.cma"}
+  "_build/install/default/lib/ptt/core/Core.cmxa" {"core/Core.cmxa"}
+  "_build/install/default/lib/ptt/core/Core.cmxs" {"core/Core.cmxs"}
+  "_build/install/default/lib/ptt/core/check.ml" {"core/check.ml"}
+  "_build/install/default/lib/ptt/core/check.mli" {"core/check.mli"}
+  "_build/install/default/lib/ptt/core/concrete_syntax.ml" {"core/concrete_syntax.ml"}
+  "_build/install/default/lib/ptt/core/concrete_syntax.mli" {"core/concrete_syntax.mli"}
+  "_build/install/default/lib/ptt/core/core.cmi" {"core/core.cmi"}
+  "_build/install/default/lib/ptt/core/core.cmt" {"core/core.cmt"}
+  "_build/install/default/lib/ptt/core/core.cmx" {"core/core.cmx"}
+  "_build/install/default/lib/ptt/core/core.ml" {"core/core.ml"}
+  "_build/install/default/lib/ptt/core/core__Check.cmi" {"core/core__Check.cmi"}
+  "_build/install/default/lib/ptt/core/core__Check.cmt" {"core/core__Check.cmt"}
+  "_build/install/default/lib/ptt/core/core__Check.cmti" {"core/core__Check.cmti"}
+  "_build/install/default/lib/ptt/core/core__Check.cmx" {"core/core__Check.cmx"}
+  "_build/install/default/lib/ptt/core/core__Concrete_syntax.cmi" {"core/core__Concrete_syntax.cmi"}
+  "_build/install/default/lib/ptt/core/core__Concrete_syntax.cmt" {"core/core__Concrete_syntax.cmt"}
+  "_build/install/default/lib/ptt/core/core__Concrete_syntax.cmti" {"core/core__Concrete_syntax.cmti"}
+  "_build/install/default/lib/ptt/core/core__Concrete_syntax.cmx" {"core/core__Concrete_syntax.cmx"}
+  "_build/install/default/lib/ptt/core/core__Domain.cmi" {"core/core__Domain.cmi"}
+  "_build/install/default/lib/ptt/core/core__Domain.cmt" {"core/core__Domain.cmt"}
+  "_build/install/default/lib/ptt/core/core__Domain.cmti" {"core/core__Domain.cmti"}
+  "_build/install/default/lib/ptt/core/core__Domain.cmx" {"core/core__Domain.cmx"}
+  "_build/install/default/lib/ptt/core/core__Driver.cmi" {"core/core__Driver.cmi"}
+  "_build/install/default/lib/ptt/core/core__Driver.cmt" {"core/core__Driver.cmt"}
+  "_build/install/default/lib/ptt/core/core__Driver.cmti" {"core/core__Driver.cmti"}
+  "_build/install/default/lib/ptt/core/core__Driver.cmx" {"core/core__Driver.cmx"}
+  "_build/install/default/lib/ptt/core/core__Grammar.cmi" {"core/core__Grammar.cmi"}
+  "_build/install/default/lib/ptt/core/core__Grammar.cmt" {"core/core__Grammar.cmt"}
+  "_build/install/default/lib/ptt/core/core__Grammar.cmti" {"core/core__Grammar.cmti"}
+  "_build/install/default/lib/ptt/core/core__Grammar.cmx" {"core/core__Grammar.cmx"}
+  "_build/install/default/lib/ptt/core/core__Lex.cmi" {"core/core__Lex.cmi"}
+  "_build/install/default/lib/ptt/core/core__Lex.cmt" {"core/core__Lex.cmt"}
+  "_build/install/default/lib/ptt/core/core__Lex.cmx" {"core/core__Lex.cmx"}
+  "_build/install/default/lib/ptt/core/core__Load.cmi" {"core/core__Load.cmi"}
+  "_build/install/default/lib/ptt/core/core__Load.cmt" {"core/core__Load.cmt"}
+  "_build/install/default/lib/ptt/core/core__Load.cmti" {"core/core__Load.cmti"}
+  "_build/install/default/lib/ptt/core/core__Load.cmx" {"core/core__Load.cmx"}
+  "_build/install/default/lib/ptt/core/core__Nbe.cmi" {"core/core__Nbe.cmi"}
+  "_build/install/default/lib/ptt/core/core__Nbe.cmt" {"core/core__Nbe.cmt"}
+  "_build/install/default/lib/ptt/core/core__Nbe.cmti" {"core/core__Nbe.cmti"}
+  "_build/install/default/lib/ptt/core/core__Nbe.cmx" {"core/core__Nbe.cmx"}
+  "_build/install/default/lib/ptt/core/core__Syntax.cmi" {"core/core__Syntax.cmi"}
+  "_build/install/default/lib/ptt/core/core__Syntax.cmt" {"core/core__Syntax.cmt"}
+  "_build/install/default/lib/ptt/core/core__Syntax.cmti" {"core/core__Syntax.cmti"}
+  "_build/install/default/lib/ptt/core/core__Syntax.cmx" {"core/core__Syntax.cmx"}
+  "_build/install/default/lib/ptt/core/domain.ml" {"core/domain.ml"}
+  "_build/install/default/lib/ptt/core/domain.mli" {"core/domain.mli"}
+  "_build/install/default/lib/ptt/core/driver.ml" {"core/driver.ml"}
+  "_build/install/default/lib/ptt/core/driver.mli" {"core/driver.mli"}
+  "_build/install/default/lib/ptt/core/grammar.ml" {"core/grammar.ml"}
+  "_build/install/default/lib/ptt/core/grammar.mli" {"core/grammar.mli"}
+  "_build/install/default/lib/ptt/core/lex.ml" {"core/lex.ml"}
+  "_build/install/default/lib/ptt/core/load.ml" {"core/load.ml"}
+  "_build/install/default/lib/ptt/core/load.mli" {"core/load.mli"}
+  "_build/install/default/lib/ptt/core/nbe.ml" {"core/nbe.ml"}
+  "_build/install/default/lib/ptt/core/nbe.mli" {"core/nbe.mli"}
+  "_build/install/default/lib/ptt/core/syntax.ml" {"core/syntax.ml"}
+  "_build/install/default/lib/ptt/core/syntax.mli" {"core/syntax.mli"}
+  "_build/install/default/lib/ptt/dune-package"
+  "_build/install/default/lib/ptt/opam"
+]
+bin: [
+  "_build/install/default/bin/ptt"
+]
+doc: [
+  "_build/install/default/doc/ptt/LICENSE"
+  "_build/install/default/doc/ptt/README.md"
+]
