@@ -34,6 +34,7 @@ and ne =
   | BApp of ne * int
   | NRec of clos * t * clos2 * ne
   | J of clos3 * clos * t * t * t * ne
+  | Extent of int * clos * clos2 * t * clos2
 and nf =
   | Normal of {tp : t; term : t}
 

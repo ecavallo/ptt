@@ -14,9 +14,15 @@ type t =
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
   | Sg of t * (* BINDS *) t | Pair of t * t | Fst of t | Snd of t
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
-  | Bridge of (* BINDS BDIM *) t | BApp of t * bdim | BLam of (* BINDS BDIM *) t
+  | Bridge of (* BBINDS *) t | BApp of t * bdim | BLam of (* BBINDS *) t
+  | Extent of bdim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS & BBINDS *) t
   | Uni of uni_level
 [@@deriving eq]
+
+(* exception Indirect_use *)
+
+(* let extract_bvar i = function
+ *   | *) 
 
 let rec condense = function
   | Zero -> Some 0
@@ -71,17 +77,20 @@ let rec pp fmt =
   | Pair (l, r) ->
     fprintf fmt "pair(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp l pp r
   | Id (tp, l, r) ->
-    fprintf fmt "Id(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@, @[<hov>%a@]@])" pp tp pp l pp r;
+    fprintf fmt "Id(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@,@ @[<hov>%a@]@])" pp tp pp l pp r;
   | Refl t ->
     fprintf fmt "refl(@[<hov>%a@])" pp t
   | J (mot, refl, eq) ->
-    fprintf fmt "J(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@, @[<hov>%a@]@])" pp mot pp refl pp eq;
+    fprintf fmt "J(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@,@ @[<hov>%a@]@])" pp mot pp refl pp eq;
   | Bridge t ->
     fprintf fmt "Bridge(@[<hov>%a@])" pp t;
   | BLam t ->
     fprintf fmt "blam(@[<hov>%a@])" pp t;
   | BApp (t, r) ->
     fprintf fmt "bapp(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp t pp_bdim r;
+  | Extent (r, dom, mot, ctx, varcase) ->
+   fprintf fmt "J(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@,@ @[<hov>%a@]@,@ @[<hov>%a@]@,@ @[<hov>%a@]@])"
+     pp_bdim r pp dom pp mot pp ctx pp varcase;
   | Uni i -> fprintf fmt "U<%d>" i
 
 let show t =

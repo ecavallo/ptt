@@ -33,6 +33,7 @@ let keywords =
     ("match", MATCH);
     ("Id", ID);
     ("refl", REFL);
+    (* ("extent", EXTENT); *)
     ("def", DEF);
     ("at", AT);
     ("normalize", NORMALIZE);

@@ -104,13 +104,25 @@ let rec bind env = function
     bind env body
   | CS.Bridge (r :: tele, body) ->
     S.Bridge (bind (BDim r :: env) (CS.Bridge (tele, body)))
-  | CS.BLam (BBinderN {names = []; body}) ->
+  | CS.BLam (BinderN {names = []; body}) ->
     bind env body
-  | CS.BLam (BBinderN {names = i :: names; body}) ->
-    let shut = CS.BLam (BBinderN {names; body}) in
-    S.BLam (bind (BDim i :: env) shut)
+  | CS.BLam (BinderN {names = i :: names; body}) ->
+    let blam = CS.BLam (BinderN {names; body}) in
+    S.BLam (bind (BDim i :: env) blam)
   | CS.BApp (p, rs) ->
     List.map (bind_bspine env) rs |> unravel_spine (bind env p)
+  | CS.Extent
+      {bdim;
+       dom = Binder {name = dom_dim; body = dom_body};
+       mot = Binder2 {name1 = mot_dim; name2 = mot_dom; body = mot_body};
+       ctx;
+       varcase = Binder2 {name1 = var_bridge; name2 = var_dim; body = var_body}} ->
+    S.Extent
+      (bbind env bdim,
+       bind (BDim dom_dim :: env) dom_body,
+       bind (Term mot_dom :: BDim mot_dim :: env) mot_body,
+       bind env ctx,
+       bind (BDim var_dim :: Term var_bridge :: env) var_body)
   | CS.Uni i -> S.Uni i
 
 and bind_bspine env r = fun p -> S.BApp (p, bbind env r)

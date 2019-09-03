@@ -8,7 +8,6 @@ type binder = Binder of {name : ident; body : t}
 and bindern = BinderN of {names : ident list; body : t}
 and binder2 = Binder2 of {name1 : ident; name2 : ident; body : t}
 and binder3 = Binder3 of {name1 : ident; name2 : ident; name3 : ident; body : t}
-and bbindern = BBinderN of {names : ident list; body : t}
 and cell = Cell of {name : ident; ty : t}
 and spine = Term of t
 and t =
@@ -31,7 +30,8 @@ and t =
   | J of {mot : binder3; refl : binder; eq : t}
   | Bridge of ident list * t
   | BApp of t * bdim list
-  | BLam of bbindern
+  | BLam of bindern
+  | Extent of {bdim : bdim; dom : binder; mot : binder2; ctx : t; varcase : binder2}
   | Uni of uni_level
 
 type decl =

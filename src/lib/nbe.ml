@@ -42,21 +42,28 @@ and do_snd size p =
 
 and do_bclos size clo r =
   match clo with
-  | D.Clos {term; env} -> eval (size + 1) term (D.BDim r :: env)
+  | D.Clos {term; env} -> eval size term (D.BDim r :: env)
   | D.ConstClos t -> t
 
 and do_clos size clo a =
   match clo with
-  | D.Clos {term; env} -> eval (size + 1) term (D.Term a :: env)
+  | D.Clos {term; env} -> eval size term (D.Term a :: env)
   | D.ConstClos t -> t
 
 and do_clos2 size (D.Clos2 {term; env}) a1 a2 =
-  eval (size + 2) term (D.Term a2 :: D.Term a1 :: env)
+  eval size term (D.Term a2 :: D.Term a1 :: env)
+
+(* TODO organize this all in a better way *)
+and do_bclosclos size (D.Clos2 {term; env}) r a =
+  eval size term (D.Term a :: D.BDim r :: env)
+
+and do_closbclos size (D.Clos2 {term; env}) a r =
+eval size term (D.BDim r :: D.Term a :: env)
 
 and do_clos3 size (D.Clos3 {term; env}) a1 a2 a3 =
-  eval (size + 3) term (D.Term a3 :: D.Term a2 :: Term a1 :: env)
+  eval size term (D.Term a3 :: D.Term a2 :: Term a1 :: env)
 
-and do_open size t r =
+and do_bapp size t r =
   match t with
   | D.BLam bclo -> do_bclos size bclo r
   | D.Neutral {tp; term} ->
@@ -68,10 +75,10 @@ and do_open size t r =
           | D.Bridge dst ->
             let dst = do_bclos size dst r in
             D.Neutral {tp = dst; term = D.BApp (term, i)}
-          | _ -> raise (Nbe_failed "Not a box in do_open")
+          | _ -> raise (Nbe_failed "Not a box in do_bapp")
         end
     end
-  | _ -> raise (Nbe_failed "Not a box or neutral in open")
+  | _ -> raise (Nbe_failed "Not a box or neutral in bapp")
 
 and do_j size mot refl eq =
   match eq with
@@ -86,6 +93,14 @@ and do_j size mot refl eq =
       | _ -> raise (Nbe_failed "Not an Id in do_j")
     end
   | _ -> raise (Nbe_failed "Not a refl or neutral in do_j")
+
+and do_extent size r dom mot ctx varcase =
+  match r with
+  | D.BVar i ->
+    (* Incomplete *)
+    D.Neutral
+      { tp = do_bclosclos size mot r ctx;
+        term = D.Extent (i, dom, mot, ctx, varcase) }
 
 and do_ap size f a =
   match f with
@@ -130,19 +145,27 @@ and eval size t (env : D.env) =
   | Syn.Fst t -> do_fst (eval size t env)
   | Syn.Snd t -> do_snd size (eval size t env)
   | Syn.Bridge dest -> D.Bridge (Clos {term = dest; env})
-  | Syn.BApp (t,r) -> do_open size (eval size t env) (eval_bdim r env)
+  | Syn.BApp (t,r) -> do_bapp size (eval size t env) (eval_bdim r env)
   | Syn.BLam t -> D.BLam (Clos {term = t; env})
   | Syn.Refl t -> D.Refl (eval size t env)
   | Syn.Id (tp, left, right) -> D.Id (eval size tp env, eval size left env, eval size right env)
   | Syn.J (mot, refl, eq) ->
     do_j size (D.Clos3 {term = mot; env}) (D.Clos {term = refl; env}) (eval size eq env)
+  | Syn.Extent (r, dom, mot, ctx, varcase) ->
+     do_extent
+      size
+      (eval_bdim r env)
+      (D.Clos {term = dom; env})
+      (D.Clos2 {term = mot; env})
+      (eval size ctx env)
+      (D.Clos2 {term = varcase; env})
 
-let rec read_back_nf size nf =
+and read_back_nf size nf =
   match nf with
   (* Functions *)
   | D.Normal {tp = D.Pi (src, dest); term = f} ->
     let arg = D.mk_var src size in
-    let nf = D.Normal {tp = do_clos size dest arg; term = do_ap size f arg} in
+    let nf = D.Normal {tp = do_clos (size + 1) dest arg; term = do_ap (size + 1) f arg} in
     Syn.Lam (read_back_nf (size + 1) nf)
   (* Pairs *)
   | D.Normal {tp = D.Sg (fst, snd); term = p} ->
@@ -160,7 +183,7 @@ let rec read_back_nf size nf =
   (* Bridge *)
   | D.Normal {tp = D.Bridge dest; term} ->
     let arg = D.mk_bvar size in
-    let nf = D.Normal {tp = do_bclos size dest arg; term = do_open size term arg} in
+    let nf = D.Normal {tp = do_bclos size dest arg; term = do_bapp size term arg} in
     Syn.BLam (read_back_nf (size + 1) nf)
   (* Id *)
   | D.Normal {tp = D.Id (tp, _, _); term = D.Refl term} ->
@@ -178,13 +201,13 @@ and read_back_tp size d =
   | D.Nat -> Syn.Nat
   | D.Pi (src, dest) ->
     let var = D.mk_var src size in
-    Syn.Pi (read_back_tp size src, read_back_tp (size + 1) (do_clos size dest var))
+    Syn.Pi (read_back_tp size src, read_back_tp (size + 1) (do_clos (size + 1) dest var))
   | D.Sg (fst, snd) ->
     let var = D.mk_var fst size in
-    Syn.Sg (read_back_tp size fst, read_back_tp (size + 1) (do_clos size snd var))
+    Syn.Sg (read_back_tp size fst, read_back_tp (size + 1) (do_clos (size + 1) snd var))
   | D.Bridge dest ->
     let var = D.mk_bvar size in
-    Syn.Bridge (read_back_tp (size + 1) (do_bclos size dest var))
+    Syn.Bridge (read_back_tp (size + 1) (do_bclos (size + 1) dest var))
   | D.Id (tp, left, right) ->
     Syn.Id
       (read_back_tp size tp,
@@ -200,12 +223,12 @@ and read_back_ne size ne =
     Syn.Ap (read_back_ne size ne, read_back_nf size arg)
   | D.NRec (tp, zero, suc, n) ->
     let tp_var = D.mk_var D.Nat size in
-    let applied_tp = do_clos size tp tp_var in
+    let applied_tp = do_clos (size + 1) tp tp_var in
     let zero_tp = do_clos size tp D.Zero in
-    let applied_suc_tp = do_clos size tp (D.Suc tp_var) in
+    let applied_suc_tp = do_clos (size + 1) tp (D.Suc tp_var) in
     let tp' = read_back_tp (size + 1) applied_tp in
     let suc_var = D.mk_var applied_tp (size + 1) in
-    let applied_suc = do_clos2 size suc tp_var suc_var in
+    let applied_suc = do_clos2 (size + 2) suc tp_var suc_var in
     let suc' =
       read_back_nf (size + 2) (D.Normal {tp = applied_suc_tp; term = applied_suc}) in
     Syn.NRec
@@ -216,16 +239,34 @@ and read_back_ne size ne =
   | D.Fst ne -> Syn.Fst (read_back_ne size ne)
   | D.Snd ne -> Syn.Snd (read_back_ne size ne)
   | D.BApp (ne, i) -> Syn.BApp (read_back_ne size ne, Syn.BVar (size - (i + 1)))
+  | D.Extent (i, dom, mot, ctx, varcase) ->
+    let dim_var = D.mk_bvar size in
+    let applied_dom = do_bclos (size + 1) dom dim_var in
+    let dom_var = D.mk_var applied_dom (size + 1) in
+    let dom' = read_back_tp (size + 1) applied_dom in
+    let applied_mot = do_bclosclos (size + 2) mot dim_var dom_var in
+    let mot' = read_back_tp (size + 2) applied_mot in
+    let i_dom = do_bclos size dom (D.BVar i) in
+    let ctx' = read_back_nf size (D.Normal {tp = i_dom; term = ctx}) in
+    let varcase_bridge = D.mk_var (D.Bridge dom) size in
+    let varcase_dim = D.mk_bvar (size + 1) in
+    let varcase_inst = do_bapp (size+2) varcase_bridge varcase_dim in
+    let bridge_mot = do_bclosclos (size + 2) mot varcase_dim varcase_inst in
+    let applied_varcase = do_closbclos (size + 2) varcase varcase_bridge varcase_dim in
+    let varcase' = read_back_nf (size + 2) (D.Normal {tp = bridge_mot; term = applied_varcase}) in
+    Syn.Extent (Syn.BVar i, dom', mot', ctx', varcase')
   | D.J (mot, refl, tp, left, right, eq) ->
     let mot_var1 = D.mk_var tp size in
     let mot_var2 = D.mk_var tp (size + 1) in
     let mot_var3 = D.mk_var (D.Id (tp, left, right)) (size + 2) in
-    let mot_syn = read_back_tp (size + 3) (do_clos3 size mot mot_var1 mot_var2 mot_var3) in
+    let mot_syn = read_back_tp (size + 3) (do_clos3 (size + 3) mot mot_var1 mot_var2 mot_var3) in
     let refl_var = D.mk_var tp size in
     let refl_syn =
       read_back_nf
         (size + 1)
-        (D.Normal {term = do_clos size refl refl_var; tp = do_clos3 size mot refl_var refl_var (D.Refl refl_var)}) in
+        (D.Normal
+           {term = do_clos (size + 1) refl refl_var;
+            tp = do_clos3 (size + 1) mot refl_var refl_var (D.Refl refl_var)}) in
     let eq_syn = read_back_ne size eq in
     Syn.J (mot_syn, refl_syn, eq_syn)
 
@@ -235,8 +276,8 @@ let rec check_nf size nf1 nf2 =
   | D.Normal {tp = D.Pi (src1, dest1); term = f1},
     D.Normal {tp = D.Pi (_, dest2); term = f2} ->
     let arg = D.mk_var src1 size in
-    let nf1 = D.Normal {tp = do_clos size dest1 arg; term = do_ap size f1 arg} in
-    let nf2 = D.Normal {tp = do_clos size dest2 arg; term = do_ap size f2 arg} in
+    let nf1 = D.Normal {tp = do_clos (size + 1) dest1 arg; term = do_ap (size + 1) f1 arg} in
+    let nf2 = D.Normal {tp = do_clos (size + 1) dest2 arg; term = do_ap (size + 1) f2 arg} in
     check_nf (size + 1) nf1 nf2
   (* Pairs *)
   | D.Normal {tp = D.Sg (fst1, snd1); term = p1},
@@ -266,8 +307,8 @@ let rec check_nf size nf1 nf2 =
   | D.Normal {tp = D.Bridge dest1; term = p1},
     D.Normal {tp = D.Bridge dest2; term = p2} ->
     let arg = D.mk_bvar size in
-    let nf1 = D.Normal {tp = do_bclos size dest1 arg; term = do_open size p1 arg} in
-    let nf2 = D.Normal {tp = do_bclos size dest2 arg; term = do_open size p2 arg} in
+    let nf1 = D.Normal {tp = do_bclos (size + 1) dest1 arg; term = do_bapp (size + 1) p1 arg} in
+    let nf2 = D.Normal {tp = do_bclos (size + 1) dest2 arg; term = do_bapp (size + 1) p2 arg} in
     check_nf (size + 1) nf1 nf2
   (* Types *)
   | D.Normal {tp = D.Uni _; term = t1}, D.Normal {tp = D.Uni _; term = t2} ->
@@ -283,13 +324,14 @@ and check_ne size ne1 ne2 =
     check_ne size ne1 ne2 && check_nf size arg1 arg2
   | D.NRec (tp1, zero1, suc1, n1), D.NRec (tp2, zero2, suc2, n2) ->
     let tp_var = D.mk_var D.Nat size in
-    let applied_tp1, applied_tp2 = do_clos size tp1 tp_var, do_clos size tp2 tp_var in
+    let applied_tp1 = do_clos (size + 1) tp1 tp_var in
+    let applied_tp2 = do_clos (size + 1) tp2 tp_var in
     let zero_tp = do_clos size tp1 D.Zero in
-    let applied_suc_tp = do_clos size tp1 (D.Suc tp_var) in
+    let applied_suc_tp = do_clos (size + 1) tp1 (D.Suc tp_var) in
     let suc_var1 = D.mk_var applied_tp1 (size + 1) in
     let suc_var2 = D.mk_var applied_tp2 (size + 1) in
-    let applied_suc1 = do_clos2 size suc1 tp_var suc_var1 in
-    let applied_suc2 = do_clos2 size suc2 tp_var suc_var2 in
+    let applied_suc1 = do_clos2 (size + 2) suc1 tp_var suc_var1 in
+    let applied_suc2 = do_clos2 (size + 2) suc2 tp_var suc_var2 in
     check_tp ~subtype:false (size + 1) applied_tp1 applied_tp2
     && check_nf size (D.Normal {tp = zero_tp; term = zero1}) (D.Normal {tp = zero_tp; term = zero2})
     && check_nf (size + 2) (D.Normal {tp = applied_suc_tp; term = applied_suc1})
@@ -298,6 +340,31 @@ and check_ne size ne1 ne2 =
   | D.Fst ne1, D.Fst ne2  -> check_ne size ne1 ne2
   | D.Snd ne1, D.Snd ne2 -> check_ne size ne1 ne2
   | D.BApp (ne1, i1), D.BApp (ne2, i2) -> check_ne size ne1 ne2 && i1 = i2
+  | D.Extent (i1, dom1, mot1, ctx1, varcase1),
+    D.Extent (i2, dom2, mot2, ctx2, varcase2) ->
+    i1 = i2 &&
+    let dim_var = D.mk_bvar size in
+    let applied_dom1 = do_bclos (size + 1) dom1 dim_var in
+    let applied_dom2 = do_bclos (size + 1) dom2 dim_var in
+    check_tp ~subtype:false (size + 1) applied_dom1 applied_dom2 &&
+    let dom_var = D.mk_var applied_dom1 (size + 1) in
+    (* let dom' = read_back_tp (size + 1) applied_dom in *)
+    let applied_mot1 = do_bclosclos (size + 2) mot1 dim_var dom_var in
+    let applied_mot2 = do_bclosclos (size + 2) mot2 dim_var dom_var in
+    check_tp ~subtype:false (size + 2) applied_mot1 applied_mot2 &&
+    (* let mot' = read_back_tp (size + 2) applied_mot in *)
+    let i_dom = do_bclos size dom1 (D.BVar i1) in
+    (* let ctx' = read_back_nf size (D.Normal {tp = i_dom; term = ctx}) in *)
+    check_nf size (D.Normal {tp = i_dom; term = ctx1}) (D.Normal {tp = i_dom; term = ctx2}) &&
+    let varcase_bridge = D.mk_var (D.Bridge dom1) size in
+    let varcase_dim = D.mk_bvar (size + 1) in
+    let varcase_inst = do_bapp (size+2) varcase_bridge varcase_dim in
+    let bridge_mot = do_bclosclos (size + 2) mot1 varcase_dim varcase_inst in
+    let applied_varcase1 = do_closbclos (size + 2) varcase1 varcase_bridge varcase_dim in
+    let applied_varcase2 = do_closbclos (size + 2) varcase2 varcase_bridge varcase_dim in
+    check_nf (size + 2)
+      (D.Normal {tp = bridge_mot; term = applied_varcase1})
+      (D.Normal {tp = bridge_mot; term = applied_varcase2})
   | D.J (mot1, refl1, tp1, left1, right1, eq1),
     D.J (mot2, refl2, tp2, left2, right2, eq2) ->
     check_tp ~subtype:false size tp1 tp2 &&
@@ -306,12 +373,18 @@ and check_ne size ne1 ne2 =
     let mot_var1 = D.mk_var tp1 size in
     let mot_var2 = D.mk_var tp1 (size + 1) in
     let mot_var3 = D.mk_var (D.Id (tp1, left1, right1)) (size + 2) in
-    check_tp ~subtype:false (size + 3) (do_clos3 size mot1 mot_var1 mot_var2 mot_var3) (do_clos3 size mot2 mot_var1 mot_var2 mot_var3) &&
+    check_tp ~subtype:false (size + 3)
+      (do_clos3 (size + 3) mot1 mot_var1 mot_var2 mot_var3)
+      (do_clos3 (size + 3) mot2 mot_var1 mot_var2 mot_var3) &&
     let refl_var = D.mk_var tp1 size in
     check_nf
       (size + 1)
-      (D.Normal {term = do_clos size refl1 refl_var; tp = do_clos3 size mot1 refl_var refl_var (D.Refl refl_var)})
-      (D.Normal {term = do_clos size refl2 refl_var; tp = do_clos3 size mot2 refl_var refl_var (D.Refl refl_var)}) &&
+      (D.Normal
+        {term = do_clos (size + 1) refl1 refl_var;
+         tp = do_clos3 (size + 1) mot1 refl_var refl_var (D.Refl refl_var)})
+      (D.Normal
+        {term = do_clos (size + 1) refl2 refl_var;
+         tp = do_clos3 (size + 1) mot2 refl_var refl_var (D.Refl refl_var)}) &&
     check_ne size eq1 eq2
   | _ -> false
 
@@ -327,13 +400,13 @@ and check_tp ~subtype size d1 d2 =
   | D.Pi (src, dest), D.Pi (src', dest') ->
     let var = D.mk_var src' size in
     check_tp ~subtype size src' src &&
-    check_tp ~subtype (size + 1) (do_clos size dest var) (do_clos size dest' var)
+    check_tp ~subtype (size + 1) (do_clos (size + 1) dest var) (do_clos (size + 1) dest' var)
   | D.Sg (fst, snd), D.Sg (fst', snd') ->
     let var = D.mk_var fst size in
     check_tp ~subtype size fst fst' &&
-    check_tp ~subtype (size + 1) (do_clos size snd var) (do_clos size snd' var)
+    check_tp ~subtype (size + 1) (do_clos (size + 1) snd var) (do_clos (size + 1) snd' var)
   | D.Bridge dest, D.Bridge dest' ->
     let var = D.mk_bvar size in
-    check_tp ~subtype (size + 1) (do_bclos size dest var) (do_bclos size dest' var)
+    check_tp ~subtype (size + 1) (do_bclos (size + 1) dest var) (do_bclos (size + 1) dest' var)
   | D.Uni k, D.Uni j -> if subtype then k <= j else k = j
   | _ -> false
