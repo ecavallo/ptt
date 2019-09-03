@@ -9,7 +9,7 @@
 %token EQUALS
 %token TIMES FST SND
 %token LAM LET IN END WITH DEF
-%token BLAM ATSIGN
+%token ATSIGN
 %token REC SUC NAT ZERO
 %token UNIV
 %token QUIT NORMALIZE
@@ -52,10 +52,8 @@ atomic:
   | UNIV; LANGLE; i = NUMERAL; RANGLE
     { Uni i }
   | NAT { Nat }
-  | LBR; BLAM; names = nonempty_list(name); RIGHT_ARROW; body = term; RBR
+  | LBR; names = nonempty_list(name); RIGHT_ARROW; body = term; RBR
     { BLam(BBinderN {names; body}) }
-  | LBR; f = atomic; ATSIGN; args = list(bdim); RBR
-    { BApp(f,args) }
   | LANGLE left = term; COMMA; right = term; RANGLE
     { Pair (left, right) };
 
@@ -65,6 +63,8 @@ spine:
 term:
   | f = atomic; args = list(spine)
     { Ap (f, args) }
+  | f = atomic; ATSIGN; args = list(bdim)
+    { BApp(f,args) }
   | LET; name = name; COLON; tp = term; EQUALS; def = term; IN; body = term
     { Let (Check {term = def; tp}, Binder {name; body}) }
   | LET; name = name; EQUALS; def = term; IN; body = term; END
@@ -100,7 +100,7 @@ term:
     { Sg ([Cell {name = ""; ty = dom}], cod)}
   | FST; t = term { Fst t }
   | SND; t = term { Snd t }
-  | LBR; names = nonempty_list(name); RBR; RIGHT_ARROW; body = term
+  | LBR; names = nonempty_list(name); RBR; body = term
     { Bridge(names,body) }
 ;
 
