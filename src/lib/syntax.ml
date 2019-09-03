@@ -14,7 +14,7 @@ type t =
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
   | Sg of t * (* BINDS *) t | Pair of t * t | Fst of t | Snd of t
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
-  | Box of (* BINDS BDIM *) t | Open of t * bdim | Shut of (* BINDS BDIM *) t
+  | Bridge of (* BINDS BDIM *) t | BApp of t * bdim | BLam of (* BINDS BDIM *) t
   | Uni of uni_level
 [@@deriving eq]
 
@@ -76,12 +76,12 @@ let rec pp fmt =
     fprintf fmt "refl(@[<hov>%a@])" pp t
   | J (mot, refl, eq) ->
     fprintf fmt "J(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@, @[<hov>%a@]@])" pp mot pp refl pp eq;
-  | Box t ->
-    fprintf fmt "[box @[<hov>%a@]]" pp t;
-  | Shut t ->
-    fprintf fmt "[lock @[<hov>%a@]]" pp t;
-  | Open (t, r) ->
-    fprintf fmt "[unlock (@[<hov>@[<hov>%a@],@ @[<hov>%a@]@]" pp t pp_bdim r;
+  | Bridge t ->
+    fprintf fmt "Bridge(@[<hov>%a@])" pp t;
+  | BLam t ->
+    fprintf fmt "blam(@[<hov>%a@])" pp t;
+  | BApp (t, r) ->
+    fprintf fmt "bapp(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp t pp_bdim r;
   | Uni i -> fprintf fmt "U<%d>" i
 
 let show t =

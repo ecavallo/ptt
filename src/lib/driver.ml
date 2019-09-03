@@ -100,20 +100,20 @@ let rec bind env = function
   | CS.Id (tp, left, right) ->
     S.Id (bind env tp, bind env left, bind env right)
   | CS.Refl t -> S.Refl (bind env t)
-  | CS.Box ([], body) ->
+  | CS.Bridge ([], body) ->
     bind env body
-  | CS.Box (r :: tele, body) ->
-    S.Box (bind (BDim r :: env) (CS.Box (tele, body)))
-  | CS.Shut (BBinderN {names = []; body}) ->
+  | CS.Bridge (r :: tele, body) ->
+    S.Bridge (bind (BDim r :: env) (CS.Bridge (tele, body)))
+  | CS.BLam (BBinderN {names = []; body}) ->
     bind env body
-  | CS.Shut (BBinderN {names = i :: names; body}) ->
-    let shut = CS.Shut (BBinderN {names; body}) in
-    S.Shut (bind (BDim i :: env) shut)
-  | CS.Open (p, rs) ->
+  | CS.BLam (BBinderN {names = i :: names; body}) ->
+    let shut = CS.BLam (BBinderN {names; body}) in
+    S.BLam (bind (BDim i :: env) shut)
+  | CS.BApp (p, rs) ->
     List.map (bind_bspine env) rs |> unravel_spine (bind env p)
   | CS.Uni i -> S.Uni i
 
-and bind_bspine env r = fun p -> S.Open (p, bbind env r)
+and bind_bspine env r = fun p -> S.BApp (p, bbind env r)
 
 and bind_spine env = function
   | CS.Term t -> fun f -> S.Ap (f, bind env t)

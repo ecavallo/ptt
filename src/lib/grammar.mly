@@ -9,7 +9,7 @@
 %token EQUALS
 %token TIMES FST SND
 %token LAM LET IN END WITH DEF
-%token LOCK ATSIGN
+%token BLAM ATSIGN
 %token REC SUC NAT ZERO
 %token UNIV
 %token QUIT NORMALIZE
@@ -52,10 +52,10 @@ atomic:
   | UNIV; LANGLE; i = NUMERAL; RANGLE
     { Uni i }
   | NAT { Nat }
-  | LBR; LOCK; names = nonempty_list(name); RIGHT_ARROW; body = term; RBR
-    { Shut (BBinderN {names; body}) }
+  | LBR; BLAM; names = nonempty_list(name); RIGHT_ARROW; body = term; RBR
+    { BLam(BBinderN {names; body}) }
   | LBR; f = atomic; ATSIGN; args = list(bdim); RBR
-    { Open(f,args) }
+    { BApp(f,args) }
   | LANGLE left = term; COMMA; right = term; RANGLE
     { Pair (left, right) };
 
@@ -101,7 +101,7 @@ term:
   | FST; t = term { Fst t }
   | SND; t = term { Snd t }
   | LBR; names = nonempty_list(name); RBR; RIGHT_ARROW; body = term
-    { Box(names,body) }
+    { Bridge(names,body) }
 ;
 
 tele_cell:

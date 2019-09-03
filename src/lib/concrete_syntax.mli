@@ -29,9 +29,9 @@ and t =
   | Id of t * t * t
   | Refl of t
   | J of {mot : binder3; refl : binder; eq : t}
-  | Box of ident list * t
-  | Open of t * bdim list
-  | Shut of bbindern
+  | Bridge of ident list * t
+  | BApp of t * bdim list
+  | BLam of bbindern
   | Uni of uni_level
 
 type decl =

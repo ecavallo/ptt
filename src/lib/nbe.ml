@@ -58,16 +58,16 @@ and do_clos3 size (D.Clos3 {term; env}) a1 a2 a3 =
 
 and do_open size t r =
   match t with
-  | D.Shut bclo -> do_bclos size bclo r
+  | D.BLam bclo -> do_bclos size bclo r
   | D.Neutral {tp; term} ->
     begin
       match r with
       | D.BVar i ->
         begin
           match tp with
-          | D.Box dst ->
+          | D.Bridge dst ->
             let dst = do_bclos size dst r in
-            D.Neutral {tp = dst; term = D.Open (term, i)}
+            D.Neutral {tp = dst; term = D.BApp (term, i)}
           | _ -> raise (Nbe_failed "Not a box in do_open")
         end
     end
@@ -129,9 +129,9 @@ and eval size t (env : D.env) =
   | Syn.Pair (t1, t2) -> D.Pair (eval size t1 env, eval size t2 env)
   | Syn.Fst t -> do_fst (eval size t env)
   | Syn.Snd t -> do_snd size (eval size t env)
-  | Syn.Box dest -> D.Box (Clos {term = dest; env})
-  | Syn.Open (t,r) -> do_open size (eval size t env) (eval_bdim r env)
-  | Syn.Shut t -> D.Shut (Clos {term = t; env})
+  | Syn.Bridge dest -> D.Bridge (Clos {term = dest; env})
+  | Syn.BApp (t,r) -> do_open size (eval size t env) (eval_bdim r env)
+  | Syn.BLam t -> D.BLam (Clos {term = t; env})
   | Syn.Refl t -> D.Refl (eval size t env)
   | Syn.Id (tp, left, right) -> D.Id (eval size tp env, eval size left env, eval size right env)
   | Syn.J (mot, refl, eq) ->
@@ -157,11 +157,11 @@ let rec read_back_nf size nf =
   | D.Normal {tp = D.Nat; term = D.Suc nf} ->
     Syn.Suc (read_back_nf size (D.Normal {tp = D.Nat; term = nf}))
   | D.Normal {tp = D.Nat; term = D.Neutral {term = ne; _}} -> read_back_ne size ne
-  (* Box *)
-  | D.Normal {tp = D.Box dest; term} ->
+  (* Bridge *)
+  | D.Normal {tp = D.Bridge dest; term} ->
     let arg = D.mk_bvar size in
     let nf = D.Normal {tp = do_bclos size dest arg; term = do_open size term arg} in
-    Syn.Shut (read_back_nf (size + 1) nf)
+    Syn.BLam (read_back_nf (size + 1) nf)
   (* Id *)
   | D.Normal {tp = D.Id (tp, _, _); term = D.Refl term} ->
     Syn.Refl (read_back_nf size (D.Normal {tp; term}))
@@ -182,9 +182,9 @@ and read_back_tp size d =
   | D.Sg (fst, snd) ->
     let var = D.mk_var fst size in
     Syn.Sg (read_back_tp size fst, read_back_tp (size + 1) (do_clos size snd var))
-  | D.Box dest ->
+  | D.Bridge dest ->
     let var = D.mk_bvar size in
-    Syn.Box (read_back_tp (size + 1) (do_bclos size dest var))
+    Syn.Bridge (read_back_tp (size + 1) (do_bclos size dest var))
   | D.Id (tp, left, right) ->
     Syn.Id
       (read_back_tp size tp,
@@ -215,7 +215,7 @@ and read_back_ne size ne =
        read_back_ne size n)
   | D.Fst ne -> Syn.Fst (read_back_ne size ne)
   | D.Snd ne -> Syn.Snd (read_back_ne size ne)
-  | D.Open (ne, i) -> Syn.Open (read_back_ne size ne, Syn.BVar (size - (i + 1)))
+  | D.BApp (ne, i) -> Syn.BApp (read_back_ne size ne, Syn.BVar (size - (i + 1)))
   | D.J (mot, refl, tp, left, right, eq) ->
     let mot_var1 = D.mk_var tp size in
     let mot_var2 = D.mk_var tp (size + 1) in
@@ -262,9 +262,9 @@ let rec check_nf size nf1 nf2 =
   | D.Normal {tp = D.Id _; term = D.Neutral {term = term1; _}},
     D.Normal {tp = D.Id _; term = D.Neutral {term = term2; _}} ->
     check_ne size term1 term2
-  (* Box *)
-  | D.Normal {tp = D.Box dest1; term = p1},
-    D.Normal {tp = D.Box dest2; term = p2} ->
+  (* Bridge *)
+  | D.Normal {tp = D.Bridge dest1; term = p1},
+    D.Normal {tp = D.Bridge dest2; term = p2} ->
     let arg = D.mk_bvar size in
     let nf1 = D.Normal {tp = do_bclos size dest1 arg; term = do_open size p1 arg} in
     let nf2 = D.Normal {tp = do_bclos size dest2 arg; term = do_open size p2 arg} in
@@ -297,7 +297,7 @@ and check_ne size ne1 ne2 =
     && check_ne size n1 n2
   | D.Fst ne1, D.Fst ne2  -> check_ne size ne1 ne2
   | D.Snd ne1, D.Snd ne2 -> check_ne size ne1 ne2
-  | D.Open (ne1, i1), D.Open (ne2, i2) -> check_ne size ne1 ne2 && i1 = i2
+  | D.BApp (ne1, i1), D.BApp (ne2, i2) -> check_ne size ne1 ne2 && i1 = i2
   | D.J (mot1, refl1, tp1, left1, right1, eq1),
     D.J (mot2, refl2, tp2, left2, right2, eq2) ->
     check_tp ~subtype:false size tp1 tp2 &&
@@ -332,7 +332,7 @@ and check_tp ~subtype size d1 d2 =
     let var = D.mk_var fst size in
     check_tp ~subtype size fst fst' &&
     check_tp ~subtype (size + 1) (do_clos size snd var) (do_clos size snd' var)
-  | D.Box dest, D.Box dest' ->
+  | D.Bridge dest, D.Bridge dest' ->
     let var = D.mk_bvar size in
     check_tp ~subtype (size + 1) (do_bclos size dest var) (do_bclos size dest' var)
   | D.Uni k, D.Uni j -> if subtype then k <= j else k = j

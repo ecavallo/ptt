@@ -12,7 +12,7 @@ type t =
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
   | Sg of t * (* BINDS *) t | Pair of t * t | Fst of t | Snd of t
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
-  | Box of (* BINDS BDIM *) t | Open of t * bdim | Shut of (* BINDS BDIM *) t
+  | Bridge of (* BINDS BDIM *) t | BApp of t * bdim | BLam of (* BINDS BDIM *) t
   | Uni of uni_level
 
 val equal_uni_level : uni_level -> uni_level -> bool

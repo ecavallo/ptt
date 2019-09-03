@@ -126,7 +126,7 @@ let rec check ~env ~size ~term ~tp =
         check ~env ~size ~term:right ~tp:(Nbe.do_clos size right_tp left_sem)
       | t -> tp_error (Misc ("Expecting Sg but found\n" ^ D.show t))
     end
-  | Box term ->
+  | Bridge term ->
     begin
       match tp with
       | Uni _ ->
@@ -134,14 +134,14 @@ let rec check ~env ~size ~term ~tp =
         check ~env:(add_bdim ~bdim:var env) ~size ~term ~tp
       | t -> tp_error (Expecting_universe t)
     end
-  | Shut body ->
+  | BLam body ->
     begin
       match tp with
-      | Box clos ->
+      | Bridge clos ->
         let var = D.mk_bvar size in
         let dest_tp = Nbe.do_bclos size clos var in
         check ~env:(add_bdim ~bdim:var env) ~size:(size + 1) ~term:body ~tp:dest_tp
-      | t -> tp_error (Misc ("Expecting Box but found\n" ^ D.show t))
+      | t -> tp_error (Misc ("Expecting Bridge but found\n" ^ D.show t))
     end
   | Uni i ->
     begin
@@ -202,7 +202,7 @@ and synth ~env ~size ~term =
       ~term:suc
       ~tp:suc_tp;
     Nbe.eval (size + 1) mot (D.Term (Nbe.eval size n sem_env) :: sem_env)
-  | Open (term,r) ->
+  | BApp (term,r) ->
     (* TODO this is totally broken *)
     let sem_env = env_to_sem_env env in
     let r' = Nbe.eval_bdim r sem_env in
@@ -212,8 +212,8 @@ and synth ~env ~size ~term =
     in
     begin
       match synth ~env ~size:new_size ~term with
-      | Box clos -> Nbe.do_bclos size clos r'
-      | t -> tp_error (Misc ("Expecting Box but found\n" ^ D.show t ^ "\n" ^ Syn.show term ^ "\n" ^ show_env env))
+      | Bridge clos -> Nbe.do_bclos size clos r'
+      | t -> tp_error (Misc ("Expecting Bridge but found\n" ^ D.show t ^ "\n" ^ Syn.show term ^ "\n" ^ show_env env))
     end
   | J (mot, refl, eq) ->
     let eq_tp = synth ~env ~size ~term:eq in
@@ -241,7 +241,7 @@ and check_tp ~env ~size ~term =
   match term with
   | Syn.Nat -> ()
   | Uni _ -> ()
-  | Box term ->
+  | Bridge term ->
     let var = D.mk_bvar size in
     check_tp ~env:(add_bdim ~bdim:var env) ~size:(size + 1) ~term
   | Pi (l, r) | Sg (l, r) ->

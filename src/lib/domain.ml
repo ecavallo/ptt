@@ -26,8 +26,8 @@ and t =
   | Pi of t * clos
   | Sg of t * clos
   | Pair of t * t
-  | Box of clos
-  | Shut of clos
+  | Bridge of clos
+  | BLam of clos
   | Refl of t
   | Id of t * t * t
   | Uni of Syntax.uni_level
@@ -37,7 +37,7 @@ and ne =
   | Ap of ne * nf
   | Fst of ne
   | Snd of ne
-  | Open of ne * int
+  | BApp of ne * int
   | NRec of clos * t * clos2 * ne
   | J of clos3 * clos * t * t * t * ne
 [@@deriving show, eq]
