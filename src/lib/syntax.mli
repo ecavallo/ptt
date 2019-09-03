@@ -19,6 +19,8 @@ type t =
 val equal_uni_level : uni_level -> uni_level -> bool
 val equal : t -> t -> bool
 
+val extract_bvar : int -> t -> t option
+
 val pp_uni_level : Format.formatter -> uni_level -> unit
 val show_uni_level : uni_level -> string
 
@@ -26,3 +28,4 @@ val pp_bdim : Format.formatter -> bdim -> unit
 
 val pp : Format.formatter -> t -> unit
 val show : t -> string
+

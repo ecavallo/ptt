@@ -94,13 +94,20 @@ and do_j size mot refl eq =
     end
   | _ -> raise (Nbe_failed "Not a refl or neutral in do_j")
 
-and do_extent size r dom mot ctx varcase =
+and do_extent size r dom mot ctx varcase env =
   match r with
   | D.BVar i ->
-    (* Incomplete *)
-    D.Neutral
-      { tp = do_bclosclos size mot r ctx;
-        term = D.Extent (i, dom, mot, ctx, varcase) }
+    let r_dom = do_bclos size dom r in
+    let ctx' = read_back_nf size (D.Normal {tp = r_dom; term = ctx}) in
+    begin
+      match Syn.extract_bvar (size - (i + 1)) ctx' with
+      | Some abs_ctx ->
+        do_closbclos size varcase (D.BLam (Clos {term = abs_ctx; env})) r
+      | None ->
+        D.Neutral
+          {tp = do_bclosclos size mot r ctx;
+           term = D.Extent (i, dom, mot, ctx, varcase)}
+    end
 
 and do_ap size f a =
   match f with
@@ -159,6 +166,7 @@ and eval size t (env : D.env) =
       (D.Clos2 {term = mot; env})
       (eval size ctx env)
       (D.Clos2 {term = varcase; env})
+      env
 
 and read_back_nf size nf =
   match nf with
@@ -183,7 +191,7 @@ and read_back_nf size nf =
   (* Bridge *)
   | D.Normal {tp = D.Bridge dest; term} ->
     let arg = D.mk_bvar size in
-    let nf = D.Normal {tp = do_bclos size dest arg; term = do_bapp size term arg} in
+    let nf = D.Normal {tp = do_bclos (size + 1) dest arg; term = do_bapp (size + 1) term arg} in
     Syn.BLam (read_back_nf (size + 1) nf)
   (* Id *)
   | D.Normal {tp = D.Id (tp, _, _); term = D.Refl term} ->

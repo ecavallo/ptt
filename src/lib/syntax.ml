@@ -19,10 +19,49 @@ type t =
   | Uni of uni_level
 [@@deriving eq]
 
-(* exception Indirect_use *)
+exception Indirect_use
 
-(* let extract_bvar i = function
- *   | *) 
+let extract_bvar i t =
+  let bgo depth = function
+    | BVar j -> if j = i + depth then BVar depth else BVar (j + 1)
+  in
+  let rec go depth = function
+    | Var j -> if j >= depth && j < i + depth then raise Indirect_use else Var (j + 1)
+    | Let (def, body) -> Let (go depth def, go (depth + 1) body)
+    | Check (term, tp) -> Check (go depth term, go depth tp)
+    | Nat -> Nat
+    | Zero -> Zero
+    | Suc t -> Suc (go depth t)
+    | NRec (mot, zero, suc, n) ->
+      NRec (go (depth + 1) mot, zero, go (depth + 2) suc, go depth n)
+    | Pi (l, r) -> Pi (go depth l, go (depth + 1) r)
+    | Lam body -> Lam (go (depth + 1) body)
+    | Ap (l, r) -> Ap (go depth l, go depth r)
+    | Sg (l, r) -> Sg (go depth l, go (depth + 1) r)
+    | Fst body -> Fst (go depth body)
+    | Snd body -> Snd (go depth body)
+    | Pair (l, r) -> Pair (go depth l, go depth r)
+    | Id (tp, l, r) ->
+      Id (go (depth + 1) tp, go depth l, go depth r)
+    | Refl t -> Refl (go depth t)
+    | J (mot, refl, eq) ->
+      J (go (depth + 3) mot, go (depth + 1) refl, go depth eq)
+    | Bridge t -> Bridge (go (depth + 1) t)
+    | BLam t -> BLam (go (depth + 1) t)
+    | BApp (t, r) -> BApp (go depth t, bgo depth r)
+    | Extent (r, dom, mot, ctx, varcase) ->
+      Extent
+        (bgo depth r,
+         go (depth + 1) dom,
+         go (depth + 2) mot,
+         go depth ctx,
+         go (depth + 2) varcase)
+    | Uni j -> Uni j
+  in
+  try
+    Some (go 0 t)
+  with
+    Indirect_use -> None
 
 let rec condense = function
   | Zero -> Some 0
@@ -54,7 +93,7 @@ let rec pp fmt =
   | Suc t ->
     begin
       match condense t with
-      | Some n -> 
+      | Some n ->
         fprintf fmt "%d" (n + 1)
       | None ->
         fprintf fmt "suc(@[<hov>%a@])" pp t
