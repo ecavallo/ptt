@@ -15,6 +15,6 @@ val check_ne : int -> Domain.ne -> Domain.ne -> bool
 val check_tp : subtype:bool -> int -> Domain.t -> Domain.t -> bool
 
 (* Functions to manipulate elements of the semantic domain *)
-val do_bclos: int -> Domain.clos -> Domain.bdim -> Domain.t
+val do_bclos : int -> Domain.clos -> Domain.bdim -> Domain.t
 val do_clos : int -> Domain.clos -> Domain.t -> Domain.t
-
+val do_bapp : int -> Domain.t -> Domain.bdim -> Domain.t

@@ -250,11 +250,11 @@ and read_back_ne size ne =
     let ctx' = read_back_nf size (D.Normal {tp = i_dom; term = ctx}) in
     let varcase_bridge = D.mk_var (D.Bridge dom) size in
     let varcase_dim = D.mk_bvar (size + 1) in
-    let varcase_inst = do_bapp (size+2) varcase_bridge varcase_dim in
-    let bridge_mot = do_bclosclos (size + 2) mot varcase_dim varcase_inst in
+    let varcase_inst = do_bapp (size + 2) varcase_bridge varcase_dim in
+    let varcase_mot = do_bclosclos (size + 2) mot varcase_dim varcase_inst in
     let applied_varcase = do_closbclos (size + 2) varcase varcase_bridge varcase_dim in
-    let varcase' = read_back_nf (size + 2) (D.Normal {tp = bridge_mot; term = applied_varcase}) in
-    Syn.Extent (Syn.BVar i, dom', mot', ctx', varcase')
+    let varcase' = read_back_nf (size + 2) (D.Normal {tp = varcase_mot; term = applied_varcase}) in
+    Syn.Extent (Syn.BVar (size - (i + 1)), dom', mot', ctx', varcase')
   | D.J (mot, refl, tp, left, right, eq) ->
     let mot_var1 = D.mk_var tp size in
     let mot_var2 = D.mk_var tp (size + 1) in
@@ -358,13 +358,13 @@ and check_ne size ne1 ne2 =
     check_nf size (D.Normal {tp = i_dom; term = ctx1}) (D.Normal {tp = i_dom; term = ctx2}) &&
     let varcase_bridge = D.mk_var (D.Bridge dom1) size in
     let varcase_dim = D.mk_bvar (size + 1) in
-    let varcase_inst = do_bapp (size+2) varcase_bridge varcase_dim in
-    let bridge_mot = do_bclosclos (size + 2) mot1 varcase_dim varcase_inst in
+    let varcase_inst = do_bapp (size + 2) varcase_bridge varcase_dim in
+    let varcase_mot = do_bclosclos (size + 2) mot1 varcase_dim varcase_inst in
     let applied_varcase1 = do_closbclos (size + 2) varcase1 varcase_bridge varcase_dim in
     let applied_varcase2 = do_closbclos (size + 2) varcase2 varcase_bridge varcase_dim in
     check_nf (size + 2)
-      (D.Normal {tp = bridge_mot; term = applied_varcase1})
-      (D.Normal {tp = bridge_mot; term = applied_varcase2})
+      (D.Normal {tp = varcase_mot; term = applied_varcase1})
+      (D.Normal {tp = varcase_mot; term = applied_varcase2})
   | D.J (mot1, refl1, tp1, left1, right1, eq1),
     D.J (mot2, refl2, tp2, left2, right2, eq2) ->
     check_tp ~subtype:false size tp1 tp2 &&

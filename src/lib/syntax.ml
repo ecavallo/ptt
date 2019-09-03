@@ -77,11 +77,11 @@ let rec pp fmt =
   | Pair (l, r) ->
     fprintf fmt "pair(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp l pp r
   | Id (tp, l, r) ->
-    fprintf fmt "Id(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@,@ @[<hov>%a@]@])" pp tp pp l pp r;
+    fprintf fmt "Id(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp tp pp l pp r;
   | Refl t ->
     fprintf fmt "refl(@[<hov>%a@])" pp t
   | J (mot, refl, eq) ->
-    fprintf fmt "J(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@,@ @[<hov>%a@]@])" pp mot pp refl pp eq;
+    fprintf fmt "J(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp mot pp refl pp eq;
   | Bridge t ->
     fprintf fmt "Bridge(@[<hov>%a@])" pp t;
   | BLam t ->
@@ -89,7 +89,7 @@ let rec pp fmt =
   | BApp (t, r) ->
     fprintf fmt "bapp(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp t pp_bdim r;
   | Extent (r, dom, mot, ctx, varcase) ->
-   fprintf fmt "J(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@,@ @[<hov>%a@]@,@ @[<hov>%a@]@,@ @[<hov>%a@]@])"
+   fprintf fmt "extent(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
      pp_bdim r pp dom pp mot pp ctx pp varcase;
   | Uni i -> fprintf fmt "U<%d>" i
 

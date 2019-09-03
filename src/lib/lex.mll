@@ -33,9 +33,10 @@ let keywords =
     ("match", MATCH);
     ("Id", ID);
     ("refl", REFL);
-    (* ("extent", EXTENT); *)
+    ("extent", EXTENT);
     ("def", DEF);
     ("at", AT);
+    ("of", OF);
     ("normalize", NORMALIZE);
     ("quit", QUIT);
   ]
@@ -71,6 +72,8 @@ rule token = parse
     { EQUALS }
   | "->"
     { RIGHT_ARROW }
+  | "."
+    { DOT }
   | "<"
     { LANGLE }
   | ">"

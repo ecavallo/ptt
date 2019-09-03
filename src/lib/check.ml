@@ -191,7 +191,7 @@ and synth ~env ~size ~term =
     let var = D.mk_var Nat size in
     check_tp ~env:(add_term ~term:var ~tp:Nat env) ~size:(size + 1) ~term:mot;
     let sem_env = env_to_sem_env env in
-    let zero_tp = Nbe.eval (size + 1) mot (D.Term Zero :: sem_env) in
+    let zero_tp = Nbe.eval size mot (D.Term Zero :: sem_env) in
     let ih_tp = Nbe.eval (size + 1) mot (D.Term var :: sem_env) in
     let ih_var = D.mk_var ih_tp (size + 1) in
     let suc_tp = Nbe.eval (size + 1) mot (D.Term (Suc var) :: sem_env) in
@@ -203,16 +203,12 @@ and synth ~env ~size ~term =
       ~tp:suc_tp;
     Nbe.eval (size + 1) mot (D.Term (Nbe.eval size n sem_env) :: sem_env)
   | BApp (term,r) ->
-    (* TODO this is totally broken *)
-    let sem_env = env_to_sem_env env in
-    let r' = Nbe.eval_bdim r sem_env in
-    let new_size =
-      match r' with
-      | BVar i -> i
-    in
     begin
-      match synth ~env ~size:new_size ~term with
-      | Bridge clos -> Nbe.do_bclos size clos r'
+      match synth ~env ~size ~term with
+      | Bridge clos ->
+        let sem_env = env_to_sem_env env in
+        let sem_r = Nbe.eval_bdim r sem_env in
+         Nbe.do_bclos size clos sem_r
       | t -> tp_error (Misc ("Expecting Bridge but found\n" ^ D.show t ^ "\n" ^ Syn.show term ^ "\n" ^ show_env env))
     end
   | J (mot, refl, eq) ->
@@ -232,9 +228,29 @@ and synth ~env ~size ~term =
         let refl_var = D.mk_var tp' size in
         let refl_tp = Nbe.eval (size + 3) mot (D.Term (D.Refl refl_var) :: D.Term refl_var :: D.Term refl_var :: sem_env) in
         check ~env:(add_term ~term:refl_var ~tp:tp' env) ~size:(size + 1) ~term:refl ~tp:refl_tp;
-        Nbe.eval (size + 3) mot (D.Term (Nbe.eval size eq sem_env) :: D.Term right :: D.Term left :: sem_env)
+        Nbe.eval size mot (D.Term (Nbe.eval size eq sem_env) :: D.Term right :: D.Term left :: sem_env)
       | t -> tp_error (Misc ("Expecting Id but found\n" ^ D.show t))
     end
+  | Extent (r, dom, mot, ctx, varcase) ->
+    let dim_var = D.mk_bvar size in
+    let dim_env = add_bdim ~bdim:dim_var env in
+    check_tp ~env:dim_env ~size:(size + 1) ~term:dom;
+    let sem_env = env_to_sem_env env in
+    let sem_dom = Nbe.eval (size + 1) dom (D.BDim dim_var :: sem_env) in
+    let dom_var = D.mk_var sem_dom (size + 1) in
+    check_tp ~env:(add_term ~term:dom_var ~tp:sem_dom dim_env) ~size:(size + 2) ~term:mot;
+    let sem_r = Nbe.eval_bdim r sem_env in
+    let r_dom = Nbe.eval size dom (D.BDim sem_r :: sem_env) in
+    check ~env ~size ~term:ctx ~tp:r_dom;
+    let dom_bridge = D.Bridge (D.Clos {term = dom; env = sem_env}) in
+    let varcase_bridge = D.mk_var dom_bridge size in
+    let varcase_dim = D.mk_bvar (size + 1) in
+    let varcase_inst = Nbe.do_bapp (size + 2) varcase_bridge varcase_dim in
+    let varcase_mot = Nbe.eval (size + 2) mot (D.Term varcase_inst :: D.BDim varcase_dim :: sem_env) in
+    let varcase_env =
+      add_term ~term:varcase_bridge ~tp:dom_bridge env |> add_bdim ~bdim:varcase_dim in
+    check ~env:varcase_env ~size:(size + 2) ~term:varcase ~tp:varcase_mot;
+    Nbe.eval size mot (D.Term (Nbe.eval size ctx sem_env) :: D.BDim sem_r :: sem_env)
   | _ -> tp_error (Cannot_synth_term term)
 
 and check_tp ~env ~size ~term =
