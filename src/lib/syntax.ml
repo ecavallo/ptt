@@ -5,7 +5,7 @@ type bdim =
   (* | BZero
    * | BOne *)
   | BVar of int
-[@@deriving show, eq]
+[@@deriving eq]
 
 type t =
   | Var of int (* DeBruijn indices for variables & ticks *)
@@ -90,9 +90,3 @@ let show t =
   pp fmt t;
   Format.pp_print_flush fmt ();
   Buffer.contents b
-
-type env_entry =
-  | BDim
-  | Term of t
-and env = env_entry list
-[@@deriving show { with_path = false }, eq]

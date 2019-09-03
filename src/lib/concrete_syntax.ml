@@ -4,6 +4,16 @@ type uni_level = int
 type bdim =
   | BVar of ident
 
+(* module Ints =
+ *   struct
+ *     type t = int
+ *     let compare = Stdlib.compare
+ *    end
+ * 
+ * module DM = Set.Make(Ints)
+ * 
+ * type dim_set = DM.t *)
+          
 type binder = Binder of {name : ident; body : t}
 and bindern = BinderN of {names : ident list; body : t}
 and binder2 = Binder2 of {name1 : ident; name2 : ident; body : t}

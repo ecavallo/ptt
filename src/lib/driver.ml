@@ -124,9 +124,9 @@ let process_decl (Env {size; check_env; bindings})  = function
     let tp = bind bindings tp in
     Check.check_tp ~size ~env:check_env ~term:tp;
     let sem_env = Check.env_to_sem_env check_env in
-    let sem_tp = Nbe.eval tp sem_env in
+    let sem_tp = Nbe.eval size tp sem_env in
     Check.check ~size ~env:check_env ~term:def ~tp:sem_tp;
-    let sem_def = Nbe.eval def sem_env in
+    let sem_def = Nbe.eval size def sem_env in
     let new_entry = Check.TopLevel {term = sem_def; tp = sem_tp} in
     NoOutput (Env {size = size + 1; check_env = new_entry :: check_env; bindings = Term name :: bindings })
   | CS.NormalizeDef name ->
@@ -142,9 +142,9 @@ let process_decl (Env {size; check_env; bindings})  = function
     let tp = bind bindings tp in
     Check.check_tp ~size ~env:check_env ~term:tp;
     let sem_env = Check.env_to_sem_env check_env in
-    let sem_tp = Nbe.eval tp sem_env in
+    let sem_tp = Nbe.eval size tp sem_env in
     Check.check ~size ~env:check_env ~term ~tp:sem_tp;
-    let sem_term = Nbe.eval term sem_env in
+    let sem_term = Nbe.eval size term sem_env in
     let norm_term = Nbe.read_back_nf 0 (D.Normal {term = sem_term; tp = sem_tp}) in
     NF_term (term, norm_term)
   | CS.Quit -> Quit

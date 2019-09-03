@@ -15,11 +15,6 @@ type t =
   | Box of (* BINDS BDIM *) t | Open of t * bdim | Shut of (* BINDS BDIM *) t
   | Uni of uni_level
 
-(* type env_entry =
- *   | BDim
- *   | Term of t
- * type env = env_entry list *)
-
 val equal_uni_level : uni_level -> uni_level -> bool
 val equal : t -> t -> bool
 
