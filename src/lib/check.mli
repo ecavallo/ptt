@@ -1,7 +1,6 @@
 type env_entry =
   | BDim of Domain.bdim
   | Term of {term : Domain.t; tp : Domain.t}
-  | TopLevel of {term : Domain.t; tp : Domain.t}
 type env = env_entry list
 
 val env_to_sem_env : env -> Domain.env
@@ -17,6 +16,6 @@ val pp_error : Format.formatter -> error -> unit
 
 exception Type_error of error
 
-val check : env:env -> size:int -> term:Syntax.t -> tp:Domain.t -> unit
-val synth : env:env -> size:int -> term:Syntax.t -> Domain.t
-val check_tp : env:env -> size:int -> term:Syntax.t -> unit
+val check : env:env -> term:Syntax.t -> tp:Domain.t -> unit
+val synth : env:env -> term:Syntax.t -> Domain.t
+val check_tp : env:env -> term:Syntax.t -> unit

@@ -38,8 +38,8 @@ and ne =
 and nf =
   | Normal of {tp : t; term : t}
 
-val mk_bvar : int -> bdim
-val mk_var : t -> int -> t
+val mk_bvar : env -> bdim
+val mk_var : t -> env -> t
 
 val equal : t -> t -> bool
 val equal_ne : ne -> ne -> bool
@@ -49,6 +49,7 @@ val pp : Format.formatter -> t -> unit
 val pp_bdim : Format.formatter -> bdim -> unit
 val pp_nf : Format.formatter -> nf -> unit
 val pp_ne : Format.formatter -> ne -> unit
+val pp_env : Format.formatter -> env -> unit
 
 val show : t -> string
 val show_nf : nf -> string

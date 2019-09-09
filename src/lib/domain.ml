@@ -46,6 +46,6 @@ and nf =
   | Normal of {tp : t; term : t}
 [@@deriving show, eq]
 
-let mk_bvar lev = BVar lev
+let mk_bvar env = BVar (List.length env)
 
-let mk_var tp lev = Neutral {tp; term = Var lev}
+let mk_var tp env = Neutral {tp; term = Var (List.length env)}
