@@ -145,10 +145,8 @@ let process_decl (Env {check_env; bindings})  = function
     let err = Check.Type_error (Check.Misc ("Unbound variable: " ^ name)) in
     begin
       let i = find_idx name bindings in
-      (* Format.printf "hi: %d\n" i; *)
       match List.nth check_env i with
       | Check.Term {term; tp} ->
-        (* Format.printf "OFF WE GO:\n%a\n" Domain.pp term; *)
         NF_def (name, Nbe.read_back_nf [] (D.Normal {term; tp}))
       | _ -> raise err
       | exception Failure _ -> raise err

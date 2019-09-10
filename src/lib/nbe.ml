@@ -10,7 +10,6 @@ exception Nbe_failed of string
 let level_to_index size i = List.length size - (i + 1)
 
 let eval_bdim r (env : D.env) =
-  (* Format.printf "EVAL_BDIM:\n%a\n" Syn.pp_bdim r; *)
   match r with
   | Syn.BVar i ->
     begin
@@ -68,7 +67,6 @@ and do_snd p =
   | _ -> raise (Nbe_failed "Couldn't snd argument in do_snd")
 
 and do_bapp t r =
-  (* Format.printf "DO_BAPP:\n%a\n%a\n" D.pp_bdim r D.pp t; *)
   match t with
   | D.BLam bclo -> do_bclos bclo r
   | D.Neutral {tp; term} ->
@@ -120,11 +118,8 @@ and do_ap f a =
   | _ -> raise (Nbe_failed "Not a function in do_ap")
 
 and eval t (env : D.env) =
-  (* Format.printf "EVAL %d:\n%a\n" size Syn.pp t; *)
-  (* Format.printf "EVAL:\n%a\n%a\n" Syn.pp t D.pp_env env; *)
   match t with
   | Syn.Var i ->
-     (* Format.printf "LOOKUP: %d\n" i; *)
      begin
        match List.nth env i with
        | D.Term t -> t
@@ -166,10 +161,8 @@ and eval t (env : D.env) =
        (D.Clos2 {term = varcase; env})
 
 let rec read_back_nf env nf =
-  (* Format.printf "READ_BACK_NF:\n%a\n" Domain.pp_nf nf; *)
   match nf with
   (* Functions *)
-  (* | D.Normal {tp = D.Extent (i, dom, mot, ctx, varcase); term = t} -> *)
   | D.Normal {tp = D.Pi (src, dest); term = f} ->
      let arg = D.mk_var src env in
      let nf = D.Normal {tp = do_clos dest arg; term = do_ap f arg} in
@@ -224,7 +217,6 @@ and read_back_tp env d =
   | _ -> raise (Nbe_failed "Not a type in read_back_tp")
 
 and read_back_ne env ne =
-  (* Format.printf "READ_BACK_NE:\n%a\n" Domain.pp_ne ne; *)
   match ne with
   | D.Var x -> Syn.Var (level_to_index env x)
   | D.Ap (ne, arg) ->
