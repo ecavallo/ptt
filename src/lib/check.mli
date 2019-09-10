@@ -10,6 +10,7 @@ type error =
   | Type_mismatch of Domain.t * Domain.t
   | Expecting_universe of Domain.t
   | Expecting_term of Domain.bdim
+  | Not_fresh of Syntax.bdim * Syntax.t
   | Misc of string
 
 val pp_error : Format.formatter -> error -> unit

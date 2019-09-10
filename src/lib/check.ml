@@ -16,6 +16,7 @@ type error =
   | Type_mismatch of D.t * D.t
   | Expecting_universe of D.t
   | Expecting_term of D.bdim
+  | Not_fresh of Syn.bdim * Syn.t
   | Misc of string
 
 let pp_error fmt = function
@@ -36,6 +37,12 @@ let pp_error fmt = function
   | Expecting_term r ->
     Format.fprintf fmt "@[<v>Expected term but found dimension@ @[<hov 2>";
     D.pp_bdim fmt r;
+    Format.fprintf fmt "@]@]@,"
+  | Not_fresh (r, t) ->
+    Format.fprintf fmt "@[<v>Dimension term@,@[<hov 2>  ";
+    Syn.pp_bdim fmt r;
+    Format.fprintf fmt "@]@ not fresh in@,@[<hov 2>  ";
+    Syn.pp fmt t;
     Format.fprintf fmt "@]@]@,"
   | Misc s -> Format.pp_print_string fmt s
 
@@ -201,6 +208,7 @@ and synth ~env ~term =
       ~tp:suc_tp;
     Nbe.eval mot (D.Term (Nbe.eval n sem_env) :: sem_env)
   | BApp (term,r) ->
+    if not (Syn.dim_is_apart_from ~depth:0 r term) then tp_error (Not_fresh (r,term)) else
     begin
       match synth ~env ~term with
       | Bridge clos ->
@@ -234,6 +242,9 @@ and synth ~env ~term =
       | t -> tp_error (Misc ("Expecting Id but found\n" ^ D.show t))
     end
   | Extent (r, dom, mot, ctx, varcase) ->
+    if not (Syn.dim_is_apart_from ~depth:1 r dom) then tp_error (Not_fresh (Syn.lift_bdim 1 r, dom)) else
+    if not (Syn.dim_is_apart_from ~depth:2 r mot) then tp_error (Not_fresh (Syn.lift_bdim 2 r, mot)) else
+    if not (Syn.dim_is_apart_from ~depth:2 r varcase) then tp_error (Not_fresh (Syn.lift_bdim 2 r,varcase)) else
     let sem_env = env_to_sem_env env in
     let dim_var = D.mk_bvar sem_env in
     let dim_env = add_bdim ~bdim:dim_var env in

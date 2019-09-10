@@ -1,5 +1,10 @@
-let boring : (A : U<0>) (p : [x y] A) -> ([x] A) =
-  fun A p -> [x. p @ x x]
+-- Should not check
+-- let diagonal : (A : U<0>) (p : [x y] A) -> ([x] A) =
+--   fun A p -> [x. p @ x x]
+
+-- Should not check
+-- let diagonal_extent : (A : U<0>) -> [x] (A -> A) =
+--   fun A -> [x. fun a -> extent x of a in [_. A] at [_. _ -> A] with | q -> _. q @ x]
 
 let fun_id : (A : U<0>) (B : A -> U<0>) -> ((x : A) -> B x) -> ((x : A) -> B x) =
   fun A B f -> f
@@ -76,7 +81,6 @@ let extent_test6 : (A : U<0>) (B : U<0>) (f : ([x] A) -> [x] B) (q : [x] A)
   =
   fun A B f q -> [x. refl ((f q) @ x)]
 
-normalize def boring
 normalize def fun_id
 normalize def extent_test
 normalize def extent_test2

@@ -19,6 +19,45 @@ type t =
   | Uni of uni_level
 [@@deriving eq]
 
+let lift_bdim depth = function
+  | BVar i -> BVar (i + depth)
+
+let var_is_apart_from ~depth i =
+  let bgo depth = function
+    | BVar j -> not (j = i + depth)
+  in
+  let rec go depth = function
+    | Var j -> j < depth || j > i + depth
+    | Let (def, body) -> go depth def && go (depth + 1) body
+    | Check (term, tp) -> go depth term && go depth tp
+    | Nat -> true
+    | Zero -> true
+    | Suc t -> go depth t
+    | NRec (mot, zero, suc, n) ->
+      go (depth + 1) mot && go depth zero && go (depth + 2) suc && go depth n
+    | Pi (l, r) -> go depth l && go (depth + 1) r
+    | Lam body -> go (depth + 1) body
+    | Ap (l, r) -> go depth l && go depth r
+    | Sg (l, r) -> go depth l && go (depth + 1) r
+    | Fst body -> go depth body
+    | Snd body -> go depth body
+    | Pair (l, r) -> go depth l && go depth r
+    | Id (tp, l, r) -> go depth tp && go depth l && go depth r
+    | Refl t -> go depth t
+    | J (mot, refl, eq) -> go (depth + 3) mot && go (depth + 1) refl && go depth eq
+    | Bridge t -> go (depth + 1) t
+    | BLam t -> go (depth + 1) t
+    | BApp (t, r) -> go depth t && bgo depth r
+    | Extent (r, dom, mot, ctx, varcase) ->
+      bgo depth r && go (depth + 1) dom && go (depth + 2) mot &&
+      go depth ctx && go (depth + 2) varcase
+    | Uni _ -> true
+  in
+  go depth
+
+let dim_is_apart_from ~depth = function
+  | BVar i -> var_is_apart_from ~depth i
+         
 exception Indirect_use
 
 let extract_bvar i t =
@@ -47,8 +86,7 @@ let extract_bvar i t =
     | Fst body -> Fst (go depth body)
     | Snd body -> Snd (go depth body)
     | Pair (l, r) -> Pair (go depth l, go depth r)
-    | Id (tp, l, r) ->
-      Id (go depth tp, go depth l, go depth r)
+    | Id (tp, l, r) -> Id (go depth tp, go depth l, go depth r)
     | Refl t -> Refl (go depth t)
     | J (mot, refl, eq) ->
       J (go (depth + 3) mot, go (depth + 1) refl, go depth eq)
