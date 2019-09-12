@@ -123,6 +123,9 @@ let rec bind env = function
        bind (Term mot_dom :: BDim mot_dim :: env) mot_body,
        bind env ctx,
        bind (BDim var_dim :: Term var_bridge :: env) var_body)
+  | CS.Gel (r, t) -> S.Gel (bbind env r, bind env t)
+  | CS.Engel (r, t) -> S.Engel (bbind env r, bind env t)
+  | CS.Ungel (Binder {name; body}) -> S.Ungel (bind (BDim name :: env) body)
   | CS.Uni i -> S.Uni i
 
 and bind_bspine env r = fun p -> S.BApp (p, bbind env r)

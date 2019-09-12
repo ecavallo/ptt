@@ -18,3 +18,5 @@ val check_tp : subtype:bool -> Domain.env -> Domain.t -> Domain.t -> bool
 val do_bclos : Domain.clos -> Domain.bdim -> Domain.t
 val do_clos : Domain.clos -> Domain.t -> Domain.t
 val do_bapp : Domain.t -> Domain.bdim -> Domain.t
+
+val level_to_index : Domain.env -> int -> int

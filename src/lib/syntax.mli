@@ -3,10 +3,10 @@ type uni_level = int
 type bdim =
   (* | BZero
    * | BOne *)
-  | BVar of int
+  | BVar of int (* DeBruijn indices for variables *)
 
 type t =
-  | Var of int (* DeBruijn indices for variables & ticks *)
+  | Var of int (* DeBruijn indices for variables *)
   | Let of t * (* BINDS *) t | Check of t * t
   | Nat | Zero | Suc of t | NRec of (* BINDS *) t * t * (* BINDS 2 *) t * t
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
@@ -14,6 +14,7 @@ type t =
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
   | Bridge of (* BBINDS *) t | BApp of t * bdim | BLam of (* BBINDS *) t
   | Extent of bdim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS & BBINDS *) t
+  | Gel of bdim * t | Engel of bdim * t | Ungel of (* BBINDS *) t
   | Uni of uni_level
 
 val equal_uni_level : uni_level -> uni_level -> bool

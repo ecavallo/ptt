@@ -70,6 +70,10 @@ let assert_equal sem_env t1 t2 tp =
   then ()
   else tp_error (Type_mismatch (t1, t2))
 
+let assert_fresh ~depth r term =
+  if Syn.dim_is_apart_from ~depth r term then ()
+  else tp_error (Not_fresh (Syn.lift_bdim depth r, term))
+
 let rec check ~env ~term ~tp =
   match term with
   | Syn.Let (def, body) ->
@@ -149,6 +153,27 @@ let rec check ~env ~term ~tp =
         check ~env:(add_bdim ~bdim:var env) ~term:body ~tp:dest_tp
       | t -> tp_error (Misc ("Expecting Bridge but found\n" ^ D.show t))
     end
+  | Gel (r, term) ->
+    assert_fresh ~depth:0 r term;
+    begin
+      match tp with
+      | Uni _ ->
+        check ~env ~term ~tp;
+      | t -> tp_error (Expecting_universe t)
+    end
+  | Engel (r, term) ->
+    assert_fresh ~depth:0 r term;
+    begin
+      match r with
+      | BVar i ->
+        begin
+          match tp with
+          | Gel (j, tp') ->
+            if i = Nbe.level_to_index (env_to_sem_env env) j then check ~env ~term ~tp:tp'
+            else tp_error (Misc ("Gel in unexpected dimension\n" ^ D.show tp))
+          | t -> tp_error (Misc ("Expecting Gel but found\n" ^ D.show t))
+        end
+    end
   | Uni i ->
     begin
       match tp with
@@ -208,7 +233,7 @@ and synth ~env ~term =
       ~tp:suc_tp;
     Nbe.eval mot (D.Term (Nbe.eval n sem_env) :: sem_env)
   | BApp (term,r) ->
-    if not (Syn.dim_is_apart_from ~depth:0 r term) then tp_error (Not_fresh (r,term)) else
+    assert_fresh ~depth:0 r term;
     begin
       match synth ~env ~term with
       | Bridge clos ->
@@ -242,9 +267,9 @@ and synth ~env ~term =
       | t -> tp_error (Misc ("Expecting Id but found\n" ^ D.show t))
     end
   | Extent (r, dom, mot, ctx, varcase) ->
-    if not (Syn.dim_is_apart_from ~depth:1 r dom) then tp_error (Not_fresh (Syn.lift_bdim 1 r, dom)) else
-    if not (Syn.dim_is_apart_from ~depth:2 r mot) then tp_error (Not_fresh (Syn.lift_bdim 2 r, mot)) else
-    if not (Syn.dim_is_apart_from ~depth:2 r varcase) then tp_error (Not_fresh (Syn.lift_bdim 2 r,varcase)) else
+    assert_fresh ~depth:1 r dom;
+    assert_fresh ~depth:2 r mot;
+    assert_fresh ~depth:2 r varcase;
     let sem_env = env_to_sem_env env in
     let dim_var = D.mk_bvar sem_env in
     let dim_env = add_bdim ~bdim:dim_var env in
@@ -264,6 +289,14 @@ and synth ~env ~term =
       add_term ~term:varcase_bridge ~tp:dom_bridge env |> add_bdim ~bdim:varcase_dim in
     check ~env:varcase_env ~term:varcase ~tp:varcase_mot;
     Nbe.eval mot (D.Term (Nbe.eval ctx sem_env) :: D.BDim sem_r :: sem_env)
+  | Ungel term ->
+    let var = D.mk_bvar (env_to_sem_env env) in
+    begin
+      match synth ~env:(add_bdim ~bdim:var env) ~term with
+      | Gel (_, tp) ->
+        tp
+      | t -> tp_error (Misc ("Expecting Gel but found\n" ^ D.show t))
+    end
   | _ -> tp_error (Cannot_synth_term term)
 
 and check_tp ~env ~term =
@@ -288,6 +321,9 @@ and check_tp ~env ~term =
     let tp = Nbe.eval tp (env_to_sem_env env) in
     check ~env ~term:l ~tp;
     check ~env ~term:r ~tp
+  | Gel (r, tp) ->
+    assert_fresh ~depth:0 r tp;
+    check_tp ~env ~term:tp
   | term ->
     begin
       match synth ~env ~term with

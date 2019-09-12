@@ -12,6 +12,7 @@ and clos =
   | ConstClos of t
 and clos2 = Clos2 of {term : Syntax.t; env : env}
 and clos3 = Clos3 of {term : Syntax.t; env : env}
+and abs = Abs of {var : int; ne : ne}
 and t =
   | Lam of clos
   | Neutral of {tp : t; term : ne}
@@ -25,6 +26,8 @@ and t =
   | BLam of clos
   | Refl of t
   | Id of t * t * t
+  | Gel of int * t
+  | Engel of int * t
   | Uni of Syntax.uni_level
 and ne =
   | Var of int (* DeBruijn levels for variables *)
@@ -35,6 +38,7 @@ and ne =
   | NRec of clos * t * clos2 * ne
   | J of clos3 * clos * t * t * t * ne
   | Extent of int * clos * clos2 * t * clos2
+  | Ungel of abs
 and nf =
   | Normal of {tp : t; term : t}
 
@@ -54,3 +58,5 @@ val pp_env : Format.formatter -> env -> unit
 val show : t -> string
 val show_nf : nf -> string
 val show_ne : ne -> string
+
+val subst_bvar_ne : int -> int -> ne -> ne

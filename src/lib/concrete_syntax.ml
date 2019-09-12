@@ -42,6 +42,9 @@ and t =
   | BApp of t * bdim list
   | BLam of bindern
   | Extent of {bdim : bdim; dom : binder; mot : binder2; ctx : t; varcase : binder2}
+  | Gel of bdim * t
+  | Engel of bdim * t
+  | Ungel of binder
   | Uni of uni_level
 
 type decl =

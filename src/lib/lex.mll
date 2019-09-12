@@ -34,6 +34,9 @@ let keywords =
     ("Id", ID);
     ("refl", REFL);
     ("extent", EXTENT);
+    ("Gel", GEL);
+    ("gel", ENGEL);
+    ("ungel", UNGEL);
     ("def", DEF);
     ("at", AT);
     ("of", OF);

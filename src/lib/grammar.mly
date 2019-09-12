@@ -10,6 +10,7 @@
 %token TIMES FST SND
 %token LAM LET IN END WITH OF DEF
 %token EXTENT ATSIGN
+%token GEL ENGEL UNGEL
 %token REC SUC NAT ZERO
 %token UNIV
 %token QUIT NORMALIZE
@@ -111,6 +112,9 @@ term:
     { Sg ([Cell {name = ""; ty = dom}], cod)}
   | FST; t = term { Fst t }
   | SND; t = term { Snd t }
+  | GEL; bdim = bdim; t = atomic { Gel (bdim, t) }
+  | ENGEL; bdim = bdim; t = atomic { Engel (bdim, t) }
+  | UNGEL; name = name; DOT; body = term { Ungel (Binder {name; body}) }
   | LBR; names = nonempty_list(name); RBR; body = term
     { Bridge(names,body) }
   

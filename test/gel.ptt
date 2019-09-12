@@ -1,0 +1,24 @@
+let gel_test1 : (A : U<0>) -> A -> [x] Gel x A =
+  fun A a -> [x. gel x a]
+
+let gel_test2 : (A : U<0>) -> [x] ((Gel x A) -> Gel x A) =
+  fun A -> [x. fun p -> p]
+
+let gel_test3 : (A : U<0>) -> ([x] Gel x A) -> ([x] Gel x A) =
+  fun A p -> p
+
+let gel_test4 : (A : U<0>) -> ([x] Gel x A) -> A =
+  fun A p -> ungel x. (p @ x)
+
+let gel_test5 : (A : U<0>) -> (a : A) -> Id A (ungel x. (gel x a at Gel x A)) a =
+  fun A a -> refl a
+
+let gel_test6 : (A : U<0>) -> (p : [x] Gel x A) -> Id ([x] Gel x A) [x. gel x (ungel y. p @ y)] p =
+  fun A p -> refl p
+
+normalize def gel_test1
+normalize def gel_test2
+normalize def gel_test3
+normalize def gel_test4
+normalize def gel_test5
+normalize def gel_test6

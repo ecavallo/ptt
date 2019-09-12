@@ -117,6 +117,14 @@ and do_ap f a =
      end
   | _ -> raise (Nbe_failed "Not a function in do_ap")
 
+and do_gel r t =
+  match r with
+  | D.BVar i -> D.Gel (i, t)
+
+and do_engel r t =
+  match r with
+  | D.BVar i -> D.Engel (i, t)
+
 and eval t (env : D.env) =
   match t with
   | Syn.Var i ->
@@ -137,7 +145,7 @@ and eval t (env : D.env) =
        (Clos2 {term = suc; env})
        (eval n env)
   | Syn.Pi (src, dest) ->
-     D.Pi (eval src env, (Clos {term = dest; env}))
+    D.Pi (eval src env, (Clos {term = dest; env}))
   | Syn.Lam t -> D.Lam (Clos {term = t; env})
   | Syn.Ap (t1, t2) -> do_ap (eval t1 env) (eval t2 env)
   | Syn.Uni i -> D.Uni i
@@ -151,7 +159,7 @@ and eval t (env : D.env) =
   | Syn.Refl t -> D.Refl (eval t env)
   | Syn.Id (tp, left, right) -> D.Id (eval tp env, eval left env, eval right env)
   | Syn.J (mot, refl, eq) ->
-     do_j (D.Clos3 {term = mot; env}) (D.Clos {term = refl; env}) (eval eq env)
+    do_j (D.Clos3 {term = mot; env}) (D.Clos {term = refl; env}) (eval eq env)
   | Syn.Extent (r, dom, mot, ctx, varcase) ->
      do_extent
        (eval_bdim r env)
@@ -159,7 +167,24 @@ and eval t (env : D.env) =
        (D.Clos2 {term = mot; env})
        (eval ctx env)
        (D.Clos2 {term = varcase; env})
-
+  | Syn.Gel (r, t) -> do_gel (eval_bdim r env) (eval t env)
+  | Syn.Engel (r, t) -> do_engel (eval_bdim r env) (eval t env)
+  | Syn.Ungel t ->
+    let var = D.mk_bvar env in
+    let t' = eval t (D.BDim var :: env) in
+    begin
+      match t' with
+      | D.Engel (_, t') -> t'
+      | D.Neutral {tp; term = e} ->
+        begin
+          match tp with
+          | D.Gel (_, dst) ->
+            D.Neutral {tp = dst; term = D.Ungel (D.Abs {var = List.length env; ne = e})}
+          | _ -> raise (Nbe_failed "Not a Gel in do_ungel")
+        end
+      | _ -> raise (Nbe_failed "Not a term of Gel in do_ungel")
+    end
+     
 let rec read_back_nf env nf =
   match nf with
   (* Functions *)
@@ -190,6 +215,18 @@ let rec read_back_nf env nf =
      Syn.Refl (read_back_nf env (D.Normal {tp; term}))
   | D.Normal {tp = D.Id _; term = D.Neutral {term; _}} ->
      read_back_ne env term
+  (* Gel *)
+  | D.Normal {tp = D.Gel (_, tp); term = D.Engel (i, t)} ->
+    let i' = level_to_index env i in
+    Syn.Engel (Syn.BVar i', read_back_nf env (D.Normal {tp; term = t}))
+  | D.Normal {tp = D.Gel (i, _); term = D.Neutral {term = g; _}} ->
+    let i' = level_to_index env i in
+    let g' = read_back_ne env g in
+    begin
+      match Syn.extract_bvar i' g' with
+      | Some extract -> Syn.Engel (Syn.BVar i', Syn.Ungel extract)
+      | None -> g'
+    end
   (* Types *)
   | D.Normal {tp = D.Uni _; term = t} -> read_back_tp env t
   | D.Normal {tp = D.Neutral _; term = D.Neutral {term = ne; _}} -> read_back_ne env ne
@@ -213,6 +250,8 @@ and read_back_tp env d =
        (read_back_tp env tp,
         read_back_nf env (D.Normal {tp; term = left}),
         read_back_nf env (D.Normal {tp; term = right}))
+  | D.Gel (i, t) ->
+    Syn.Gel (Syn.BVar (level_to_index env i), read_back_tp env t)
   | D.Uni k -> Syn.Uni k
   | _ -> raise (Nbe_failed "Not a type in read_back_tp")
 
@@ -287,6 +326,10 @@ and read_back_ne env ne =
             tp = do_clos3 mot refl_var refl_var (D.Refl refl_var)}) in
     let eq_syn = read_back_ne env eq in
     Syn.J (mot_syn, refl_syn, eq_syn)
+  | D.Ungel (Abs {var; ne}) ->
+    let var' = D.mk_bvar env in
+    let ne' = D.subst_bvar_ne (List.length env) var ne in
+    Syn.Ungel (read_back_ne (D.BDim var' :: env) ne')
 
 let rec check_nf env nf1 nf2 =
   match nf1, nf2 with
@@ -328,6 +371,35 @@ let rec check_nf env nf1 nf2 =
     let nf1 = D.Normal {tp = do_bclos dest1 arg; term = do_bapp p1 arg} in
     let nf2 = D.Normal {tp = do_bclos dest2 arg; term = do_bapp p2 arg} in
     check_nf (D.BDim arg :: env) nf1 nf2
+  (* Gel *)
+  | D.Normal {tp = D.Gel (_, tp1); term = D.Engel (_, t1)},
+    D.Normal {tp = D.Gel (_, tp2); term = D.Engel (_, t2)} ->
+    check_nf env (D.Normal {tp = tp1; term = t1}) (D.Normal {tp = tp2; term = t2})
+  | D.Normal {tp = D.Gel (_, tp1); term = D.Engel (_, t1)},
+    D.Normal {tp = D.Gel (i2, _); term = D.Neutral {term = g2; _}} ->
+    (* is there a more efficient way? *)
+    let i2' = level_to_index env i2 in
+    let g2' = read_back_ne env g2 in
+    begin
+      match Syn.extract_bvar i2' g2' with
+      | Some extract ->
+        read_back_nf env (D.Normal {tp = tp1; term = t1}) = Syn.Ungel extract
+      | None -> false
+    end
+  | D.Normal {tp = D.Gel (i1, _); term = D.Neutral {term = g1; _}},
+    D.Normal {tp = D.Gel (_, tp2); term = D.Engel (_, t2)} ->
+    (* is there a more efficient way? *)
+    let i1' = level_to_index env i1 in
+    let g1' = read_back_ne env g1 in
+    begin
+      match Syn.extract_bvar i1' g1' with
+      | Some extract ->
+        Syn.Ungel extract = read_back_nf env (D.Normal {tp = tp2; term = t2})
+      | None -> false
+    end
+  | D.Normal {tp = D.Gel _; term = D.Neutral {term = g1; _}},
+    D.Normal {tp = D.Gel _; term = D.Neutral {term = g2; _}} ->
+    check_ne env g1 g2
   (* Types *)
   | D.Normal {tp = D.Uni _; term = t1}, D.Normal {tp = D.Uni _; term = t2} ->
      check_tp ~subtype:false env t1 t2
@@ -355,14 +427,14 @@ and check_ne env ne1 ne2 =
        (D.Normal {term = term1; tp})
        (D.Normal {term = D.Neutral {tp; term = ne2}; tp})
   | None ->
-     begin
-       match try_extent env ne2 with
-       | Some (term2, tp) ->
-         check_nf env
-           (D.Normal {term = D.Neutral {tp; term = ne1}; tp})
-           (D.Normal {term = term2; tp}) 
-       | None -> check_ne_inner env ne1 ne2
-     end
+    begin
+      match try_extent env ne2 with
+      | Some (term2, tp) ->
+        check_nf env
+          (D.Normal {term = D.Neutral {tp; term = ne1}; tp})
+          (D.Normal {term = term2; tp}) 
+      | None -> check_ne_inner env ne1 ne2
+    end
 
 and check_ne_wrapped env nf1 nf2 =
   match nf1, nf2 with
@@ -437,6 +509,11 @@ and check_ne_inner env ne1 ne2 =
         {term = do_clos refl2 refl_var;
          tp = do_clos3 mot2 refl_var refl_var (D.Refl refl_var)}) &&
     check_ne env eq1 eq2
+  | D.Ungel (Abs {var = var1; ne = ne1}), D.Ungel (Abs {var = var2; ne = ne2}) ->
+    let var = D.mk_bvar env in
+    let ne1' = D.subst_bvar_ne (List.length env) var1 ne1 in
+    let ne2' = D.subst_bvar_ne (List.length env) var2 ne2 in
+    check_ne (D.BDim var :: env) ne1' ne2'
   | _ -> false
 
 and check_tp ~subtype env d1 d2 =
@@ -459,6 +536,8 @@ and check_tp ~subtype env d1 d2 =
   | D.Bridge dest, D.Bridge dest' ->
     let var = D.mk_bvar env in
     check_tp ~subtype (D.BDim var :: env) (do_bclos dest var) (do_bclos dest' var)
+  | D.Gel (i, t), D.Gel (i', t') ->
+    i = i' && check_tp ~subtype env t t'
   | D.Uni k, D.Uni j -> if subtype then k <= j else k = j
   | _ -> false
 

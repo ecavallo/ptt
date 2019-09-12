@@ -16,6 +16,7 @@ type t =
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
   | Bridge of (* BBINDS *) t | BApp of t * bdim | BLam of (* BBINDS *) t
   | Extent of bdim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS & BBINDS *) t
+  | Gel of bdim * t | Engel of bdim * t | Ungel of (* BBINDS *) t
   | Uni of uni_level
 [@@deriving eq]
 
@@ -51,6 +52,9 @@ let var_is_apart_from ~depth i =
     | Extent (r, dom, mot, ctx, varcase) ->
       bgo depth r && go (depth + 1) dom && go (depth + 2) mot &&
       go depth ctx && go (depth + 2) varcase
+    | Gel (r, t) -> bgo depth r && go depth t
+    | Engel (r, t) -> bgo depth r && go depth t
+    | Ungel t -> go (depth + 1) t
     | Uni _ -> true
   in
   go depth
@@ -100,6 +104,9 @@ let extract_bvar i t =
          go (depth + 2) mot,
          go depth ctx,
          go (depth + 2) varcase)
+    | Gel (r, t) -> Gel (bgo depth r, go depth t)
+    | Engel (r, t) -> Engel (bgo depth r, go depth t)
+    | Ungel t -> Ungel (go (depth + 1) t)
     | Uni j -> Uni j
   in
   try
@@ -174,6 +181,12 @@ let rec pp fmt =
   | Extent (r, dom, mot, ctx, varcase) ->
    fprintf fmt "extent(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
      pp_bdim r pp dom pp mot pp ctx pp varcase;
+  | Gel (r, t) ->
+    fprintf fmt "Gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp_bdim r pp t;
+  | Engel (r, t) ->
+    fprintf fmt "gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp_bdim r pp t;
+  | Ungel t ->
+    fprintf fmt "ungel(@[<hov>%a@])" pp t;
   | Uni i -> fprintf fmt "U<%d>" i
 
 let show t =
