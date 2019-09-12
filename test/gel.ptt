@@ -16,9 +16,17 @@ let gel_test5 : (A : U<0>) -> (a : A) -> Id A (ungel x. (gel x a at Gel x A)) a 
 let gel_test6 : (A : U<0>) -> (p : [x] Gel x A) -> Id ([x] Gel x A) [x. gel x (ungel y. p @ y)] p =
   fun A p -> refl p
 
+let gel_test7 : ([x] nat) -> nat =
+  fun p ->
+  ungel x.
+  rec (p @ x) at _ -> Gel x nat with
+  | zero -> gel x zero
+  | suc _, q -> extent x of q in [y. Gel y nat] at [y. _ -> Gel y nat] with | t -> y. gel y (suc (ungel z. t @ z))
+
 normalize def gel_test1
 normalize def gel_test2
 normalize def gel_test3
 normalize def gel_test4
 normalize def gel_test5
 normalize def gel_test6
+normalize def gel_test7
