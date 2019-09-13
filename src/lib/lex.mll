@@ -29,6 +29,7 @@ let keywords =
     ("fst", FST);
     ("snd", SND);
     ("fun", LAM);
+    ("bri", BRI);
     ("U", UNIV);
     ("match", MATCH);
     ("Id", ID);
@@ -75,8 +76,6 @@ rule token = parse
     { EQUALS }
   | "->"
     { RIGHT_ARROW }
-  | "."
-    { DOT }
   | "<"
     { LANGLE }
   | ">"

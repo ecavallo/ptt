@@ -4,12 +4,12 @@
 
 %token <int> NUMERAL
 %token <string> ATOM
-%token COLON PIPE AT COMMA RIGHT_ARROW DOT UNDERSCORE
+%token COLON PIPE AT COMMA RIGHT_ARROW UNDERSCORE
 %token LPR RPR LANGLE RANGLE LBR RBR
 %token EQUALS
 %token TIMES FST SND
 %token LAM LET IN END WITH OF DEF
-%token EXTENT ATSIGN
+%token BRI ATSIGN EXTENT
 %token GEL ENGEL UNGEL
 %token REC SUC NAT ZERO
 %token UNIV
@@ -53,8 +53,6 @@ atomic:
   | UNIV; LANGLE; i = NUMERAL; RANGLE
     { Uni i }
   | NAT { Nat }
-  | LBR; names = nonempty_list(name); DOT; body = term; RBR
-    { BLam(BinderN {names; body}) }
   | LANGLE left = term; COMMA; right = term; RANGLE
     { Pair (left, right) };
 
@@ -90,10 +88,10 @@ term:
     PIPE; REFL; name = name; RIGHT_ARROW; refl = term;
     { J {mot = Binder3 {name1; name2; name3; body = mot_term}; refl = Binder {name; body = refl}; eq} }
   | EXTENT; bdim = bdim; OF; ctx = term;
-    IN; LBR; dom_dim = name; DOT; dom = term; RBR;
-    AT; LBR; mot_dim = name; DOT; mot_var = name; RIGHT_ARROW; mot = term; RBR;
+    IN; dom_dim = name; RIGHT_ARROW; dom = term;
+    AT; mot_dim = name; mot_var = name; RIGHT_ARROW; mot = term;
     WITH;
-    PIPE; varcase_bridge = name; RIGHT_ARROW; varcase_dim = name; DOT; varcase = term;
+    PIPE; varcase_bridge = name; varcase_dim = name; RIGHT_ARROW; varcase = term;
     { Extent
         {bdim;
          dom = Binder {name = dom_dim; body = dom};
@@ -102,6 +100,8 @@ term:
          varcase = Binder2 {name1 = varcase_bridge; name2 = varcase_dim; body = varcase}} }
   | LAM; names = nonempty_list(name); RIGHT_ARROW; body = term
     { Lam (BinderN {names; body}) }
+  | BRI; names = nonempty_list(name); RIGHT_ARROW; body = term
+    { BLam (BinderN {names; body}) }
   | tele = nonempty_list(tele_cell); RIGHT_ARROW; cod = term
     { Pi (tele, cod) }
   | tele = nonempty_list(tele_cell); TIMES; cod = term
@@ -114,7 +114,7 @@ term:
   | SND; t = term { Snd t }
   | GEL; bdim = bdim; t = atomic { Gel (bdim, t) }
   | ENGEL; bdim = bdim; t = atomic { Engel (bdim, t) }
-  | UNGEL; name = name; DOT; body = term { Ungel (Binder {name; body}) }
+  | UNGEL; name = name; RIGHT_ARROW; body = term { Ungel (Binder {name; body}) }
   | LBR; names = nonempty_list(name); RBR; body = term
     { Bridge(names,body) }
   
