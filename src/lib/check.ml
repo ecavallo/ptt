@@ -61,12 +61,12 @@ let get_var env n = match List.nth env n with
   | Term {term = _; tp} -> tp
 
 let assert_subtype sem_env t1 t2 =
-  if Nbe.check_tp ~subtype:true sem_env t1 t2
+  if Nbe.check_tp ~subtype:true sem_env sem_env t1 t2
   then ()
   else tp_error (Type_mismatch (t1, t2))
 
 let assert_equal sem_env t1 t2 tp =
-  if Nbe.check_nf sem_env (D.Normal {tp; term = t1}) (D.Normal {tp; term = t2})
+  if Nbe.check_nf sem_env sem_env (D.Normal {tp; term = t1}) (D.Normal {tp; term = t2})
   then ()
   else tp_error (Type_mismatch (t1, t2))
 
@@ -293,8 +293,7 @@ and synth ~env ~term =
     let var = D.mk_bvar (env_to_sem_env env) in
     begin
       match synth ~env:(add_bdim ~bdim:var env) ~term with
-      | Gel (_, tp) ->
-        tp
+      | Gel (_, tp) -> tp
       | t -> tp_error (Misc ("Expecting Gel but found\n" ^ D.show t))
     end
   | _ -> tp_error (Cannot_synth_term term)

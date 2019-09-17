@@ -12,10 +12,10 @@ and clos =
   | ConstClos of t
 and clos2 = Clos2 of {term : Syntax.t; env : env}
 and clos3 = Clos3 of {term : Syntax.t; env : env}
-and abs = Abs of {var : int; ne : ne}
 and t =
   | Lam of clos
   | Neutral of {tp : t; term : ne}
+  | Extent of {var : int; dom : clos; mot : clos2; ctx : t; varcase : clos2; stack : stack}
   | Nat
   | Zero
   | Suc of t
@@ -29,21 +29,23 @@ and t =
   | Gel of int * t
   | Engel of int * t
   | Uni of Syntax.uni_level
-and ne =
-  | Var of int (* DeBruijn levels for variables *)
-  | Ap of ne * nf
-  | Fst of ne
-  | Snd of ne
-  | BApp of ne * int
-  | NRec of clos * t * clos2 * ne
-  | J of clos3 * clos * t * t * t * ne
-  | Extent of int * clos * clos2 * t * clos2
-  | Ungel of abs
+and cell =
+  | Ap of nf
+  | Fst
+  | Snd
+  | BApp of int
+  | NRec of clos * t * clos2
+  | J of clos3 * clos * t * t * t
+  | Ungel of env
+and stack = cell list
+and ne = int * stack (* DeBruijn levels for variables *)
 and nf =
   | Normal of {tp : t; term : t}
 
 val mk_bvar : env -> bdim
 val mk_var : t -> env -> t
+
+val stack_env : env -> stack -> env
 
 val equal : t -> t -> bool
 val equal_ne : ne -> ne -> bool
@@ -58,5 +60,3 @@ val pp_env : Format.formatter -> env -> unit
 val show : t -> string
 val show_nf : nf -> string
 val show_ne : ne -> string
-
-val subst_bvar_ne : int -> int -> ne -> ne
