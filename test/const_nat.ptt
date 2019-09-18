@@ -1,0 +1,39 @@
+-- Identity type lemmas
+
+let subst : (A : nat -> U<0>) (n : nat) (m : nat) -> (Id nat n m) -> (A n) -> (A m) =
+  fun A n m prf ->
+  match prf at x y prf -> (A x) -> (A y) with
+  | refl _ -> fun x -> x
+
+let cong_suc : (m : nat) (n : nat) -> (Id nat m n) -> Id nat (suc m) (suc n) =
+  fun m n eq ->
+  match eq at x y _ -> Id nat (suc x) (suc y) with
+  | refl z -> refl (suc z)
+
+-- nat is a retract of ([x] nat)
+
+let stretch : nat -> ([x] nat) =
+  fun n -> bri _ -> n
+
+normalize def stretch
+
+let flatten : ([x] nat) -> nat =
+  fun p -> ungel x ->
+  rec (p @ x) at _ -> Gel x nat with
+  | zero -> gel x zero
+  | suc _, q ->
+    extent x of q in y -> Gel y nat at y _ -> Gel y nat with
+    | t y -> gel y (suc (ungel z -> t @ z))
+
+normalize def flatten
+
+let flatten_stretch : (n : nat) -> Id nat (flatten (stretch n)) n =
+  fun n ->
+  rec n at n -> Id nat (flatten (stretch n)) n with
+  | zero -> refl zero
+  | suc k, q -> cong_suc (flatten (stretch k)) k q
+
+normalize def flatten_stretch
+
+-- can we prove that this is an equivalence (modulo bridge extensionality),
+-- or do we need binary parametricity?
