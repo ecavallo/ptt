@@ -150,6 +150,7 @@ let process_decl (Env {check_env; bindings})  = function
       let i = find_idx name bindings in
       match List.nth check_env i with
       | Check.Term {term; tp} ->
+        (* Format.printf "EVAL'D\n%a\n" Domain.pp term; *)
         NF_def (name, Nbe.read_back_nf [] (D.Normal {term; tp}))
       | _ -> raise err
       | exception Failure _ -> raise err
