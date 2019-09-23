@@ -57,7 +57,7 @@ let mk_bvar env = BVar (List.length env)
 
 let mk_var tp env = Neutral {tp; term = Root (List.length env)}
 
-(* Assume that i is (at least) the largest level occurring in the input *)
+(* instantiate_* r i assumes that i is (at least) the largest free level occurring in the input *)
 
 let instantiate_bvar r i j =
   if j = i then r else j

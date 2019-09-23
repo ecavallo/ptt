@@ -265,28 +265,15 @@ let rec reduce_extent_root env (D.Ext {var = i; dom; ctx; varcase; _}) =
     | None -> raise Cannot_reduce_extent
   end
 
-and reduce_extent env term =
-  match term with
-  | D.Extent {term = stack; _} ->
-    let result =
-      try
-        Some (do_stack D.instantiate_extent_root reduce_extent_root env stack)
-      with
-        Cannot_reduce_extent -> None
-    in
-    begin
-      match result with
-      | Some term -> reduce_extent env term
-      | None -> term
-    end
-  | _ -> term
-
-and reduce_extent_nf env (D.Normal {tp; term}) =
-  D.Normal {tp = reduce_extent env tp; term = reduce_extent env term}
+and reduce_extent env stack =
+    try
+      Some (do_stack D.instantiate_extent_root reduce_extent_root env stack)
+    with
+      Cannot_reduce_extent -> None
 
 and read_back_nf env nf =
   (* Format.printf "READ_BACK_NF:\n%a\n" D.pp_nf nf; *)
-  match reduce_extent_nf env nf with
+  match nf with
   (* Functions *)
   | D.Normal {tp = D.Pi (src, dest); term = f} ->
      let arg = D.mk_var src env in
@@ -304,7 +291,6 @@ and read_back_nf env nf =
   | D.Normal {tp = D.Nat; term = D.Zero} -> Syn.Zero
   | D.Normal {tp = D.Nat; term = D.Suc nf} ->
      Syn.Suc (read_back_nf env (D.Normal {tp = D.Nat; term = nf}))
-  | D.Normal {tp = D.Nat; term = D.Neutral {term = ne; _}} -> read_back_ne env ne
   (* Bridge *)
   | D.Normal {tp = D.Bridge dest; term} ->
      let arg = D.mk_bvar env in
@@ -313,32 +299,31 @@ and read_back_nf env nf =
   (* Id *)
   | D.Normal {tp = D.Id (tp, _, _); term = D.Refl term} ->
      Syn.Refl (read_back_nf env (D.Normal {tp; term}))
-  | D.Normal {tp = D.Id _; term = D.Neutral {term; _}} ->
-     read_back_ne env term
   (* Gel *)
-  | D.Normal {tp = D.Gel (_, tp); term = D.Engel (i, t)} ->
-    let i' = level_to_index env i in
-    Syn.Engel (Syn.BVar i', read_back_nf env (D.Normal {tp; term = t}))
-  | D.Normal {tp = D.Gel (i, _); term = D.Neutral {term = g; _}} ->
-    let i' = level_to_index env i in
-    let g' = read_back_ne env g in
-    begin
-      match Syn.extract_bvar i' g' with
-      | Some extract -> Syn.Engel (Syn.BVar i', Syn.Ungel extract)
-      | None -> g'
-    end
+  (* | D.Normal {tp = D.Gel (_, tp); term = D.Engel (i, t)} ->
+   *   let i' = level_to_index env i in
+   *   Syn.Engel (Syn.BVar i', read_back_nf env (D.Normal {tp; term = t}))
+   * | D.Normal {tp = D.Gel (i, _); term = D.Neutral {term = g; _}} ->
+   *   let i' = level_to_index env i in
+   *   let g' = read_back_ne env g in
+   *   begin
+   *     match Syn.extract_bvar i' g' with
+   *     | Some extract -> Syn.Engel (Syn.BVar i', Syn.Ungel extract)
+   *     | None -> g'
+   *   end *)
   (* Types *)
   | D.Normal {tp = D.Uni _; term = t} -> read_back_tp env t
-  (* Irreducible extent term *)
-  | D.Normal {tp = _; term = D.Extent {term = stack; _}} ->
-    read_back_stack D.instantiate_extent_root read_back_extent_root env stack
-  (* Neutral *)
-  | D.Normal {tp = _; term = D.Neutral {term = ne; _}} -> read_back_ne env ne
-  | _ -> raise (Nbe_failed "Ill-typed read_back_nf")
+  (* Extent type *)
+  | D.Normal {tp = D.Extent {term = tp_stack; _}; term} ->
+    begin
+      match reduce_extent env tp_stack with
+      | Some tp -> read_back_nf env (D.Normal {tp; term})
+      | None -> read_back_neutral_or_extent env term
+    end
+  | D.Normal {tp = _; term} -> read_back_neutral_or_extent env term
 
 and read_back_tp env d =
-  match reduce_extent env d with
-  | D.Neutral {term; _} -> read_back_ne env term
+  match d with
   | D.Nat -> Syn.Nat
   | D.Pi (src, dest) ->
      let var = D.mk_var src env in
@@ -357,7 +342,19 @@ and read_back_tp env d =
   | D.Gel (i, t) ->
     Syn.Gel (Syn.BVar (level_to_index env i), read_back_tp env t)
   | D.Uni k -> Syn.Uni k
-  | _ -> raise (Nbe_failed "Not a type in read_back_tp")
+  | _ -> read_back_neutral_or_extent env d
+
+and read_back_neutral_or_extent env term =
+  match term with
+  | D.Neutral {term = ne; _} ->
+    read_back_stack D.instantiate_bvar (fun env x -> Syn.Var (level_to_index env x)) env ne
+  | D.Extent {tp; term} ->
+    begin
+      match reduce_extent env term with
+      | Some term -> read_back_nf env (D.Normal {tp; term})
+      | None -> read_back_stack D.instantiate_extent_root read_back_extent_root env term
+    end
+  | _ -> raise (Nbe_failed "Ill-typed read_back_neutral_or_extent")
 
 and read_back_stack
   : 'a. (int -> int -> 'a -> 'a) -> (D.env -> 'a -> Syntax.t) -> D.env -> 'a D.stack -> Syntax.t =
@@ -410,9 +407,6 @@ and read_back_stack
   in
   go
 
-and read_back_ne env ne =
-  read_back_stack D.instantiate_bvar (fun env x -> Syn.Var (level_to_index env x)) env ne
-
 and read_back_extent_root env (D.Ext {var = i; dom; mot; ctx; varcase}) =
   let dim_var = D.mk_bvar env in
   let applied_dom = do_bclos dom dim_var in
@@ -435,7 +429,7 @@ and read_back_extent_root env (D.Ext {var = i; dom; mot; ctx; varcase}) =
   Syn.Extent (Syn.BVar (level_to_index env i), dom', mot', ctx', varcase')
 
 let rec check_nf env nf1 nf2 =
-  match reduce_extent_nf env nf1, reduce_extent_nf env nf2 with
+  match nf1, nf2 with
   (* Functions *)
   | D.Normal {tp = D.Pi (src1, dest1); term = f1},
     D.Normal {tp = D.Pi (_, dest2); term = f2} ->
@@ -458,15 +452,10 @@ let rec check_nf env nf1 nf2 =
   | D.Normal {tp = D.Nat; term = D.Suc nf1},
     D.Normal {tp = D.Nat; term = D.Suc nf2} ->
     check_nf env (D.Normal {tp = D.Nat; term = nf1}) (D.Normal {tp = D.Nat; term = nf2})
-  | D.Normal {tp = D.Nat; term = D.Neutral {term = ne1; _}},
-    D.Normal {tp = D.Nat; term = D.Neutral {term = ne2; _}}-> check_ne env ne1 ne2
   (* Id *)
   | D.Normal {tp = D.Id (tp, _, _); term = D.Refl term1},
     D.Normal {tp = D.Id (_, _, _); term = D.Refl term2} ->
     check_nf env (D.Normal {tp; term = term1}) (D.Normal {tp; term = term2})
-  | D.Normal {tp = D.Id _; term = D.Neutral {term = term1; _}},
-    D.Normal {tp = D.Id _; term = D.Neutral {term = term2; _}} ->
-    check_ne env term1 term2
   (* Bridge *)
   | D.Normal {tp = D.Bridge dest1; term = p1},
     D.Normal {tp = D.Bridge dest2; term = p2} ->
@@ -474,45 +463,96 @@ let rec check_nf env nf1 nf2 =
     let nf1 = D.Normal {tp = do_bclos dest1 arg; term = do_bapp p1 arg} in
     let nf2 = D.Normal {tp = do_bclos dest2 arg; term = do_bapp p2 arg} in
     check_nf (D.BDim arg :: env) nf1 nf2
-  (* Gel *)
-  | D.Normal {tp = D.Gel (_, tp1); term = D.Engel (_, t1)},
-    D.Normal {tp = D.Gel (_, tp2); term = D.Engel (_, t2)} ->
-    check_nf env (D.Normal {tp = tp1; term = t1}) (D.Normal {tp = tp2; term = t2})
-  | D.Normal {tp = D.Gel (_, tp1); term = D.Engel (_, t1)},
-    D.Normal {tp = D.Gel (i2, _); term = D.Neutral {term = g2; _}} ->
-    (* TODO inefficient *)
-    let i2' = level_to_index env i2 in
-    let g2' = read_back_ne env g2 in
-    begin
-      match Syn.extract_bvar i2' g2' with
-      | Some extract ->
-        read_back_nf env (D.Normal {tp = tp1; term = t1}) = Syn.Ungel extract
-      | None -> false
-    end
-  | D.Normal {tp = D.Gel (i1, _); term = D.Neutral {term = g1; _}},
-    D.Normal {tp = D.Gel (_, tp2); term = D.Engel (_, t2)} ->
-    (* TODO inefficient *)
-    let i1' = level_to_index env i1 in
-    let g1' = read_back_ne env g1 in
-    begin
-      match Syn.extract_bvar i1' g1' with
-      | Some extract ->
-        Syn.Ungel extract = read_back_nf env (D.Normal {tp = tp2; term = t2})
-      | None -> false
-    end
-  | D.Normal {tp = D.Gel _; term = D.Neutral {term = g1; _}},
-    D.Normal {tp = D.Gel _; term = D.Neutral {term = g2; _}} ->
-    check_ne env g1 g2
+  (* (\* Gel *\)
+   * | D.Normal {tp = D.Gel (_, tp1); term = D.Engel (_, t1)},
+   *   D.Normal {tp = D.Gel (_, tp2); term = D.Engel (_, t2)} ->
+   *   check_nf env (D.Normal {tp = tp1; term = t1}) (D.Normal {tp = tp2; term = t2})
+   * | D.Normal {tp = D.Gel (_, tp1); term = D.Engel (_, t1)},
+   *   D.Normal {tp = D.Gel (i2, _); term = D.Neutral {term = g2; _}} ->
+   *   (\* TODO inefficient *\)
+   *   let i2' = level_to_index env i2 in
+   *   let g2' = read_back_ne env g2 in
+   *   begin
+   *     match Syn.extract_bvar i2' g2' with
+   *     | Some extract ->
+   *       read_back_nf env (D.Normal {tp = tp1; term = t1}) = Syn.Ungel extract
+   *     | None -> false
+   *   end
+   * | D.Normal {tp = D.Gel (i1, _); term = D.Neutral {term = g1; _}},
+   *   D.Normal {tp = D.Gel (_, tp2); term = D.Engel (_, t2)} ->
+   *   (\* TODO inefficient *\)
+   *   let i1' = level_to_index env i1 in
+   *   let g1' = read_back_ne env g1 in
+   *   begin
+   *     match Syn.extract_bvar i1' g1' with
+   *     | Some extract ->
+   *       Syn.Ungel extract = read_back_nf env (D.Normal {tp = tp2; term = t2})
+   *     | None -> false
+   *   end
+   * | D.Normal {tp = D.Gel _; term = D.Neutral {term = g1; _}},
+   *   D.Normal {tp = D.Gel _; term = D.Neutral {term = g2; _}} ->
+   *   check_ne env g1 g2 *)
   (* Types *)
   | D.Normal {tp = D.Uni _; term = t1}, D.Normal {tp = D.Uni _; term = t2} ->
-     check_tp ~subtype:false env t1 t2
-  (* Irreducible extent terms *)
-  | D.Normal {tp = _; term = D.Extent {term = stack1; _}},
-    D.Normal {tp = _ ;term = D.Extent {term = stack2; _}} ->
-    check_stack D.instantiate_extent_root check_extent_root env stack1 stack2
-  | D.Normal {tp = _; term = D.Neutral {term = ne1; _}},
-    D.Normal {tp = _; term = D.Neutral {term = ne2; _}} ->
-    check_ne env ne1 ne2
+    check_tp ~subtype:false env t1 t2
+  (* Extent type on the left *)
+  | D.Normal {tp = D.Extent {term = tp_stack1; _}; term = term1}, _ ->
+    begin
+      match reduce_extent env tp_stack1 with
+      | Some tp1 -> check_nf env (D.Normal {tp = tp1; term = term1}) nf2
+      | None ->
+        begin
+          match nf2 with
+          | D.Normal {tp = D.Extent {term = tp_stack2; _}; term = term2} ->
+            begin
+              match reduce_extent env tp_stack2 with
+              | Some tp2 -> check_nf env nf1 (D.Normal {tp = tp2; term = term2})
+              | None -> check_neutral_or_extent env term1 term2
+            end
+          | _ -> false
+        end
+    end
+  | D.Normal {tp = _; term = term1}, D.Normal {tp = _; term = term2} ->
+    check_neutral_or_extent env term1 term2
+
+and check_neutral_or_extent env term1 term2 =
+  match term1, term2 with
+  (* Neutral *)
+  | D.Neutral {term = ne1; _}, D.Neutral {term = ne2; _} ->
+    check_stack D.instantiate_bvar (fun _ x y -> x = y) env ne1 ne2
+  (* Extent term on the left *)
+  | D.Extent {term = stack1; tp = tp1}, _ ->
+    begin
+      match reduce_extent env stack1 with
+      | Some term1 ->
+        check_nf env (D.Normal {tp = tp1; term = term1}) (D.Normal {tp = tp1; term = term2})
+      | None ->
+        begin
+          match term2 with
+          | D.Extent {term = stack2; tp = tp2} ->
+            begin
+              match reduce_extent env stack2 with
+              | Some term2 ->
+                check_nf env (D.Normal {tp = tp2; term = term1}) (D.Normal {tp = tp2; term = term2})
+              | None -> check_stack D.instantiate_extent_root check_extent_root env stack1 stack2
+            end
+          | _ -> false
+        end
+    end
+  (* Extent term on the right *)
+  | _, D.Extent {term = stack2; tp = tp2} ->
+    begin
+      match reduce_extent env stack2 with
+      | Some term2 ->
+        check_nf env (D.Normal {tp = tp2; term = term1}) (D.Normal {tp = tp2; term = term2})
+      | None ->
+        begin
+          match term1 with
+          | D.Extent {term = stack1; tp = _} ->
+            check_stack D.instantiate_extent_root check_extent_root env stack1 stack2
+          | _ -> false
+        end
+    end
   | _ -> false
 
 and check_stack
@@ -572,9 +612,6 @@ and check_stack
   in
   go
 
-and check_ne env ne1 ne2 =
-  check_stack D.instantiate_bvar (fun _ x y -> x = y) env ne1 ne2
-
 and check_extent_root env
     (D.Ext {var = i1; dom = dom1; mot = mot1; ctx = ctx1; varcase = varcase1})
     (D.Ext {var = i2; dom = dom2; mot = mot2; ctx = ctx2; varcase = varcase2})
@@ -601,11 +638,7 @@ and check_extent_root env
     (D.Normal {tp = varcase_mot; term = applied_varcase2})
 
 and check_tp ~subtype env d1 d2 =
-  match reduce_extent env d1, reduce_extent env d2 with
-  | D.Neutral {term = term1; _}, D.Neutral {term = term2; _} ->
-    check_ne env term1 term2
-  | D.Extent {term = stack1; _}, D.Extent {term = stack2; _} ->
-    check_stack D.instantiate_extent_root check_extent_root env stack1 stack2
+  match d1, d2 with
   | D.Nat, D.Nat -> true
   | D.Id (tp1, left1, right1), D.Id (tp2, left2, right2) ->
     check_tp ~subtype env tp1 tp2 &&
@@ -625,4 +658,4 @@ and check_tp ~subtype env d1 d2 =
   | D.Gel (i, t), D.Gel (i', t') ->
     i = i' && check_tp ~subtype env t t'
   | D.Uni k, D.Uni j -> if subtype then k <= j else k = j
-  | _ -> false
+  | _ -> check_neutral_or_extent env d1 d2

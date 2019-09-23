@@ -46,6 +46,7 @@ and nf =
 val mk_bvar : env -> bdim
 val mk_var : t -> env -> t
 
+(* instantiate_* r i assumes that i is (at least) the largest free level occurring in the input *)
 val instantiate : int -> int -> t -> t
 val instantiate_stack : (int -> int -> 'a -> 'a) -> int -> int -> 'a stack -> 'a stack
 val instantiate_bvar : int -> int -> int -> int

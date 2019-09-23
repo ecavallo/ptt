@@ -1,0 +1,67 @@
+let ra : U<0> -> [_] U<0> =
+  fun A -> bri x -> Gel x A
+
+normalize def ra
+
+let Bridge : ([_] U<0>) -> U<0> =
+  fun P -> [x] P @ x
+
+normalize def Bridge
+
+-- let ra_beta_fwd : (A : U<0>) -> (Bridge (ra A)) -> A =
+--   fun A p -> ungel x -> p @ x
+
+-- normalize def ra_beta_fwd
+
+-- let ra_beta_bwd : (A : U<0>) -> A -> Bridge (ra A) =
+--   fun A a -> bri x -> gel x a
+
+-- normalize def ra_beta_bwd
+
+-- let ra_beta_fwd_bwd : (A : U<0>) -> (a : A) -> Id A (ra_beta_fwd A (ra_beta_bwd A a)) a =
+--   fun A a -> refl a
+
+-- normalize def ra_beta_fwd_bwd
+
+-- let ra_beta_bwd_fwd : (A : U<0>) -> (p : Bridge (ra A))
+--   -> Id (Bridge (ra A)) (ra_beta_bwd A (ra_beta_fwd A p)) p
+--   =
+--   fun A p -> refl p
+
+-- normalize def ra_beta_bwd_fwd
+
+let ra_eta_fwd : (P : [_] U<0>) -> [x] ((ra (Bridge P)) @ x) -> P @ x =
+  fun P -> bri x -> fun g ->
+  extent x of g in y -> (ra (Bridge P)) @ y at y _ -> P @ y with
+  | q y -> (ungel z -> q @ z) @ y
+
+normalize def ra_eta_fwd
+
+let ra_eta_bwd : (P : [_] U<0>) -> [x] (P @ x) -> (ra (Bridge P)) @ x =
+  fun P -> bri x -> fun a ->
+  extent x of a in y -> P @ y at y _ -> (ra (Bridge P)) @ y with
+  | p y -> gel y p
+
+-- normalize def ra_eta_bwd
+
+-- let ra_eta_fwd_bwd : (P : [_] U<0>)
+--   -> [x] (a : P @ x) -> Id (P @ x) (((ra_eta_fwd P) @ x) (((ra_eta_bwd P) @ x) a)) a
+--   =
+--   fun P -> bri x -> fun a ->
+--   extent x of a in
+--   y -> P @ y at
+--   y b -> Id (P @ y) (((ra_eta_fwd P) @ y) (((ra_eta_bwd P) @ y) b)) b with
+--   | p y -> refl (p @ y)
+
+-- normalize def ra_eta_fwd_bwd
+
+-- normalize (bri x -> ((ra_eta_fwd_bwd (bri _ -> nat)) @ x) zero) at [x] Id nat zero zero
+
+let ra_eta_bwd_fwd : (P : [_] U<0>) -> [x] (g : (ra (Bridge P)) @ x)
+  -> Id ((ra (Bridge P)) @ x) (((ra_eta_bwd P) @ x) (((ra_eta_fwd P) @ x) g)) g
+  =
+  fun P -> bri x -> fun g ->
+  extent x of g in
+  y -> (ra (Bridge P)) @ y at
+  y h -> Id ((ra (Bridge P)) @ y) (((ra_eta_bwd P) @ y) (((ra_eta_fwd P) @ y) h)) h with
+  | q y -> refl (q @ y)

@@ -8,10 +8,8 @@ val eval_bdim : Syntax.bdim -> Domain.env -> Domain.bdim
 val eval : Syntax.t -> Domain.env -> Domain.t
 val read_back_nf : Domain.env -> Domain.nf -> Syntax.t (* Note that read_back is referred to as quotation in the paper *)
 val read_back_tp : Domain.env -> Domain.t -> Syntax.t
-val read_back_ne : Domain.env -> Domain.ne -> Syntax.t
 
 val check_nf : Domain.env -> Domain.nf -> Domain.nf -> bool
-val check_ne : Domain.env -> Domain.ne -> Domain.ne -> bool
 val check_tp : subtype:bool -> Domain.env -> Domain.t -> Domain.t -> bool
 
 (* Functions to manipulate elements of the semantic domain *)

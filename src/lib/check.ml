@@ -68,7 +68,13 @@ let assert_subtype sem_env t1 t2 =
 let assert_equal sem_env t1 t2 tp =
   if Nbe.check_nf sem_env (D.Normal {tp; term = t1}) (D.Normal {tp; term = t2})
   then ()
-  else tp_error (Type_mismatch (t1, t2))
+  else
+    begin
+      let s1 = Nbe.read_back_nf sem_env (D.Normal {tp; term = t1}) in
+      let s2 = Nbe.read_back_nf sem_env (D.Normal {tp; term = t2}) in
+      Format.printf "ONE:\n%a\nTWO:\n%a\n" Syn.pp s1 Syn.pp s2;
+      tp_error (Type_mismatch (t1, t2))
+    end
 
 let assert_fresh ~depth r term =
   if Syn.dim_is_apart_from ~depth r term then ()

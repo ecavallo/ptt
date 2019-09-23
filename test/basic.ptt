@@ -1,101 +1,13 @@
--- Should not check
--- let diagonal : (A : U<0>) (p : [x y] A) -> ([x] A) =
---   fun A p -> bri x -> p @ x x
-
--- Should not check
--- let diagonal_extent : (A : U<0>) -> [x] (A -> A) =
---   fun A -> bri x -> fun a ->
---   extent x of a in _ -> A at _ _ -> A with
---   | q _ -> q @ x
-
 let fun_id : (A : U<0>) (B : A -> U<0>) -> ((x : A) -> B x) -> ((x : A) -> B x) =
   fun A B f -> f
 
 normalize def fun_id
 
-let extent_test : (A : U<0>) -> [x] (A -> [y] A) =
-  fun A -> bri x -> fun a ->
-  extent x of a in _ -> A at _ _ -> [y] A with
-  | q _ -> q
+let swap : (A : [_ _] U<0>) -> ([x y] (A @ x y)) -> ([x y] (A @ y x)) =
+  fun A sq -> bri x y -> sq @ y x
 
-normalize def extent_test
-
-let extent_test2 : (A : U<0>) (B : U<0>) -> (([x] A) -> [x] B) -> ([x] A) -> [x] B =
-  fun A B f q -> bri x ->
-  extent x of q @ x in _ -> A at _ _ -> B with
-  | q y -> (f q) @ y
-
-normalize def extent_test2
-  
-let bunext : (A : U<0>) (B : U<0>) -> (([x] A) -> [x] B) -> [x] A -> B =
-  fun A B f -> bri x -> fun a ->
-  extent x of a in _ -> A at _ _ -> B with
-  | q y -> (f q) @ y
-
-normalize def bunext
-
-let bunapp : (A : U<0>) (B : U<0>) -> ([x] A -> B) -> ([x] A) -> [x] B =
-  fun A B p q -> bri x -> (p @ x) (q @ x)
-
-normalize def bunapp
-
-let extent_test3 : (A : U<0>) (B : U<0>) -> (([x] A) -> [x] B) -> (([x] A) -> [x] B) =
-  fun A B f -> bunapp A B (bunext A B f)
-
-normalize def extent_test3
-
-let bunext_inv : (A : U<0>) (B : U<0>) (f : ([x] A) -> [x] B) (q : [x] A)
-  -> [x] Id B ((bunapp A B (bunext A B f) q) @ x) ((f q) @ x)
-  =
-  fun A B f q -> bri x -> refl ((f q) @ x)
-
-normalize def bunext_inv
-
-let bunext_inv2 : (A : U<0>) (B : U<0>) (f : ([x] A) -> [x] B)
-  -> Id (([x] A) -> [x] B) (bunapp A B (bunext A B f)) f
-  =
-  fun A B f -> refl f
-
-normalize def bunext_inv2
+normalize def swap
 
 -- Should not check
--- let bunapp_inv_bad : (A : U<0>) (B : U<0>) (p : [x] A -> B)
---   -> [x] (a : A) -> Id B (((bunext A B (bunapp A B p)) @ x) a) ((p @ x) a)
---   =
---   fun A B p -> bri x -> fun a -> refl ((p @ x) a)
-
-let bunapp_inv : (A : U<0>) (B : U<0>) (p : [x] A -> B)
-  -> [x] (a : A) -> Id B (((bunext A B (bunapp A B p)) @ x) a) ((p @ x) a)
-  =
-  fun A B p -> bri x -> fun a ->
-  extent x of a in _ -> A at y c -> Id B (((bunext A B (bunapp A B p)) @ y) c) ((p @ y) c) with
-  | q y -> refl ((p @ y) (q @ y))
-
-normalize def bunapp_inv
-
-let extent_type_test : (A : U<0>)
-  -> A -> [x] (extent x of A in _ -> U<0> at _ _ -> U<0> with | q y -> q @ y)
-  =
-  fun A a -> bri x -> a
-
-normalize def extent_type_test
-
-let extent_type_test2 : (A : U<0>)
-  -> [x] (A -> extent x of A in _ -> U<0> at _ _ -> U<0> with | q y -> q @ y)
-  =
-  fun A -> bri x -> fun a -> a
-
-normalize def extent_type_test2
-
--- Should not check
--- let extent_type_test_bad : 
---   [x] ((A : U<0>) -> A -> extent x of A in _ -> U<0> at _ _ -> U<0> with | q y -> q @ y)
---   =
---   bri x -> fun A a -> a
-
-let extent_test4 : (A : U<0>) (B : U<0>) (f : ([x] A) -> [x] B) (q : [x] A)
-  -> [x] Id B ((f q) @ x) ((bunapp A B (bunext A B (bunapp A B (bunext A B f))) q) @ x)
-  =
-  fun A B f q -> bri x -> refl ((f q) @ x)
-
-normalize def extent_test4
+-- let diagonal : (A : U<0>) (p : [x y] A) -> ([x] A) =
+--   fun A p -> bri x -> p @ x x
