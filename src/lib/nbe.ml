@@ -147,24 +147,16 @@ and do_ap f a =
     end
   | _ -> raise (Nbe_failed "Not a function in do_ap")
 
-and do_ungel i t =
+and do_ungel mot bound_gel i gel case =
   begin
-    match t with
-    | D.Engel (_, t) -> t
-    | D.Neutral {tp; term} ->
-      begin
-        match tp with
-        | D.Gel (_, dst) ->
-          D.Neutral {tp = dst; term = D.Ungel (i, term)}
-        | _ -> raise (Nbe_failed "Not a Gel in do_ungel")
-      end
-    | D.Extent {tp; term} ->
-      begin
-        match tp with
-        | D.Gel (_, dst) ->
-          D.Extent {tp = dst; term = D.Ungel (i, term)}
-        | _ -> raise (Nbe_failed "Not a Gel in do_ungel")
-      end
+    match gel with
+    | D.Engel (_, t) -> do_clos case t
+    | D.Neutral {term; _} ->
+      let final_tp = do_clos mot bound_gel in
+      D.Neutral {tp = final_tp; term = D.Ungel (mot, i, gel, case)}
+    | D.Extent {term; _} ->
+      let final_tp = do_clos mot bound_gel in
+      D.Extent {tp = final_tp; term = D.Ungel (mot, i, gel, case)}
     | _ -> raise (Nbe_failed "Not a term of Gel in do_ungel")
   end
 
@@ -229,10 +221,14 @@ and eval t (env : D.env) =
       match (eval_bdim r env) with
       | D.BVar i -> D.Engel (i, eval t env)
     end
-  | Syn.Ungel t ->
+  | Syn.Ungel (mot, gel, case) ->
     let var = D.mk_bvar env in
-    let t' = eval t (D.BDim var :: env) in
-    do_ungel (List.length env) t'
+    do_ungel
+      (D.Clos {term = mot; env})
+      (D.Clos {term = gel; env})
+      (List.length env)
+      (eval gel (D.BDim var :: env))
+      (D.Clos {term = case; env})
 
 let do_stack root_inst rootf =
   let rec go env = function

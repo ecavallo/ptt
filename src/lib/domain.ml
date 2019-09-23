@@ -45,7 +45,7 @@ and 'a stack =
   | BApp of 'a stack * int
   | NRec of clos * t * clos2 * 'a stack
   | J of clos3 * clos * t * t * t * 'a stack
-  | Ungel of (* BBINDER *) int * 'a stack
+  | Ungel of clos * (* BBINDER *) int * 'a stack * clos
 [@@deriving show, eq]
 and ne = int stack (* DeBruijn levels for variables *)
 [@@deriving show, eq]
@@ -121,9 +121,13 @@ and instantiate_stack : 'a. (int -> int -> 'a -> 'a) -> int -> int -> 'a stack -
        instantiate r i left,
        instantiate r i right,
        instantiate_stack rootf r i s)
-  | Ungel (j, s) ->
+  | Ungel (mot, j, s, case) ->
     let j' = i + 1 in
-    Ungel (j', instantiate_stack rootf r i (instantiate_stack rootf j' j s))
+    Ungel
+      (instantiate_clos r i mot,
+       j',
+       instantiate_stack rootf r i (instantiate_stack rootf j' j s),
+       instantiate_clos r i case)
 
 and instantiate_ne r i = instantiate_stack instantiate_bvar r i
 

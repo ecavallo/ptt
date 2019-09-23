@@ -38,7 +38,7 @@ and 'a stack =
   | BApp of 'a stack * int
   | NRec of clos * t * clos2 * 'a stack
   | J of clos3 * clos * t * t * t * 'a stack
-  | Ungel of (* BBINDER *) int * 'a stack
+  | Ungel of clos * (* BBINDER *) int * 'a stack * clos
 and ne = int stack (* DeBruijn levels for variables *)
 and nf =
   | Normal of {tp : t; term : t}
