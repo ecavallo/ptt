@@ -54,16 +54,15 @@ atomic:
     { Uni i }
   | NAT { Nat }
   | LANGLE left = term; COMMA; right = term; RANGLE
-    { Pair (left, right) };
+    { Pair (left, right) }
 
 spine:
-  | t = atomic { Term t };
+  | t = atomic { Term t }
+  | ATSIGN; b = bdim { BDim b };
 
 term:
   | f = atomic; args = list(spine)
     { Ap (f, args) }
-  | f = atomic; ATSIGN; args = list(bdim)
-    { BApp(f,args) }
   | LET; name = name; COLON; tp = term; EQUALS; def = term; IN; body = term
     { Let (Check {term = def; tp}, Binder {name; body}) }
   | LET; name = name; EQUALS; def = term; IN; body = term; END

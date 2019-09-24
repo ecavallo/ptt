@@ -47,12 +47,12 @@ let flatten_aux : [x] nat -> Gel x nat =
   bri x -> fun n ->
   rec n at _ -> Gel x nat with
   | zero -> gel x zero
-  | suc _, g -> ((mapGel nat nat (fun m -> suc m)) @ x) g
+  | suc _, g -> mapGel nat nat (fun m -> suc m) @ x g
 
 normalize def flatten_aux
 
 let flatten : ([x] nat) -> nat =
-  fun p -> gelproj nat (bri x -> (flatten_aux @ x) (p @ x))
+  fun p -> gelproj nat (bri x -> flatten_aux @ x (p @ x))
 
 normalize def flatten
 

@@ -109,8 +109,6 @@ let rec bind env = function
   | CS.BLam (BinderN {names = i :: names; body}) ->
     let blam = CS.BLam (BinderN {names; body}) in
     S.BLam (bind (BDim i :: env) blam)
-  | CS.BApp (p, rs) ->
-    List.map (bind_bspine env) rs |> unravel_spine (bind env p)
   | CS.Extent
       {bdim;
        dom = Binder {name = dom_dim; body = dom_body};
@@ -135,10 +133,9 @@ let rec bind env = function
        bind (Term case_name :: env) case_body)
   | CS.Uni i -> S.Uni i
 
-and bind_bspine env r = fun p -> S.BApp (p, bbind env r)
-
 and bind_spine env = function
   | CS.Term t -> fun f -> S.Ap (f, bind env t)
+  | CS.BDim b -> fun f -> S.BApp (f, bbind env b)
 
 let process_decl (Env {check_env; bindings})  = function
   | CS.Def {name; def; tp} ->

@@ -4,22 +4,12 @@ type uni_level = int
 type bdim =
   | BVar of ident
 
-(* module Ints =
- *   struct
- *     type t = int
- *     let compare = Stdlib.compare
- *    end
- * 
- * module DM = Set.Make(Ints)
- * 
- * type dim_set = DM.t *)
-          
 type binder = Binder of {name : ident; body : t}
 and bindern = BinderN of {names : ident list; body : t}
 and binder2 = Binder2 of {name1 : ident; name2 : ident; body : t}
 and binder3 = Binder3 of {name1 : ident; name2 : ident; name3 : ident; body : t}
 and cell = Cell of {name : ident; ty : t}
-and spine = Term of t
+and spine = Term of t | BDim of bdim
 and t =
   | Var of ident
   | Let of t * binder
@@ -39,7 +29,6 @@ and t =
   | Refl of t
   | J of {mot : binder3; refl : binder; eq : t}
   | Bridge of ident list * t
-  | BApp of t * bdim list
   | BLam of bindern
   | Extent of {bdim : bdim; dom : binder; mot : binder2; ctx : t; varcase : binder2}
   | Gel of bdim * t

@@ -64,9 +64,9 @@ let ra_beta_bwd_fwd : (A : U<0>) -> (p : Bridge (ra A))
 
 normalize def ra_beta_bwd_fwd
 
-let ra_eta_fwd : (P : [_] U<0>) -> [x] ((ra (Bridge P)) @ x) -> P @ x =
+let ra_eta_fwd : (P : [_] U<0>) -> [x] (ra (Bridge P) @ x) -> P @ x =
   fun P -> bri x -> fun g ->
-  extent x of g in y -> (ra (Bridge P)) @ y at y _ -> P @ y with
+  extent x of g in y -> ra (Bridge P) @ y at y _ -> P @ y with
   | q y -> (ungel z -> q @ z at _ -> Bridge P with | gel t -> t) @ y
 
 --------------------------------------------------------------------------------
@@ -75,39 +75,39 @@ let ra_eta_fwd : (P : [_] U<0>) -> [x] ((ra (Bridge P)) @ x) -> P @ x =
 
 normalize def ra_eta_fwd
 
-let ra_eta_bwd : (P : [_] U<0>) -> [x] (P @ x) -> (ra (Bridge P)) @ x =
+let ra_eta_bwd : (P : [_] U<0>) -> [x] (P @ x) -> ra (Bridge P) @ x =
   fun P -> bri x -> fun a ->
-  extent x of a in y -> P @ y at y _ -> (ra (Bridge P)) @ y with
+  extent x of a in y -> P @ y at y _ -> ra (Bridge P) @ y with
   | p y -> gel y p
 
 normalize def ra_eta_bwd
 
 let ra_eta_fwd_bwd : (P : [_] U<0>)
-  -> [x] (a : P @ x) -> Id (P @ x) (((ra_eta_fwd P) @ x) (((ra_eta_bwd P) @ x) a)) a
+  -> [x] (a : P @ x) -> Id (P @ x) (ra_eta_fwd P @ x (ra_eta_bwd P @ x a)) a
   =
   fun P -> bri x -> fun a ->
   extent x of a in
   y -> P @ y at
-  y b -> Id (P @ y) (((ra_eta_fwd P) @ y) (((ra_eta_bwd P) @ y) b)) b with
+  y b -> Id (P @ y) (ra_eta_fwd P @ y (ra_eta_bwd P @ y b)) b with
   | p y -> refl (p @ y)
 
 normalize def ra_eta_fwd_bwd
 
-normalize (bri x -> ((ra_eta_fwd_bwd (bri _ -> nat)) @ x) zero) at [x] Id nat zero zero
+normalize (bri x -> ra_eta_fwd_bwd (bri _ -> nat) @ x zero) at [x] Id nat zero zero
 
-let ra_eta_bwd_fwd : (P : [_] U<0>) -> [x] (g : (ra (Bridge P)) @ x)
-  -> Id ((ra (Bridge P)) @ x) (((ra_eta_bwd P) @ x) (((ra_eta_fwd P) @ x) g)) g
+let ra_eta_bwd_fwd : (P : [_] U<0>) -> [x] (g : ra (Bridge P) @ x)
+  -> Id (ra (Bridge P) @ x) (ra_eta_bwd P @ x (ra_eta_fwd P @ x g)) g
   =
   fun P -> bri x -> fun g ->
   extent x of g in
   y -> (ra (Bridge P)) @ y at
-  y h -> Id ((ra (Bridge P)) @ y) (((ra_eta_bwd P) @ y) (((ra_eta_fwd P) @ y) h)) h with
+  y h -> Id (ra (Bridge P) @ y) (ra_eta_bwd P @ y (ra_eta_fwd P @ y h)) h with
   | q y ->
-    (bapp_cong
-      (bri z -> (ra (Bridge P)) @ z)
-      (bri z -> ((ra_eta_bwd P) @ z) (((ra_eta_fwd P) @ z) (q @ z)))
+    bapp_cong
+      (bri z -> ra (Bridge P) @ z)
+      (bri z -> ra_eta_bwd P @ z (ra_eta_fwd P @ z (q @ z)))
       q
-      (ra_beta_bwd_fwd (Bridge P) q))
-    @ y
+      (ra_beta_bwd_fwd (Bridge P) q)
+      @ y
 
 normalize def ra_eta_bwd_fwd
