@@ -1,3 +1,21 @@
+--------------------------------------------------------------------------------
+-- Parts of the proof of relativity that can be defined without univalence
+-- With no endpoints, the expected principle says [_] U<0> is equivalent to U<0>
+--------------------------------------------------------------------------------
+
+let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
+  -> (Id A a0 a1) -> Id B (f a0) (f a1)
+  =
+  fun A B f a0 a1 eq ->
+  match eq at x0 x1 _ -> Id B (f x0) (f x1) with
+  | refl z -> refl (f z)
+
+normalize def cong
+
+--------------------------------------------------------------------------------
+-- Functions back and forth
+--------------------------------------------------------------------------------
+
 let ra : U<0> -> [_] U<0> =
   fun A -> bri x -> Gel x A
 
@@ -8,32 +26,52 @@ let Bridge : ([_] U<0>) -> U<0> =
 
 normalize def Bridge
 
--- let ra_beta_fwd : (A : U<0>) -> (Bridge (ra A)) -> A =
---   fun A p -> ungel x -> p @ x
+let bapp_cong : (P : [_] U<0>) (p0 : Bridge P) (p1 : Bridge P)
+  -> (Id (Bridge P) p0 p1) -> [x] Id (P @ x) (p0 @ x) (p1 @ x)
+  =
+  fun P p0 p1 eq ->
+  match eq at q0 q1 _ -> [x] Id (P @ x) (q0 @ x) (q1 @ x) with
+  | refl q -> bri x -> refl (q @ x)
 
--- normalize def ra_beta_fwd
+normalize def bapp_cong
 
--- let ra_beta_bwd : (A : U<0>) -> A -> Bridge (ra A) =
---   fun A a -> bri x -> gel x a
+--------------------------------------------------------------------------------
+-- Functions and inverses for the beta-equivalence
+--------------------------------------------------------------------------------
 
--- normalize def ra_beta_bwd
+let ra_beta_fwd : (A : U<0>) -> (Bridge (ra A)) -> A =
+  fun A p ->
+  ungel x -> p @ x at _ -> A with | gel a -> a
 
--- let ra_beta_fwd_bwd : (A : U<0>) -> (a : A) -> Id A (ra_beta_fwd A (ra_beta_bwd A a)) a =
---   fun A a -> refl a
+normalize def ra_beta_fwd
 
--- normalize def ra_beta_fwd_bwd
+let ra_beta_bwd : (A : U<0>) -> A -> Bridge (ra A) =
+  fun A a -> bri x -> gel x a
 
--- let ra_beta_bwd_fwd : (A : U<0>) -> (p : Bridge (ra A))
---   -> Id (Bridge (ra A)) (ra_beta_bwd A (ra_beta_fwd A p)) p
---   =
---   fun A p -> refl p
+normalize def ra_beta_bwd
 
--- normalize def ra_beta_bwd_fwd
+let ra_beta_fwd_bwd : (A : U<0>) -> (a : A) -> Id A (ra_beta_fwd A (ra_beta_bwd A a)) a =
+  fun A a -> refl a
+
+normalize def ra_beta_fwd_bwd
+
+let ra_beta_bwd_fwd : (A : U<0>) -> (p : Bridge (ra A))
+  -> Id (Bridge (ra A)) (ra_beta_bwd A (ra_beta_fwd A p)) p
+  =
+  fun A p ->
+  ungel x -> p @ x at q -> Id ([x] Gel x A) (ra_beta_bwd A (ra_beta_fwd A q)) q with
+  | gel a -> refl (bri x -> gel x a)
+
+normalize def ra_beta_bwd_fwd
 
 let ra_eta_fwd : (P : [_] U<0>) -> [x] ((ra (Bridge P)) @ x) -> P @ x =
   fun P -> bri x -> fun g ->
   extent x of g in y -> (ra (Bridge P)) @ y at y _ -> P @ y with
-  | q y -> (ungel z -> q @ z) @ y
+  | q y -> (ungel z -> q @ z at _ -> Bridge P with | gel t -> t) @ y
+
+--------------------------------------------------------------------------------
+-- Functions and inverses for the eta-equivalence
+--------------------------------------------------------------------------------
 
 normalize def ra_eta_fwd
 
@@ -42,20 +80,20 @@ let ra_eta_bwd : (P : [_] U<0>) -> [x] (P @ x) -> (ra (Bridge P)) @ x =
   extent x of a in y -> P @ y at y _ -> (ra (Bridge P)) @ y with
   | p y -> gel y p
 
--- normalize def ra_eta_bwd
+normalize def ra_eta_bwd
 
--- let ra_eta_fwd_bwd : (P : [_] U<0>)
---   -> [x] (a : P @ x) -> Id (P @ x) (((ra_eta_fwd P) @ x) (((ra_eta_bwd P) @ x) a)) a
---   =
---   fun P -> bri x -> fun a ->
---   extent x of a in
---   y -> P @ y at
---   y b -> Id (P @ y) (((ra_eta_fwd P) @ y) (((ra_eta_bwd P) @ y) b)) b with
---   | p y -> refl (p @ y)
+let ra_eta_fwd_bwd : (P : [_] U<0>)
+  -> [x] (a : P @ x) -> Id (P @ x) (((ra_eta_fwd P) @ x) (((ra_eta_bwd P) @ x) a)) a
+  =
+  fun P -> bri x -> fun a ->
+  extent x of a in
+  y -> P @ y at
+  y b -> Id (P @ y) (((ra_eta_fwd P) @ y) (((ra_eta_bwd P) @ y) b)) b with
+  | p y -> refl (p @ y)
 
--- normalize def ra_eta_fwd_bwd
+normalize def ra_eta_fwd_bwd
 
--- normalize (bri x -> ((ra_eta_fwd_bwd (bri _ -> nat)) @ x) zero) at [x] Id nat zero zero
+normalize (bri x -> ((ra_eta_fwd_bwd (bri _ -> nat)) @ x) zero) at [x] Id nat zero zero
 
 let ra_eta_bwd_fwd : (P : [_] U<0>) -> [x] (g : (ra (Bridge P)) @ x)
   -> Id ((ra (Bridge P)) @ x) (((ra_eta_bwd P) @ x) (((ra_eta_fwd P) @ x) g)) g
@@ -64,4 +102,12 @@ let ra_eta_bwd_fwd : (P : [_] U<0>) -> [x] (g : (ra (Bridge P)) @ x)
   extent x of g in
   y -> (ra (Bridge P)) @ y at
   y h -> Id ((ra (Bridge P)) @ y) (((ra_eta_bwd P) @ y) (((ra_eta_fwd P) @ y) h)) h with
-  | q y -> refl (q @ y)
+  | q y ->
+    (bapp_cong
+      (bri z -> (ra (Bridge P)) @ z)
+      (bri z -> ((ra_eta_bwd P) @ z) (((ra_eta_fwd P) @ z) (q @ z)))
+      q
+      (ra_beta_bwd_fwd (Bridge P) q))
+    @ y
+
+normalize def ra_eta_bwd_fwd

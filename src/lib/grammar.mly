@@ -114,7 +114,13 @@ term:
   | SND; t = term { Snd t }
   | GEL; bdim = bdim; t = atomic { Gel (bdim, t) }
   | ENGEL; bdim = bdim; t = atomic { Engel (bdim, t) }
-  | UNGEL; name = name; RIGHT_ARROW; body = term { Ungel (Binder {name; body}) }
+  | UNGEL; gel_name = name; RIGHT_ARROW; gel_body = term; AT;
+    mot_name = name; RIGHT_ARROW; mot_body = term; WITH
+    PIPE; ENGEL; case_name = name; RIGHT_ARROW; case_body = term;
+    { Ungel
+        {mot = Binder {name = mot_name; body = mot_body};
+         gel = Binder {name = gel_name; body = gel_body};
+         case = Binder {name = case_name; body = case_body}} }
   | LBR; names = nonempty_list(name); RBR; body = term
     { Bridge(names,body) }
   

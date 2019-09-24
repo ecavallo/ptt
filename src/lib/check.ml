@@ -13,6 +13,7 @@ let add_term ~term ~tp env = Term {term; tp} :: env
 
 type error =
     Cannot_synth_term of Syn.t
+  | BDim_mismatch of D.bdim * D.bdim
   | Type_mismatch of D.t * D.t
   | Expecting_universe of D.t
   | Expecting_term of D.bdim
@@ -23,6 +24,12 @@ let pp_error fmt = function
   | Cannot_synth_term t ->
     Format.fprintf fmt "@[<v> Cannot synthesize the type of: @[<hov 2>  ";
     Syn.pp fmt t;
+    Format.fprintf fmt "@]@]@,"
+  | BDim_mismatch (b1, b2) ->
+    Format.fprintf fmt "@[<v>Cannot equate@,@[<hov 2>  ";
+    D.pp_bdim fmt b1;
+    Format.fprintf fmt "@]@ with@,@[<hov 2>  ";
+    D.pp_bdim fmt b2;
     Format.fprintf fmt "@]@]@,"
   | Type_mismatch (t1, t2) ->
     Format.fprintf fmt "@[<v>Cannot equate@,@[<hov 2>  ";
@@ -68,17 +75,15 @@ let assert_subtype sem_env t1 t2 =
 let assert_equal sem_env t1 t2 tp =
   if Nbe.check_nf sem_env (D.Normal {tp; term = t1}) (D.Normal {tp; term = t2})
   then ()
-  else
-    begin
-      let s1 = Nbe.read_back_nf sem_env (D.Normal {tp; term = t1}) in
-      let s2 = Nbe.read_back_nf sem_env (D.Normal {tp; term = t2}) in
-      Format.printf "ONE:\n%a\nTWO:\n%a\n" Syn.pp s1 Syn.pp s2;
-      tp_error (Type_mismatch (t1, t2))
-    end
+  else tp_error (Type_mismatch (t1, t2))
 
 let assert_fresh ~depth r term =
   if Syn.dim_is_apart_from ~depth r term then ()
   else tp_error (Not_fresh (Syn.lift_bdim depth r, term))
+
+let assert_bdim_equal b1 b2 =
+  if b1 = b2 then ()
+  else tp_error (BDim_mismatch (b1, b2))
 
 let rec check ~env ~term ~tp =
   match term with
@@ -175,8 +180,9 @@ let rec check ~env ~term ~tp =
         begin
           match tp with
           | Gel (j, tp') ->
-            if i = Nbe.level_to_index (env_to_sem_env env) j then check ~env ~term ~tp:tp'
-            else tp_error (Misc ("Gel in unexpected dimension\n" ^ D.show tp))
+            let sem_env = env_to_sem_env env in
+            assert_bdim_equal (Nbe.eval_bdim (Syn.BVar i) sem_env) (D.BVar j);
+            check ~env ~term ~tp:tp'
           | t -> tp_error (Misc ("Expecting Gel but found\n" ^ D.show t))
         end
     end
@@ -249,11 +255,10 @@ and synth ~env ~term =
       | t -> tp_error (Misc ("Expecting Bridge but found\n" ^ D.show t ^ "\n" ^ Syn.show term ^ "\n" ^ show_env env))
     end
   | J (mot, refl, eq) ->
-    let eq_tp = synth ~env ~term:eq in
     begin
-      let sem_env = env_to_sem_env env in
-      match eq_tp with
+      match synth ~env ~term:eq with
       | D.Id (tp', left, right) ->
+        let sem_env = env_to_sem_env env in
         let mot_var1 = D.mk_var tp' sem_env in
         let mot_var2 = D.mk_var tp' (D.Term mot_var1 :: sem_env) in
         let mot_var3 =
@@ -295,11 +300,30 @@ and synth ~env ~term =
       add_term ~term:varcase_bridge ~tp:dom_bridge env |> add_bdim ~bdim:varcase_dim in
     check ~env:varcase_env ~term:varcase ~tp:varcase_mot;
     Nbe.eval mot (D.Term (Nbe.eval ctx sem_env) :: D.BDim sem_r :: sem_env)
-  | Ungel term ->
-    let var = D.mk_bvar (env_to_sem_env env) in
+  | Ungel (mot, term, case) ->
+    let sem_env = env_to_sem_env env in
+    let var = D.mk_bvar sem_env in
+    let var_env = add_bdim ~bdim:var env in
     begin
-      match synth ~env:(add_bdim ~bdim:var env) ~term with
-      | Gel (_, tp) -> tp
+      match synth ~env:var_env ~term with
+      | D.Gel (i, tp) ->
+        assert_bdim_equal (D.BVar i) var;
+        let syn_tp = Nbe.read_back_tp (D.BDim var :: sem_env) tp in
+        let mot_hyp =
+          D.Bridge (D.Clos {term = Syn.Gel (Syn.BVar 0, syn_tp); env = sem_env}) in
+        let mot_var = D.mk_var mot_hyp sem_env in
+        let mot_env = add_term ~term:mot_var ~tp:mot_hyp env in
+        check_tp ~env:mot_env ~term:mot;
+        let case_var = D.mk_var tp sem_env in
+        let gel_term =
+          D.BLam
+            (D.Clos
+               {term = Syn.Engel (Syn.BVar 0, Syn.Var 1);
+                env = D.Term case_var :: sem_env})
+        in
+        let gel_tp = Nbe.eval mot (D.Term gel_term :: sem_env) in
+        check ~env:(add_term ~term:case_var ~tp env) ~term:case ~tp:gel_tp;
+        Nbe.eval mot (D.Term (D.BLam (D.Clos {term; env = sem_env})) :: sem_env)
       | t -> tp_error (Misc ("Expecting Gel but found\n" ^ D.show t))
     end
   | _ -> tp_error (Cannot_synth_term term)

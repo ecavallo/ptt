@@ -147,25 +147,27 @@ and do_ap f a =
     end
   | _ -> raise (Nbe_failed "Not a function in do_ap")
 
-and do_ungel i t =
+and do_ungel mot i gel clo case =
   begin
-    match t with
-    | D.Engel (_, t) -> t
+    match gel with
+    | D.Engel (_, t) -> do_clos case t
     | D.Neutral {tp; term} ->
       begin
         match tp with
-        | D.Gel (_, dst) ->
-          D.Neutral {tp = dst; term = D.Ungel (i, term)}
+        | D.Gel (_, tp) ->
+          let final_tp = do_clos mot (D.BLam clo) in
+          D.Neutral {tp = final_tp; term = D.Ungel (tp, mot, i, term, clo, case)}
         | _ -> raise (Nbe_failed "Not a Gel in do_ungel")
       end
     | D.Extent {tp; term} ->
       begin
         match tp with
-        | D.Gel (_, dst) ->
-          D.Extent {tp = dst; term = D.Ungel (i, term)}
+        | D.Gel (_, tp) ->
+          let final_tp = do_clos mot (D.BLam clo) in
+          D.Extent {tp = final_tp; term = D.Ungel (tp, mot, i, term, clo, case)}
         | _ -> raise (Nbe_failed "Not a Gel in do_ungel")
       end
-    | _ -> raise (Nbe_failed "Not a term of Gel in do_ungel")
+    | _ -> raise (Nbe_failed "Not a gel or neutral in do_ungel")
   end
 
 and eval t (env : D.env) =
@@ -229,10 +231,14 @@ and eval t (env : D.env) =
       match (eval_bdim r env) with
       | D.BVar i -> D.Engel (i, eval t env)
     end
-  | Syn.Ungel t ->
+  | Syn.Ungel (mot, gel, case) ->
     let var = D.mk_bvar env in
-    let t' = eval t (D.BDim var :: env) in
-    do_ungel (List.length env) t'
+    do_ungel
+      (D.Clos {term = mot; env})
+      (List.length env)
+      (eval gel (D.BDim var :: env))
+      (D.Clos {term = gel; env})
+      (D.Clos {term = case; env})
 
 let do_stack root_inst rootf =
   let rec go env = function
@@ -243,10 +249,10 @@ let do_stack root_inst rootf =
     | D.Snd s -> do_snd (go env s)
     | D.BApp (s, i) -> do_bapp (go env s) (D.BVar i)
     | D.J (mot, refl, _, _, _, s) -> do_j mot refl (go env s)
-    | D.Ungel (i, s) ->
+    | D.Ungel (_, mot, i, s, clo, case) ->
       let j = List.length env in
       let s = D.instantiate_stack root_inst j i s in
-      do_ungel j (go (D.BDim (D.BVar j) :: env) s)
+      do_ungel mot j (go (D.BDim (D.BVar j) :: env) s) clo case
   in
   go
 
@@ -272,7 +278,6 @@ and reduce_extent env stack =
       Cannot_reduce_extent -> None
 
 and read_back_nf env nf =
-  (* Format.printf "READ_BACK_NF:\n%a\n" D.pp_nf nf; *)
   match nf with
   (* Functions *)
   | D.Normal {tp = D.Pi (src, dest); term = f} ->
@@ -300,17 +305,9 @@ and read_back_nf env nf =
   | D.Normal {tp = D.Id (tp, _, _); term = D.Refl term} ->
      Syn.Refl (read_back_nf env (D.Normal {tp; term}))
   (* Gel *)
-  (* | D.Normal {tp = D.Gel (_, tp); term = D.Engel (i, t)} ->
-   *   let i' = level_to_index env i in
-   *   Syn.Engel (Syn.BVar i', read_back_nf env (D.Normal {tp; term = t}))
-   * | D.Normal {tp = D.Gel (i, _); term = D.Neutral {term = g; _}} ->
-   *   let i' = level_to_index env i in
-   *   let g' = read_back_ne env g in
-   *   begin
-   *     match Syn.extract_bvar i' g' with
-   *     | Some extract -> Syn.Engel (Syn.BVar i', Syn.Ungel extract)
-   *     | None -> g'
-   *   end *)
+  | D.Normal {tp = D.Gel (_, tp); term = D.Engel (i, t)} ->
+    let i' = level_to_index env i in
+    Syn.Engel (Syn.BVar i', read_back_nf env (D.Normal {tp; term = t}))
   (* Types *)
   | D.Normal {tp = D.Uni _; term = t} -> read_back_tp env t
   (* Extent type *)
@@ -400,10 +397,21 @@ and read_back_stack
              {term = do_clos refl refl_var;
               tp = do_clos3 mot refl_var refl_var (D.Refl refl_var)}) in
       Syn.J (mot_syn, refl_syn, go env s)
-    | D.Ungel (i, s) ->
+    | D.Ungel (tp, mot, i, s, _, case) ->
+      let bvar = D.mk_bvar env in
+      let mot_inner_env = D.BDim bvar :: env in
+      let mot_inner_tp = Syn.Gel (Syn.BVar 0, read_back_tp mot_inner_env tp) in
+      let mot_var = D.mk_var (D.Bridge (D.Clos {term = mot_inner_tp; env})) env in
+      let mot' = read_back_tp (D.Term mot_var :: env) (do_clos mot mot_var) in
+      let case_var = D.mk_var tp env in
+      let mot_gel =
+        D.BLam (D.Clos {term = Syn.Engel (Syn.BVar 0, Syn.Var 1); env = D.Term case_var :: env}) in
+      let case' = read_back_nf
+          (D.Term case_var :: env)
+          (D.Normal {term = do_clos case case_var; tp = do_clos mot mot_gel}) in
       let j = List.length env in
       let s = D.instantiate_stack root_inst j i s in
-      Syn.Ungel (go (D.BDim (D.BVar j) :: env) s)
+      Syn.Ungel (mot', go (D.BDim (D.BVar j) :: env) s, case')
   in
   go
 
@@ -463,35 +471,10 @@ let rec check_nf env nf1 nf2 =
     let nf1 = D.Normal {tp = do_bclos dest1 arg; term = do_bapp p1 arg} in
     let nf2 = D.Normal {tp = do_bclos dest2 arg; term = do_bapp p2 arg} in
     check_nf (D.BDim arg :: env) nf1 nf2
-  (* (\* Gel *\)
-   * | D.Normal {tp = D.Gel (_, tp1); term = D.Engel (_, t1)},
-   *   D.Normal {tp = D.Gel (_, tp2); term = D.Engel (_, t2)} ->
-   *   check_nf env (D.Normal {tp = tp1; term = t1}) (D.Normal {tp = tp2; term = t2})
-   * | D.Normal {tp = D.Gel (_, tp1); term = D.Engel (_, t1)},
-   *   D.Normal {tp = D.Gel (i2, _); term = D.Neutral {term = g2; _}} ->
-   *   (\* TODO inefficient *\)
-   *   let i2' = level_to_index env i2 in
-   *   let g2' = read_back_ne env g2 in
-   *   begin
-   *     match Syn.extract_bvar i2' g2' with
-   *     | Some extract ->
-   *       read_back_nf env (D.Normal {tp = tp1; term = t1}) = Syn.Ungel extract
-   *     | None -> false
-   *   end
-   * | D.Normal {tp = D.Gel (i1, _); term = D.Neutral {term = g1; _}},
-   *   D.Normal {tp = D.Gel (_, tp2); term = D.Engel (_, t2)} ->
-   *   (\* TODO inefficient *\)
-   *   let i1' = level_to_index env i1 in
-   *   let g1' = read_back_ne env g1 in
-   *   begin
-   *     match Syn.extract_bvar i1' g1' with
-   *     | Some extract ->
-   *       Syn.Ungel extract = read_back_nf env (D.Normal {tp = tp2; term = t2})
-   *     | None -> false
-   *   end
-   * | D.Normal {tp = D.Gel _; term = D.Neutral {term = g1; _}},
-   *   D.Normal {tp = D.Gel _; term = D.Neutral {term = g2; _}} ->
-   *   check_ne env g1 g2 *)
+  (* Gel *)
+  | D.Normal {tp = D.Gel (_, tp1); term = D.Engel (_, t1)},
+    D.Normal {tp = D.Gel (_, tp2); term = D.Engel (_, t2)} ->
+    check_nf env (D.Normal {tp = tp1; term = t1}) (D.Normal {tp = tp2; term = t2})
   (* Types *)
   | D.Normal {tp = D.Uni _; term = t1}, D.Normal {tp = D.Uni _; term = t2} ->
     check_tp ~subtype:false env t1 t2
@@ -603,7 +586,19 @@ and check_stack
            {term = do_clos refl2 refl_var;
             tp = do_clos3 mot2 refl_var refl_var (D.Refl refl_var)}) &&
       go env eq1 eq2
-    | D.Ungel (i1, s1), D.Ungel (i2, s2) ->
+    | D.Ungel (tp1, mot1, i1, s1, _, case1),
+      D.Ungel (_, mot2, i2, s2, _, case2) ->
+      let bvar = D.mk_bvar env in
+      let mot_inner_env = D.BDim bvar :: env in
+      let mot_inner_tp = Syn.Gel (Syn.BVar 0, read_back_tp mot_inner_env tp1) in
+      let mot_var = D.mk_var (D.Bridge (D.Clos {term = mot_inner_tp; env})) env in
+      check_tp ~subtype:false (D.Term mot_var :: env) (do_clos mot1 mot_var) (do_clos mot2 mot_var) &&
+      let case_var = D.mk_var tp1 env in
+      let mot_gel =
+        D.BLam (D.Clos {term = Syn.Engel (Syn.BVar 0, Syn.Var 1); env = D.Term case_var :: env}) in
+      check_nf (D.Term case_var :: env)
+        (D.Normal {term = do_clos case1 case_var; tp = do_clos mot1 mot_gel})
+        (D.Normal {term = do_clos case2 case_var; tp = do_clos mot2 mot_gel}) &&
       let j = List.length env in
       let s1 = D.instantiate_stack root_inst j i1 s1 in
       let s2 = D.instantiate_stack root_inst j i2 s2 in

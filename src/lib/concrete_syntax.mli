@@ -34,7 +34,7 @@ and t =
   | Extent of {bdim : bdim; dom : binder; mot : binder2; ctx : t; varcase : binder2}
   | Gel of bdim * t
   | Engel of bdim * t
-  | Ungel of binder
+  | Ungel of {mot : binder; gel : binder; case : binder}
   | Uni of uni_level
 
 type decl =

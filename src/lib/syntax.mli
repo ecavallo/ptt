@@ -14,7 +14,7 @@ type t =
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
   | Bridge of (* BBINDS *) t | BApp of t * bdim | BLam of (* BBINDS *) t
   | Extent of bdim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS & BBINDS *) t
-  | Gel of bdim * t | Engel of bdim * t | Ungel of (* BBINDS *) t
+  | Gel of bdim * t | Engel of bdim * t | Ungel of (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
   | Uni of uni_level
 
 val equal_uni_level : uni_level -> uni_level -> bool

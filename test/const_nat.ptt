@@ -1,9 +1,16 @@
+--------------------------------------------------------------------------------
+-- Part of a proof that nat is bridge-discrete
+-- Unclear if the full result follows from nullary parametricity
+--------------------------------------------------------------------------------
+
 -- Identity type lemmas
 
 let subst : (A : nat -> U<0>) (n : nat) (m : nat) -> (Id nat n m) -> (A n) -> (A m) =
   fun A n m prf ->
   match prf at x y prf -> (A x) -> (A y) with
   | refl _ -> fun x -> x
+
+normalize def subst
 
 let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
   -> (Id A a0 a1) -> Id B (f a0) (f a1)
@@ -12,12 +19,16 @@ let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
   match eq at x0 x1 _ -> Id B (f x0) (f x1) with
   | refl z -> refl (f z)
 
+normalize def cong
+
 -- Gel type lemma
 
 let mapGel : (A : U<0>) (B : U<0>) -> (A -> B) -> [x] (Gel x A) -> Gel x B =
   fun A B f -> bri x -> fun g ->
   extent x of g in y -> Gel y A at y _ -> Gel y B with
-  | q y -> gel y (f (ungel z -> q @ z))
+  | q y -> gel y (f (ungel z -> q @ z at _ -> A with | gel a -> a))
+
+normalize def mapGel
 
 -- nat is a retract of ([x] nat)
 
@@ -27,10 +38,12 @@ let stretch : nat -> ([x] nat) =
 normalize def stretch
 
 let flatten : ([x] nat) -> nat =
-  fun p -> ungel x ->
-  rec p @ x at _ -> Gel x nat with
-  | zero -> gel x zero
-  | suc _, g -> ((mapGel nat nat (fun m -> suc m)) @ x) g
+  fun p ->
+  ungel x ->
+    rec p @ x at _ -> Gel x nat with
+    | zero -> gel x zero
+    | suc _, g -> ((mapGel nat nat (fun m -> suc m)) @ x) g
+  at _ -> nat with | gel n -> n
 
 normalize def flatten
 
