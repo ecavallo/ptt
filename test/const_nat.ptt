@@ -21,12 +21,18 @@ let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
 
 normalize def cong
 
--- Gel type lemma
+-- Gel type lemmas
+
+let gelproj : (A : U<0>) -> ([x] Gel x A) -> A =
+  fun A p ->
+  ungel x -> p @ x at _ -> A with | gel a -> a
+
+normalize def gelproj
 
 let mapGel : (A : U<0>) (B : U<0>) -> (A -> B) -> [x] (Gel x A) -> Gel x B =
   fun A B f -> bri x -> fun g ->
   extent x of g in y -> Gel y A at y _ -> Gel y B with
-  | q y -> gel y (f (ungel z -> q @ z at _ -> A with | gel a -> a))
+  | q y -> gel y (f (gelproj A q))
 
 normalize def mapGel
 
@@ -37,13 +43,16 @@ let stretch : nat -> ([x] nat) =
 
 normalize def stretch
 
+let flatten_aux : [x] nat -> Gel x nat =
+  bri x -> fun n ->
+  rec n at _ -> Gel x nat with
+  | zero -> gel x zero
+  | suc _, g -> ((mapGel nat nat (fun m -> suc m)) @ x) g
+
+normalize def flatten_aux
+
 let flatten : ([x] nat) -> nat =
-  fun p ->
-  ungel x ->
-    rec p @ x at _ -> Gel x nat with
-    | zero -> gel x zero
-    | suc _, g -> ((mapGel nat nat (fun m -> suc m)) @ x) g
-  at _ -> nat with | gel n -> n
+  fun p -> gelproj nat (bri x -> (flatten_aux @ x) (p @ x))
 
 normalize def flatten
 
@@ -57,3 +66,4 @@ normalize def flatten_stretch
 
 -- can we prove that this is an equivalence (modulo bridge extensionality),
 -- or do we need binary parametricity?
+-- let stretch_flatten : (p : [x] nat) -> Id ([x] nat) (stretch (flatten p)) p =
