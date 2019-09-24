@@ -188,7 +188,7 @@ let rec pp fmt =
   | Engel (r, t) ->
     fprintf fmt "gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp_bdim r pp t;
   | Ungel (mot, gel, case) ->
-    fprintf fmt "extent(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp mot pp gel pp case
+    fprintf fmt "ungel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp mot pp gel pp case
   | Uni i -> fprintf fmt "U<%d>" i
 
 let show t =

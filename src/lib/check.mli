@@ -7,6 +7,7 @@ val env_to_sem_env : env -> Domain.env
 
 type error =
     Cannot_synth_term of Syntax.t
+  | BDim_mismatch of Domain.bdim * Domain.bdim
   | Type_mismatch of Domain.t * Domain.t
   | Expecting_universe of Domain.t
   | Expecting_term of Domain.bdim

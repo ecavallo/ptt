@@ -14,18 +14,26 @@ let gel_test3 : (A : U<0>) -> ([x] Gel x A) -> ([x] Gel x A) =
 normalize def gel_test3
 
 let gel_test4 : (A : U<0>) -> ([x] Gel x A) -> A =
-  fun A p -> ungel x -> p @ x
+  fun A p -> ungel x -> p @ x at _ -> A with | gel a -> a
 
 normalize def gel_test4
 
-let gel_test5 : (A : U<0>) -> (a : A) -> Id A (ungel x -> (gel x a at Gel x A)) a =
+let gel_test5 : (A : U<0>) -> (a : A) -> Id A (gel_test4 A (bri x -> gel x a)) a =
   fun A a -> refl a
 
 normalize def gel_test5
 
+-- should not check with positive Gel
+-- let gel_test6_bad : (A : U<0>) -> (p : [x] Gel x A)
+--   -> Id ([x] Gel x A) (bri x -> gel x (gel_test4 A p)) p
+--   =
+--   fun A p -> refl p
+
 let gel_test6 : (A : U<0>) -> (p : [x] Gel x A)
-  -> Id ([x] Gel x A) (bri x -> gel x (ungel y -> p @ y)) p
+  -> Id ([x] Gel x A) (bri x -> gel x (gel_test4 A p)) p
   =
-  fun A p -> refl p
+  fun A p ->
+  ungel x -> p @ x at q -> Id ([x] Gel x A) (bri x -> gel x (gel_test4 A q)) q with
+  | gel a -> refl (bri x -> gel x a)
 
 normalize def gel_test6
