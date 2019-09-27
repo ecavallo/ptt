@@ -1,7 +1,7 @@
 ## ptt
 
 An experimental implementation of normalization by evaluation (nbe) & semantic type checking for a Martin-Löf
-Type Theory with nullary internal parametricity. This code was obtained from
+Type Theory with nullary internal parametricity (i.e., names). This code was obtained from
 [`blott`](https://github.com/jozefg/blott), an implementation of modal dependent type theory, by removing the
 modal constructs and adding internal parametricity primitives. The remainder of this README has been shameless
 copied from that of `blott`.
