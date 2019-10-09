@@ -41,3 +41,14 @@ let gel_test6 : (A : U<0>) -> (p : [x] Gel x A)
   | gel a -> refl (bri x -> gel x a)
 
 normalize def gel_test6
+
+let gel_test7 : (A : U<0>) -> ([x y] Gel y (Gel x A)) -> A =
+  fun A g -> gel_test4 A (bri x -> (gel_test4 (Gel x A) (g @ x)))
+
+normalize def gel_test7
+
+let gel_test8 : (A : U<0>) (B : U<0>) (f : A -> B) -> ([x] Gel x A) -> B =
+  fun A B f p -> ungel x -> p @ x at _ -> B with | gel a -> f a
+
+normalize def gel_test8
+

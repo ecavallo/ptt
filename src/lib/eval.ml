@@ -3,6 +3,17 @@ module D = Domain
 
 exception Eval_failed of string
 
+let restrict_env r (entries, range) =
+  let rec go i entries =
+    match i, entries with
+    | 0, D.BDim _ :: entries -> entries
+    | _, D.BDim s :: entries -> D.BDim s :: go (i - 1) entries
+    | _, D.Term _ :: entries -> go (i - 1) entries
+    | _ -> raise (Eval_failed "Failed to restrict semantic entriesironment")
+  in
+  match r with
+  | Syn.BVar i -> (go i entries, range)
+
 let eval_bdim r (env : D.env) =
   match r with
   | Syn.BVar i ->
@@ -198,7 +209,7 @@ and eval t (env : D.env) =
   | Syn.Bridge dest -> D.Bridge (Clos {term = dest; env})
   | Syn.BApp (t,r) ->
     let r' = eval_bdim r env in
-    do_bapp (D.get_range env) (eval t (D.restrict_env r' env)) r'
+    do_bapp (D.get_range env) (eval t (restrict_env r env)) r'
   | Syn.BLam t -> D.BLam (Clos {term = t; env})
   | Syn.Refl t -> D.Refl (eval t env)
   | Syn.Id (tp, left, right) -> D.Id (eval tp env, eval left env, eval right env)
@@ -210,7 +221,7 @@ and eval t (env : D.env) =
       match r' with
       | D.BVar i ->
         let ctx' = eval ctx env in
-        let restricted_env = D.restrict_env r' env in
+        let restricted_env = restrict_env r env in
         let final_env =
           D.add_term ctx' (D.add_bdim r' (D.resize_env (D.get_range env) restricted_env)) in
         let final_tp = eval mot final_env in
@@ -228,13 +239,13 @@ and eval t (env : D.env) =
     begin
       let r' = eval_bdim r env in
       match r' with
-      | D.BVar i -> D.Gel (i, eval t (D.restrict_env r' env))
+      | D.BVar i -> D.Gel (i, eval t (restrict_env r env))
     end
   | Syn.Engel (r, t) ->
     begin
       let r' = eval_bdim r env in
       match r' with
-      | D.BVar i -> D.Engel (i, eval t (D.restrict_env r' env))
+      | D.BVar i -> D.Engel (i, eval t (restrict_env r env))
     end
   | Syn.Ungel (mot, gel, case) ->
     let (l, env') = D.mk_bvar env in

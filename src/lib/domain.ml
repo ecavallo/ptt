@@ -62,18 +62,7 @@ let add_bdim b (entries, range) =
 let add_term t (entries, range) =
   (Term t :: entries, range)
 
-let restrict_env r (entries, range) =
-  let rec go i = function
-  | [] -> []
-  | BDim j :: env -> if BVar i = j then env else BDim j :: go i env
-  | Term _ :: env -> go i env
-  in
-  match r with
-  | BVar i -> (go i entries, range)
-
 let resize_env range (entries, _) = (entries, range)
-
-(* instantiate_* r i assumes that i is (at least) the largest free level occurring in the input *)
 
 let instantiate_bvar r i j =
   if j = i then r else j

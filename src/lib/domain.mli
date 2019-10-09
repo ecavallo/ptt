@@ -44,12 +44,10 @@ and nf =
 val mk_bvar : env -> int * env
 val add_bdim : bdim -> env -> env
 val add_term : t -> env -> env
-val restrict_env : bdim -> env -> env
 
 val get_range : env -> int
 val resize_env : int -> env -> env
 
-(* instantiate_* r i assumes that i is (at least) the largest free level occurring in the input *)
 val instantiate : int -> int -> t -> t
 val instantiate_stack : (int -> int -> 'a -> 'a) -> int -> int -> 'a stack -> 'a stack
 val instantiate_bvar : int -> int -> int -> int

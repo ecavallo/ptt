@@ -249,7 +249,7 @@ and synth ~env ~term =
     let sem_env = Q.env_to_sem_env env in
     let r' = E.eval_bdim r sem_env in
     let res_env = Q.restrict_env r' env in
-    let res_sem_env = D.restrict_env r' sem_env in
+    let res_sem_env = Q.env_to_sem_env res_env in
     let (_, dim_env) = Q.mk_bvar res_env in
     check_tp ~env:dim_env ~term:dom;
     let dom' = E.eval dom (Q.env_to_sem_env dim_env) in
