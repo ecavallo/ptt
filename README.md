@@ -25,5 +25,5 @@ commands will also install dune. Once dune is available the executable can be lo
 run with the following:
 
 ```
-$ dune exec ./src/bin/main.exe          # from the `ptt` top-level directory
+$ dune exec ./src/bin/main.exe [file]   # from the `ptt` top-level directory
 ```
