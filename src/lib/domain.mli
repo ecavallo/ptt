@@ -1,12 +1,10 @@
 type bdim =
-  (* | BZero
-   * | BOne *)
   | BVar of int
 
 type env_entry =
   | BDim of bdim
   | Term of t
-and env = env_entry list
+and env = env_entry list * int
 and clos =
     Clos of {term : Syntax.t; env : env}
   | ConstClos of t
@@ -43,8 +41,13 @@ and ne = int stack (* DeBruijn levels for variables *)
 and nf =
   | Normal of {tp : t; term : t}
 
-val mk_bvar : env -> bdim
-val mk_var : t -> env -> t
+val mk_bvar : env -> int * env
+val add_bdim : bdim -> env -> env
+val add_term : t -> env -> env
+val restrict_env : bdim -> env -> env
+
+val get_range : env -> int
+val resize_env : int -> env -> env
 
 (* instantiate_* r i assumes that i is (at least) the largest free level occurring in the input *)
 val instantiate : int -> int -> t -> t

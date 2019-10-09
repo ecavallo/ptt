@@ -1,13 +1,11 @@
 type bdim =
-  (* | BZero
-   * | BOne *)
   | BVar of int
 [@@deriving show, eq]
 
 type env_entry =
   | BDim of bdim
   | Term of t
-and env = env_entry list
+and env = env_entry list * int
 [@@deriving show, eq]
 and clos =
     Clos of {term : Syntax.t; env : env}
@@ -53,9 +51,27 @@ and nf =
   | Normal of {tp : t; term : t}
 [@@deriving show, eq]
 
-let mk_bvar env = BVar (List.length env)
+let get_range (_, range) = range
 
-let mk_var tp env = Neutral {tp; term = Root (List.length env)}
+let mk_bvar (entries, range) =
+  (range, (BDim (BVar range) :: entries, range + 1))
+
+let add_bdim b (entries, range) =
+  (BDim b :: entries, range)
+
+let add_term t (entries, range) =
+  (Term t :: entries, range)
+
+let restrict_env r (entries, range) =
+  let rec go i = function
+  | [] -> []
+  | BDim j :: env -> if BVar i = j then env else BDim j :: go i env
+  | Term _ :: env -> go i env
+  in
+  match r with
+  | BVar i -> (go i entries, range)
+
+let resize_env range (entries, _) = (entries, range)
 
 (* instantiate_* r i assumes that i is (at least) the largest free level occurring in the input *)
 
@@ -69,15 +85,18 @@ let rec instantiate_entry r i = function
   | BDim s -> BDim (instantiate_bdim r i s)
   | Term t -> Term (instantiate r i t)
 
+and instantiate_env r i (entries, range) =
+  (List.map (instantiate_entry r i) entries, range)
+
 and instantiate_clos r i = function
-  | Clos {term; env} -> Clos {term; env = List.map (instantiate_entry r i) env}
+  | Clos {term; env} -> Clos {term; env = instantiate_env r i env}
   | ConstClos t -> ConstClos (instantiate r i t)
 
 and instantiate_clos2 r i (Clos2 {term; env = env}) =
-  Clos2 {term; env = List.map (instantiate_entry r i) env}
+  Clos2 {term; env = instantiate_env r i env}
 
 and instantiate_clos3 r i (Clos3 {term; env = env}) =
-  Clos3 {term; env = List.map (instantiate_entry r i) env}
+  Clos3 {term; env = instantiate_env r i env}
 
 and instantiate r i = function
   | Lam clo -> Lam (instantiate_clos r i clo)
@@ -122,14 +141,17 @@ and instantiate_stack : 'a. (int -> int -> 'a -> 'a) -> int -> int -> 'a stack -
        instantiate r i right,
        instantiate_stack rootf r i s)
   | Ungel (tp, mot, j, s, clo, case) ->
-    let j' = i + 1 in
-    Ungel
-      (instantiate r i tp,
-       instantiate_clos r i mot,
-       j',
-       instantiate_stack rootf r i (instantiate_stack rootf j' j s),
-       instantiate_clos r i clo,
-       instantiate_clos r i case)
+    if i = j
+    then
+      Ungel (tp, mot, j, s, clo, case)
+    else
+      Ungel
+        (instantiate r i tp,
+         instantiate_clos r i mot,
+         j,
+         instantiate_stack rootf r i s,
+         instantiate_clos r i clo,
+         instantiate_clos r i case)
 
 and instantiate_ne r i = instantiate_stack instantiate_bvar r i
 

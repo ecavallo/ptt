@@ -2,8 +2,6 @@ type uni_level = int
 [@@deriving show{ with_path = false }, eq]
 
 type bdim =
-  (* | BZero
-   * | BOne *)
   | BVar of int
 [@@deriving eq]
 
@@ -20,102 +18,6 @@ type t =
   | Uni of uni_level
 [@@deriving eq]
 
-let lift_bdim depth = function
-  | BVar i -> BVar (i + depth)
-
-let var_is_apart_from ~depth i =
-  let bgo depth = function
-    | BVar j -> not (j = i + depth)
-  in
-  let rec go depth = function
-    | Var j -> j < depth || j > i + depth
-    | Let (def, body) -> go depth def && go (depth + 1) body
-    | Check (term, tp) -> go depth term && go depth tp
-    | Nat -> true
-    | Zero -> true
-    | Suc t -> go depth t
-    | NRec (mot, zero, suc, n) ->
-      go (depth + 1) mot && go depth zero && go (depth + 2) suc && go depth n
-    | Pi (l, r) -> go depth l && go (depth + 1) r
-    | Lam body -> go (depth + 1) body
-    | Ap (l, r) -> go depth l && go depth r
-    | Sg (l, r) -> go depth l && go (depth + 1) r
-    | Fst body -> go depth body
-    | Snd body -> go depth body
-    | Pair (l, r) -> go depth l && go depth r
-    | Id (tp, l, r) -> go depth tp && go depth l && go depth r
-    | Refl t -> go depth t
-    | J (mot, refl, eq) -> go (depth + 3) mot && go (depth + 1) refl && go depth eq
-    | Bridge t -> go (depth + 1) t
-    | BLam t -> go (depth + 1) t
-    | BApp (t, r) -> go depth t && bgo depth r
-    | Extent (r, dom, mot, ctx, varcase) ->
-      bgo depth r && go (depth + 1) dom && go (depth + 2) mot &&
-      go depth ctx && go (depth + 2) varcase
-    | Gel (r, t) -> bgo depth r && go depth t
-    | Engel (r, t) -> bgo depth r && go depth t
-    | Ungel (mot, gel, case) ->
-      go (depth + 1) mot && go (depth + 1) gel && go (depth + 1) case
-    | Uni _ -> true
-  in
-  go depth
-
-let dim_is_apart_from ~depth = function
-  | BVar i -> var_is_apart_from ~depth i
-         
-exception Indirect_use
-
-let extract_bvar i t =
-  let bgo depth = function
-    | BVar j ->
-      if j < depth then BVar j
-      else if j = i + depth then BVar depth
-      else BVar (j + 1)
-  in
-  let rec go depth = function
-    | Var j ->
-      if j < depth then Var j
-      else if j < i + depth then raise Indirect_use
-      else Var (j + 1)
-    | Let (def, body) -> Let (go depth def, go (depth + 1) body)
-    | Check (term, tp) -> Check (go depth term, go depth tp)
-    | Nat -> Nat
-    | Zero -> Zero
-    | Suc t -> Suc (go depth t)
-    | NRec (mot, zero, suc, n) ->
-      NRec (go (depth + 1) mot, go depth zero, go (depth + 2) suc, go depth n)
-    | Pi (l, r) -> Pi (go depth l, go (depth + 1) r)
-    | Lam body -> Lam (go (depth + 1) body)
-    | Ap (l, r) -> Ap (go depth l, go depth r)
-    | Sg (l, r) -> Sg (go depth l, go (depth + 1) r)
-    | Fst body -> Fst (go depth body)
-    | Snd body -> Snd (go depth body)
-    | Pair (l, r) -> Pair (go depth l, go depth r)
-    | Id (tp, l, r) -> Id (go depth tp, go depth l, go depth r)
-    | Refl t -> Refl (go depth t)
-    | J (mot, refl, eq) ->
-      J (go (depth + 3) mot, go (depth + 1) refl, go depth eq)
-    | Bridge t -> Bridge (go (depth + 1) t)
-    | BLam t -> BLam (go (depth + 1) t)
-    | BApp (t, r) -> BApp (go depth t, bgo depth r)
-    | Extent (r, dom, mot, ctx, varcase) ->
-      Extent
-        (bgo depth r,
-         go (depth + 1) dom,
-         go (depth + 2) mot,
-         go depth ctx,
-         go (depth + 2) varcase)
-    | Gel (r, t) -> Gel (bgo depth r, go depth t)
-    | Engel (r, t) -> Engel (bgo depth r, go depth t)
-    | Ungel (mot, gel, case) ->
-      Ungel (go (depth + 1) mot, go (depth + 1) gel, go (depth + 1) case)
-    | Uni j -> Uni j
-  in
-  try
-    Some (go 0 t)
-  with
-    Indirect_use -> None
-
 let rec condense = function
   | Zero -> Some 0
   | Suc t ->
@@ -129,8 +31,6 @@ let rec condense = function
 let pp_bdim fmt =
   let open Format in
   function
-  (* | BZero -> fprintf fmt "O"
-   * | BOne -> fprintf fmt "I" *)
   | BVar i -> fprintf fmt "#%d" i
 
 let rec pp fmt =

@@ -1,8 +1,6 @@
 type uni_level = int
 
 type bdim =
-  (* | BZero
-   * | BOne *)
   | BVar of int (* DeBruijn indices for variables *)
 
 type t =
@@ -19,10 +17,6 @@ type t =
 
 val equal_uni_level : uni_level -> uni_level -> bool
 val equal : t -> t -> bool
-
-val lift_bdim : int -> bdim -> bdim
-val dim_is_apart_from : depth:int -> bdim -> t -> bool
-val extract_bvar : int -> t -> t option
 
 val pp_uni_level : Format.formatter -> uni_level -> unit
 val show_uni_level : uni_level -> string

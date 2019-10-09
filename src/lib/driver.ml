@@ -6,9 +6,9 @@ type env_entry =
   | BDim of string
   | Term of string
 
-type env = Env of {check_env : Check.env; bindings : env_entry list}
+type env = Env of {check_env : Quote.env; bindings : env_entry list}
 
-let initial_env = Env {check_env = []; bindings = []}
+let initial_env = Env {check_env = ([], 0); bindings = []}
 
 type output =
   | NoOutput of env
@@ -42,12 +42,22 @@ let find_idx key =
   in
   go 0
 
+let restrict_env =
+  let rec go i = function
+    | [] -> []
+    | BDim j :: bindings ->
+      if i = j then bindings else BDim j :: go i bindings
+    | Term _ :: bindings -> go i bindings
+  in
+  function
+  | CS.BVar i -> go i
+
 let rec int_to_term = function
   | 0 -> S.Zero
   | n -> S.Suc (int_to_term (n - 1))
 
 let rec unravel_spine f = function
-  | [] -> f
+  | [] -> fun env -> f env
   | x :: xs -> unravel_spine (x f) xs
 
 let bbind env = function
@@ -77,7 +87,7 @@ let rec bind env = function
     let lam = CS.Lam (BinderN {names; body}) in
     S.Lam (bind (Term x :: env) lam)
   | CS.Ap (f, args) ->
-    List.map (bind_spine env) args |> unravel_spine (bind env f)
+    unravel_spine (fun env -> bind env f) (List.map bind_spine args) env
   | CS.Sg ([], body) ->
     bind env body
   | CS.Sg (Cell cell :: tele, body) ->
@@ -115,47 +125,54 @@ let rec bind env = function
        mot = Binder2 {name1 = mot_dim; name2 = mot_dom; body = mot_body};
        ctx;
        varcase = Binder2 {name1 = var_bridge; name2 = var_dim; body = var_body}} ->
+    let restricted_env = restrict_env bdim env in
     S.Extent
       (bbind env bdim,
-       bind (BDim dom_dim :: env) dom_body,
-       bind (Term mot_dom :: BDim mot_dim :: env) mot_body,
+       bind (BDim dom_dim :: restricted_env) dom_body,
+       bind (Term mot_dom :: BDim mot_dim :: restricted_env) mot_body,
        bind env ctx,
-       bind (BDim var_dim :: Term var_bridge :: env) var_body)
-  | CS.Gel (r, t) -> S.Gel (bbind env r, bind env t)
-  | CS.Engel (r, t) -> S.Engel (bbind env r, bind env t)
+       bind (BDim var_dim :: Term var_bridge :: restricted_env) var_body)
+  | CS.Gel (r, t) ->
+    let restricted_env = restrict_env r env in
+    S.Gel (bbind env r, bind restricted_env t)
+  | CS.Engel (r, t) ->
+    let restricted_env = restrict_env r env in
+    S.Engel (bbind env r, bind restricted_env t)
   | CS.Ungel
       {mot = Binder {name = mot_name; body = mot_body};
        gel = Binder {name = gel_name; body = gel_body};
        case = Binder {name = case_name; body = case_body}} ->
     S.Ungel
       (bind (Term mot_name :: env) mot_body,
-       bind (Term gel_name :: env) gel_body,
+       bind (BDim gel_name :: env) gel_body,
        bind (Term case_name :: env) case_body)
   | CS.Uni i -> S.Uni i
 
-and bind_spine env = function
-  | CS.Term t -> fun f -> S.Ap (f, bind env t)
-  | CS.BDim b -> fun f -> S.BApp (f, bbind env b)
+and bind_spine = function
+  | CS.Term t -> fun f env -> S.Ap (f env, bind env t)
+  | CS.BDim b -> fun f env ->
+    let restricted_env = restrict_env b env in
+    S.BApp (f restricted_env, bbind env b)
 
 let process_decl (Env {check_env; bindings})  = function
   | CS.Def {name; def; tp} ->
     let def = bind bindings def in
     let tp = bind bindings tp in
     Check.check_tp ~env:check_env ~term:tp;
-    let sem_env = Check.env_to_sem_env check_env in
-    let sem_tp = Nbe.eval tp sem_env in
+    let sem_env = Quote.env_to_sem_env check_env in
+    let sem_tp = Eval.eval tp sem_env in
     Check.check ~env:check_env ~term:def ~tp:sem_tp;
-    let sem_def = Nbe.eval def sem_env in
-    let new_entry = Check.Term {term = sem_def; tp = sem_tp} in
-    NoOutput (Env {check_env = new_entry :: check_env; bindings = Term name :: bindings })
+    let sem_def = Eval.eval def sem_env in
+    let new_env = Quote.add_def ~term:sem_def ~tp:sem_tp check_env in
+    NoOutput (Env {check_env = new_env; bindings = Term name :: bindings })
   | CS.NormalizeDef name ->
     let err = Check.Type_error (Check.Misc ("Unbound variable: " ^ name)) in
     begin
       let i = find_idx name bindings in
-      match List.nth check_env i with
-      | Check.Term {term; tp} ->
-        (* Format.printf "EVAL'D\n%a\n" Domain.pp term; *)
-        NF_def (name, Nbe.read_back_nf [] (D.Normal {term; tp}))
+      let (entries, _) = check_env in
+      match List.nth entries i with
+      | Quote.Def {term; tp} ->
+        NF_def (name, Quote.read_back_nf ([], 0) (D.Normal {term; tp}))
       | _ -> raise err
       | exception Failure _ -> raise err
     end
@@ -163,11 +180,11 @@ let process_decl (Env {check_env; bindings})  = function
     let term = bind bindings term in
     let tp = bind bindings tp in
     Check.check_tp ~env:check_env ~term:tp;
-    let sem_env = Check.env_to_sem_env check_env in
-    let sem_tp = Nbe.eval tp sem_env in
+    let sem_env = Quote.env_to_sem_env check_env in
+    let sem_tp = Eval.eval tp sem_env in
     Check.check ~env:check_env ~term ~tp:sem_tp;
-    let sem_term = Nbe.eval term sem_env in
-    let norm_term = Nbe.read_back_nf sem_env (D.Normal {term = sem_term; tp = sem_tp}) in
+    let sem_term = Eval.eval term sem_env in
+    let norm_term = Quote.read_back_nf check_env (D.Normal {term = sem_term; tp = sem_tp}) in
     NF_term (term, norm_term)
   | CS.Quit -> Quit
 

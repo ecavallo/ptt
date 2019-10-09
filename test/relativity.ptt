@@ -64,14 +64,14 @@ let ra_beta_bwd_fwd : (A : U<0>) -> (p : Bridge (ra A))
 
 normalize def ra_beta_bwd_fwd
 
+--------------------------------------------------------------------------------
+-- Functions and inverses for the eta-equivalence
+--------------------------------------------------------------------------------
+
 let ra_eta_fwd : (P : [_] U<0>) -> [x] (ra (Bridge P) @ x) -> P @ x =
   fun P -> bri x -> fun g ->
   extent x of g in y -> ra (Bridge P) @ y at y _ -> P @ y with
   | q y -> (ungel z -> q @ z at _ -> Bridge P with | gel t -> t) @ y
-
---------------------------------------------------------------------------------
--- Functions and inverses for the eta-equivalence
---------------------------------------------------------------------------------
 
 normalize def ra_eta_fwd
 

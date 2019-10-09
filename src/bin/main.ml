@@ -8,7 +8,8 @@ let main input =
   | Invalid_argument s -> Printf.eprintf "Internal error (invalid argument): %s\n" s; 1
   | Failure s -> Printf.eprintf "Internal error (Failure): %s\n" s; 1
   | Load.Parse_error s -> Printf.eprintf "Frontend error: %s" s; 1
-  | Nbe.Nbe_failed s -> Printf.eprintf "Internal error (Failed to normalize): %s\n" s; 1
+  | Eval.Eval_failed s -> Printf.eprintf "Internal error (Failed to evaluate): %s\n" s; 1
+  | Quote.Quote_failed s -> Printf.eprintf "Internal error (Failed to quote): %s\n" s; 1
   | Check.Type_error e ->
     Printf.eprintf "Type error: ";
     Check.pp_error Format.err_formatter e;
