@@ -5,7 +5,7 @@ type bdim =
 type env_entry =
   | BDim of bdim
   | Term of t
-and env = env_entry list * int
+and env = env_entry list
 [@@deriving show, eq]
 and clos =
     Clos of {term : Syntax.t; env : env}
@@ -51,19 +51,6 @@ and nf =
   | Normal of {tp : t; term : t}
 [@@deriving show, eq]
 
-let get_range (_, range) = range
-
-let mk_bvar (entries, range) =
-  (range, (BDim (BVar range) :: entries, range + 1))
-
-let add_bdim b (entries, range) =
-  (BDim b :: entries, range)
-
-let add_term t (entries, range) =
-  (Term t :: entries, range)
-
-let resize_env range (entries, _) = (entries, range)
-
 let instantiate_bvar r i j =
   if j = i then r else j
 
@@ -74,8 +61,8 @@ let rec instantiate_entry r i = function
   | BDim s -> BDim (instantiate_bdim r i s)
   | Term t -> Term (instantiate r i t)
 
-and instantiate_env r i (entries, range) =
-  (List.map (instantiate_entry r i) entries, range)
+and instantiate_env r i env =
+  List.map (instantiate_entry r i) env
 
 and instantiate_clos r i = function
   | Clos {term; env} -> Clos {term; env = instantiate_env r i env}

@@ -43,19 +43,19 @@ exception Type_error of error
 
 let tp_error e = raise (Type_error e)
 
-let get_tp (entries, _) x =
-  match List.nth entries x with
+let get_tp env x =
+  match List.nth env x with
   | Q.BVar j -> tp_error (Expecting_term j)
   | Q.Var {tp; _} -> tp
   | Q.Def {tp; _} -> tp
 
-let assert_subtype env t1 t2 =
-  if Q.check_tp ~subtype:true env t1 t2
+let assert_subtype env size t1 t2 =
+  if Q.check_tp ~subtype:true env size t1 t2
   then ()
   else tp_error (Type_mismatch (t1, t2))
 
-let assert_equal env t1 t2 tp =
-  if Q.check_nf env (D.Normal {tp; term = t1}) (D.Normal {tp; term = t2})
+let assert_equal env size t1 t2 tp =
+  if Q.check_nf env size (D.Normal {tp; term = t1}) (D.Normal {tp; term = t2})
   then ()
   else tp_error (Type_mismatch (t1, t2))
 
@@ -63,12 +63,12 @@ let assert_bdim_equal b1 b2 =
   if b1 = b2 then ()
   else tp_error (BDim_mismatch (b1, b2))
 
-let rec check ~env ~term ~tp =
+let rec check ~env ~size ~term ~tp =
   match term with
   | Syn.Let (def, body) ->
-    let def_tp = synth ~env ~term:def in
-    let def_val = E.eval def (Q.env_to_sem_env env) in
-    check ~env:(Q.add_def ~term:def_val ~tp:def_tp env) ~term:body ~tp
+    let def_tp = synth ~env ~size ~term:def in
+    let def_val = E.eval def (Q.env_to_sem_env env) size in
+    check ~env:(Q.Def {term = def_val; tp = def_tp} :: env) ~size ~term:body ~tp
   | Nat ->
     begin
       match tp with
@@ -79,66 +79,66 @@ let rec check ~env ~term ~tp =
     begin
       match tp with
       | D.Uni _ ->
-        check ~env ~term:tp' ~tp;
-        let tp' = E.eval tp' (Q.env_to_sem_env env) in
-        check ~env ~term:l ~tp:tp';
-        check ~env ~term:r ~tp:tp'
+        check ~env ~size ~term:tp' ~tp;
+        let tp' = E.eval tp' (Q.env_to_sem_env env) size in
+        check ~env ~size ~term:l ~tp:tp';
+        check ~env ~size ~term:r ~tp:tp'
       | t -> tp_error (Expecting_universe t)
     end
   | Refl term ->
     begin
       match tp with
       | D.Id (tp, left, right) ->
-        check ~env ~term ~tp;
+        check ~env ~size ~term ~tp;
         let sem_env = Q.env_to_sem_env env in
-        let term = E.eval term sem_env in
-        assert_equal env term left tp;
-        assert_equal env term right tp
+        let term = E.eval term sem_env size in
+        assert_equal env size term left tp;
+        assert_equal env size term right tp
       | t -> tp_error (Misc ("Expecting Id but found\n" ^ D.show t))
     end
   | Pi (l, r) | Sg (l, r) ->
     begin
       match tp with
       | D.Uni _ ->
-        check ~env ~term:l ~tp;
-        let l_sem = E.eval l (Q.env_to_sem_env env) in
-        let (_, arg_env) = Q.mk_var l_sem env in
-        check ~env:arg_env ~term:r ~tp
+        check ~env ~size ~term:l ~tp;
+        let l_sem = E.eval l (Q.env_to_sem_env env) size in
+        let (_, arg_env) = Q.mk_var l_sem env size in
+        check ~env:arg_env ~size:(size + 1) ~term:r ~tp
       | t -> tp_error (Expecting_universe t)
     end
   | Lam body ->
     begin
       match tp with
       | D.Pi (arg_tp, clos) ->
-        let (arg, arg_env) = Q.mk_var arg_tp env in
-        let dest_tp = E.do_clos (Q.get_range arg_env) clos arg in
-        check ~env:arg_env ~term:body ~tp:dest_tp;
+        let (arg, arg_env) = Q.mk_var arg_tp env size in
+        let dest_tp = E.do_clos (size + 1) clos arg in
+        check ~env:arg_env ~size:(size + 1) ~term:body ~tp:dest_tp;
       | t -> tp_error (Misc ("Expecting Pi but found\n" ^ D.show t))
     end
   | Pair (left, right) ->
     begin
       match tp with
       | D.Sg (left_tp, right_tp) ->
-        check ~env ~term:left ~tp:left_tp;
-        let left_sem = E.eval left (Q.env_to_sem_env env) in
-        check ~env ~term:right ~tp:(E.do_clos (Q.get_range env) right_tp left_sem)
+        check ~env ~size ~term:left ~tp:left_tp;
+        let left_sem = E.eval left (Q.env_to_sem_env env) size in
+        check ~env ~size ~term:right ~tp:(E.do_clos size right_tp left_sem)
       | t -> tp_error (Misc ("Expecting Sg but found\n" ^ D.show t))
     end
   | Bridge term ->
     begin
       match tp with
       | Uni _ ->
-        let (_, arg_env) = Q.mk_bvar env in
-        check ~env:arg_env ~term ~tp
+        let (_, arg_env) = Q.mk_bvar env size in
+        check ~env:arg_env ~size:(size + 1) ~term ~tp
       | t -> tp_error (Expecting_universe t)
     end
   | BLam body ->
     begin
       match tp with
       | Bridge clos ->
-        let (arg, arg_env) = Q.mk_bvar env in
-        let dest_tp = E.do_bclos (Q.get_range arg_env) clos arg in
-        check ~env:arg_env ~term:body ~tp:dest_tp
+        let (arg, arg_env) = Q.mk_bvar env size in
+        let dest_tp = E.do_bclos (size + 1) clos arg in
+        check ~env:arg_env ~size:(size + 1) ~term:body ~tp:dest_tp
       | t -> tp_error (Misc ("Expecting Bridge but found\n" ^ D.show t))
     end
   | Gel (r, term) ->
@@ -146,7 +146,7 @@ let rec check ~env ~term ~tp =
       match tp with
       | Uni _ ->
         let r' = E.eval_bdim r (Q.env_to_sem_env env) in
-        check ~env:(Q.restrict_env r' env) ~term ~tp;
+        check ~env:(Q.restrict_env r' env) ~size ~term ~tp;
       | t -> tp_error (Expecting_universe t)
     end
   | Engel (r, term) ->
@@ -158,7 +158,7 @@ let rec check ~env ~term ~tp =
           | Gel (j, tp) ->
             let sem_env = Q.env_to_sem_env env in
             assert_bdim_equal (E.eval_bdim (Syn.BVar i) sem_env) (D.BVar j);
-            check ~env:(Q.restrict_env (D.BVar j) env) ~term ~tp
+            check ~env:(Q.restrict_env (D.BVar j) env) ~size ~term ~tp
           | t -> tp_error (Misc ("Expecting Gel but found\n" ^ D.show t))
         end
     end
@@ -171,78 +171,75 @@ let rec check ~env ~term ~tp =
           "Expecting universe over " ^ string_of_int i ^ " but found\n" ^ D.show t in
         tp_error (Misc msg)
     end
-  | term -> assert_subtype env (synth ~env ~term) tp
+  | term -> assert_subtype env size (synth ~env ~size ~term) tp
 
-and synth ~env ~term =
+and synth ~env ~size ~term =
   match term with
   | Syn.Var i -> get_tp env i
   | Check (term, tp') ->
-    let tp = E.eval tp' (Q.env_to_sem_env env) in
-    check ~env ~term ~tp;
+    let tp = E.eval tp' (Q.env_to_sem_env env) size in
+    check ~env ~size ~term ~tp;
     tp
   | Zero -> D.Nat
-  | Suc term -> check ~env ~term ~tp:Nat; D.Nat
+  | Suc term -> check ~env ~size ~term ~tp:Nat; D.Nat
   | Fst p ->
     begin
-      match synth ~env ~term:p with
+      match synth ~env ~size ~term:p with
       | Sg (left_tp, _) -> left_tp
       | t -> tp_error (Misc ("Expecting Sg but found\n" ^ D.show t))
     end
   | Snd p ->
     begin
-      match synth ~env ~term:p with
+      match synth ~env ~size ~term:p with
       | Sg (_, right_tp) ->
-        let proj = E.eval (Fst p) (Q.env_to_sem_env env) in
-        E.do_clos (Q.get_range env) right_tp proj
+        let proj = E.eval (Fst p) (Q.env_to_sem_env env) size in
+        E.do_clos size right_tp proj
       | t -> tp_error (Misc ("Expecting Sg but found\n" ^ D.show t))
     end
   | Ap (f, a) ->
     begin
-      match synth ~env ~term:f with
+      match synth ~env ~size ~term:f with
       | Pi (src, dest) ->
-        check ~env ~term:a ~tp:src;
-        let a_sem = E.eval a (Q.env_to_sem_env env) in
-        E.do_clos (Q.get_range env) dest a_sem
+        check ~env ~size ~term:a ~tp:src;
+        let a_sem = E.eval a (Q.env_to_sem_env env) size in
+        E.do_clos size dest a_sem
       | t -> tp_error (Misc ("Expecting Pi but found\n" ^ D.show t))
     end
   | NRec (mot, zero, suc, n) ->
-    check ~env ~term:n ~tp:Nat;
+    check ~env ~size ~term:n ~tp:Nat;
     let sem_env = Q.env_to_sem_env env in
-    let (nat_arg, nat_env) = Q.mk_var Nat env in
-    check_tp ~env:nat_env ~term:mot;
-    let zero_tp = E.eval mot (D.add_term D.Zero sem_env) in
-    check ~env ~term:zero ~tp:zero_tp;
-    let ih_tp = E.eval mot (Q.env_to_sem_env nat_env) in
-    let (_, ih_env) = Q.mk_var ih_tp nat_env in
-    let suc_sem_env = D.resize_env (Q.get_range ih_env) sem_env in
-    let suc_tp = E.eval mot (D.add_term (Suc nat_arg) suc_sem_env) in
-    check
-      ~env:ih_env
-      ~term:suc
-      ~tp:suc_tp;
-    E.eval mot (D.add_term (E.eval n sem_env) sem_env)
+    let (nat_arg, nat_env) = Q.mk_var Nat env size in
+    check_tp ~env:nat_env ~size:(size + 1) ~term:mot;
+    let zero_tp = E.eval mot (D.Term D.Zero :: sem_env) size in
+    check ~env ~size ~term:zero ~tp:zero_tp;
+    let ih_tp = E.eval mot (Q.env_to_sem_env nat_env) (size + 1) in
+    let (_, ih_env) = Q.mk_var ih_tp nat_env (size + 1) in
+    let suc_tp = E.eval mot (D.Term (Suc nat_arg) :: sem_env) (size + 2) in
+    check ~env:ih_env ~size:(size + 2) ~term:suc ~tp:suc_tp;
+    E.eval mot (D.Term (E.eval n sem_env size) :: sem_env) size
   | BApp (term,r) ->
     let sem_r = E.eval_bdim r (Q.env_to_sem_env env) in
     let restricted_env = Q.restrict_env sem_r env in
     begin
-      match synth ~env:restricted_env ~term with
-      | Bridge clos -> E.do_bclos (Q.get_range env) clos sem_r
+      match synth ~env:restricted_env ~size ~term with
+      | Bridge clos -> E.do_bclos size clos sem_r
       | t -> tp_error (Misc ("Expecting Bridge but found\n" ^ D.show t ^ "\n" ^ Syn.show term ^ "\n" ^ Q.show_env env))
     end
   | J (mot, refl, eq) ->
     begin
-      match synth ~env ~term:eq with
+      match synth ~env ~size ~term:eq with
       | D.Id (tp', left, right) ->
         let sem_env = Q.env_to_sem_env env in
-        let (mot_arg1, mot_env1) = Q.mk_var tp' env in
-        let (mot_arg2, mot_env2) = Q.mk_var tp' mot_env1 in
-        let (_, mot_env3) = Q.mk_var (D.Id (tp', mot_arg1, mot_arg2)) mot_env2 in
-        check_tp ~env:mot_env3 ~term:mot;
-        let refl_sem_env = D.resize_env (Q.get_range mot_env1) sem_env in
-        let refl_tp = E.eval mot
-            (D.add_term (D.Refl mot_arg1) (D.add_term mot_arg1 (D.add_term mot_arg1 refl_sem_env))) in
-        check ~env:mot_env1 ~term:refl ~tp:refl_tp;
-        E.eval mot (D.add_term (E.eval eq sem_env) (D.add_term right (D.add_term left sem_env)))
+        let (mot_arg1, mot_env1) = Q.mk_var tp' env size in
+        let (mot_arg2, mot_env2) = Q.mk_var tp' mot_env1 (size + 1) in
+        let (_, mot_env3) = Q.mk_var (D.Id (tp', mot_arg1, mot_arg2)) mot_env2 (size + 2) in
+        check_tp ~env:mot_env3 ~size:(size + 3) ~term:mot;
+        let refl_tp =
+          E.eval mot
+            (D.Term (D.Refl mot_arg1) :: D.Term mot_arg1 :: D.Term mot_arg1 :: sem_env)
+            (size + 1) in
+        check ~env:mot_env1 ~size:(size + 1) ~term:refl ~tp:refl_tp;
+        E.eval mot (D.Term (E.eval eq sem_env size) :: D.Term right :: D.Term left :: sem_env) size
       | t -> tp_error (Misc ("Expecting Id but found\n" ^ D.show t))
     end
   | Extent (r, dom, mot, ctx, varcase) ->
@@ -250,82 +247,75 @@ and synth ~env ~term =
     let r' = E.eval_bdim r sem_env in
     let res_env = Q.restrict_env r' env in
     let res_sem_env = Q.env_to_sem_env res_env in
-    let (_, dim_env) = Q.mk_bvar res_env in
-    check_tp ~env:dim_env ~term:dom;
-    let dom' = E.eval dom (Q.env_to_sem_env dim_env) in
-    let (_, dom_env) = Q.mk_var dom' dim_env in
-    check_tp ~env:dom_env ~term:mot;
-    let dom_r = E.eval dom (D.add_bdim r' res_sem_env) in
-    check ~env ~term:ctx ~tp:dom_r;
+    let (_, dim_env) = Q.mk_bvar res_env size in
+    check_tp ~env:dim_env ~size:(size + 1) ~term:dom;
+    let dom' = E.eval dom (Q.env_to_sem_env dim_env) (size + 1) in
+    let (_, dom_env) = Q.mk_var dom' dim_env (size + 1) in
+    check_tp ~env:dom_env ~size:(size + 2) ~term:mot;
+    let dom_r = E.eval dom (D.BDim r' :: res_sem_env) size in
+    check ~env ~size ~term:ctx ~tp:dom_r;
     let dom_bridge = D.Bridge (D.Clos {term = dom; env = res_sem_env}) in
-    let (bridge_arg, bridge_env) = Q.mk_var dom_bridge res_env in
-    let (varcase_barg, varcase_benv) = Q.mk_bvar bridge_env in
-    let varcase_inst = E.do_bapp (Q.get_range varcase_benv) bridge_arg varcase_barg in
-    let varcase_mot = E.eval mot
-        (D.add_term varcase_inst
-           (D.add_bdim varcase_barg
-              (D.resize_env (Q.get_range varcase_benv) res_sem_env))) in
-    check ~env:varcase_benv ~term:varcase ~tp:varcase_mot;
-    E.eval mot
-      (D.add_term (E.eval ctx sem_env)
-         (D.add_bdim r'
-            (D.resize_env (D.get_range sem_env) res_sem_env)))
+    let (bridge_arg, bridge_env) = Q.mk_var dom_bridge res_env size in
+    let (varcase_barg, varcase_benv) = Q.mk_bvar bridge_env (size + 1) in
+    let varcase_inst = E.do_bapp (size + 2) bridge_arg varcase_barg in
+    let varcase_mot =
+      E.eval mot (D.Term varcase_inst :: D.BDim varcase_barg :: res_sem_env) (size + 2) in
+    check ~env:varcase_benv ~size:(size + 2) ~term:varcase ~tp:varcase_mot;
+    E.eval mot (D.Term (E.eval ctx sem_env size) :: D.BDim r' :: res_sem_env) size
   | Ungel (mot, term, case) ->
-    let (var_arg, var_env) = Q.mk_bvar env in
+    let (var_arg, var_env) = Q.mk_bvar env size in
     begin
-      match synth ~env:var_env ~term with
+      match synth ~env:var_env ~size:(size + 1) ~term with
       | D.Gel (i, tp) ->
         assert_bdim_equal (D.BVar i) var_arg;
-        let syn_tp = Q.read_back_tp env tp in
+        let syn_tp = Q.read_back_tp env size tp in
         let sem_env = Q.env_to_sem_env env in
         let mot_hyp =
           D.Bridge (D.Clos {term = Syn.Gel (Syn.BVar 0, syn_tp); env = sem_env}) in
-        let (_, hyp_env) = Q.mk_var mot_hyp env in
-        check_tp ~env:hyp_env ~term:mot;
-        let (_, case_env) = Q.mk_var tp env in
+        let (_, hyp_env) = Q.mk_var mot_hyp env size in
+        check_tp ~env:hyp_env ~size:(size + 1) ~term:mot;
+        let (_, case_env) = Q.mk_var tp env size in
         let gel_term =
           D.BLam
             (D.Clos
                {term = Syn.Engel (Syn.BVar 0, Syn.Var 0);
                 env = Q.env_to_sem_env case_env})
         in
-        let gel_tp =
-          E.eval mot (D.add_term gel_term (D.resize_env (Q.get_range case_env) sem_env)) in
-        check ~env:case_env ~term:case ~tp:gel_tp;
-        E.eval mot (D.add_term (D.BLam (D.Clos {term; env = sem_env})) sem_env)
+        let gel_tp = E.eval mot (D.Term gel_term :: sem_env) (size + 1) in
+        check ~env:case_env ~size:(size + 1) ~term:case ~tp:gel_tp;
+        E.eval mot (D.Term (D.BLam (D.Clos {term; env = sem_env})) :: sem_env) size
       | t -> tp_error (Misc ("Expecting Gel but found\n" ^ D.show t))
     end
   | _ -> tp_error (Cannot_synth_term term)
 
-and check_tp ~env ~term =
+and check_tp ~env ~size ~term =
   match term with
   | Syn.Nat -> ()
   | Uni _ -> ()
   | Bridge term ->
-    let (_, var_env) = Q.mk_bvar env in
-    check_tp ~env:var_env ~term
+    let (_, var_env) = Q.mk_bvar env size in
+    check_tp ~env:var_env ~size:(size + 1) ~term
   | Pi (l, r) | Sg (l, r) ->
-    check_tp ~env ~term:l;
+    check_tp ~env ~size ~term:l;
     let sem_env = Q.env_to_sem_env env in
-    let l_sem = E.eval l sem_env in
-    let (_, var_env) = Q.mk_var l_sem env in
-    check_tp ~env:var_env ~term:r
+    let l_sem = E.eval l sem_env size in
+    let (_, var_env) = Q.mk_var l_sem env size in
+    check_tp ~env:var_env ~size:(size + 1) ~term:r
   | Let (def, body) ->
-    let def_tp = synth ~env ~term:def in
-    let def_val = E.eval def (Q.env_to_sem_env env) in
-    let def_env = Q.add_def ~term:def_val ~tp:def_tp env in
-    check_tp ~env:def_env ~term:body
+    let def_tp = synth ~env ~size ~term:def in
+    let def_val = E.eval def (Q.env_to_sem_env env) size in
+    check_tp ~env:(Q.Def {term = def_val; tp = def_tp} :: env) ~size ~term:body
   | Id (tp, l, r) ->
-    check_tp ~env ~term:tp;
-    let tp = E.eval tp (Q.env_to_sem_env env) in
-    check ~env ~term:l ~tp;
-    check ~env ~term:r ~tp
+    check_tp ~env ~size ~term:tp;
+    let tp = E.eval tp (Q.env_to_sem_env env) size in
+    check ~env ~size ~term:l ~tp;
+    check ~env ~size ~term:r ~tp
   | Gel (r, tp) ->
     let r' = E.eval_bdim r (Q.env_to_sem_env env) in
-    check_tp ~env:(Q.restrict_env r' env) ~term:tp
+    check_tp ~env:(Q.restrict_env r' env) ~size ~term:tp
   | term ->
     begin
-      match synth ~env ~term with
+      match synth ~env ~size ~term with
       | D.Uni _ -> ()
       | t -> tp_error (Expecting_universe t)
     end

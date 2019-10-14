@@ -4,7 +4,7 @@ type bdim =
 type env_entry =
   | BDim of bdim
   | Term of t
-and env = env_entry list * int
+and env = env_entry list
 and clos =
     Clos of {term : Syntax.t; env : env}
   | ConstClos of t
@@ -40,13 +40,6 @@ and 'a stack =
 and ne = int stack (* DeBruijn levels for variables *)
 and nf =
   | Normal of {tp : t; term : t}
-
-val mk_bvar : env -> int * env
-val add_bdim : bdim -> env -> env
-val add_term : t -> env -> env
-
-val get_range : env -> int
-val resize_env : int -> env -> env
 
 val instantiate : int -> int -> t -> t
 val instantiate_stack : (int -> int -> 'a -> 'a) -> int -> int -> 'a stack -> 'a stack

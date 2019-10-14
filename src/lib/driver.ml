@@ -8,7 +8,7 @@ type env_entry =
 
 type env = Env of {check_env : Quote.env; bindings : env_entry list}
 
-let initial_env = Env {check_env = ([], 0); bindings = []}
+let initial_env = Env {check_env = []; bindings = []}
 
 type output =
   | NoOutput of env
@@ -158,33 +158,32 @@ let process_decl (Env {check_env; bindings})  = function
   | CS.Def {name; def; tp} ->
     let def = bind bindings def in
     let tp = bind bindings tp in
-    Check.check_tp ~env:check_env ~term:tp;
+    Check.check_tp ~env:check_env ~size:0 ~term:tp;
     let sem_env = Quote.env_to_sem_env check_env in
-    let sem_tp = Eval.eval tp sem_env in
-    Check.check ~env:check_env ~term:def ~tp:sem_tp;
-    let sem_def = Eval.eval def sem_env in
-    let new_env = Quote.add_def ~term:sem_def ~tp:sem_tp check_env in
+    let sem_tp = Eval.eval tp sem_env 0 in
+    Check.check ~env:check_env ~size:0 ~term:def ~tp:sem_tp;
+    let sem_def = Eval.eval def sem_env 0 in
+    let new_env = Quote.Def {term = sem_def; tp = sem_tp} :: check_env in
     NoOutput (Env {check_env = new_env; bindings = Term name :: bindings })
   | CS.NormalizeDef name ->
     let err = Check.Type_error (Check.Misc ("Unbound variable: " ^ name)) in
     begin
       let i = find_idx name bindings in
-      let (entries, _) = check_env in
-      match List.nth entries i with
+      match List.nth check_env i with
       | Quote.Def {term; tp} ->
-        NF_def (name, Quote.read_back_nf ([], 0) (D.Normal {term; tp}))
+        NF_def (name, Quote.read_back_nf [] 0 (D.Normal {term; tp}))
       | _ -> raise err
       | exception Failure _ -> raise err
     end
   | CS.NormalizeTerm {term; tp} ->
     let term = bind bindings term in
     let tp = bind bindings tp in
-    Check.check_tp ~env:check_env ~term:tp;
+    Check.check_tp ~env:check_env ~size:0 ~term:tp;
     let sem_env = Quote.env_to_sem_env check_env in
-    let sem_tp = Eval.eval tp sem_env in
-    Check.check ~env:check_env ~term ~tp:sem_tp;
-    let sem_term = Eval.eval term sem_env in
-    let norm_term = Quote.read_back_nf check_env (D.Normal {term = sem_term; tp = sem_tp}) in
+    let sem_tp = Eval.eval tp sem_env 0 in
+    Check.check ~env:check_env ~size:0 ~term ~tp:sem_tp;
+    let sem_term = Eval.eval term sem_env 0 in
+    let norm_term = Quote.read_back_nf check_env 0 (D.Normal {term = sem_term; tp = sem_tp}) in
     NF_term (term, norm_term)
   | CS.Quit -> Quit
 

@@ -10,6 +10,6 @@ val pp_error : Format.formatter -> error -> unit
 
 exception Type_error of error
 
-val check : env:Quote.env -> term:Syntax.t -> tp:Domain.t -> unit
-val synth : env:Quote.env -> term:Syntax.t -> Domain.t
-val check_tp : env:Quote.env -> term:Syntax.t -> unit
+val check : env:Quote.env -> size:int -> term:Syntax.t -> tp:Domain.t -> unit
+val synth : env:Quote.env -> size:int -> term:Syntax.t -> Domain.t
+val check_tp : env:Quote.env -> size:int -> term:Syntax.t -> unit

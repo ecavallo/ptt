@@ -2,7 +2,7 @@ exception Eval_failed of string
 
 (* Evaluation *)
 val eval_bdim : Syntax.bdim -> Domain.env -> Domain.bdim
-val eval : Syntax.t -> Domain.env -> Domain.t
+val eval : Syntax.t -> Domain.env -> int -> Domain.t
 
 (* Functions to manipulate elements of the semantic domain *)
 val do_ap : int -> Domain.t -> Domain.t -> Domain.t
