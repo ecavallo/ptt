@@ -4,8 +4,6 @@ module E = Eval
 
 exception Quote_failed of string
 
-exception Removed
-
 type env_entry =
   | BVar of int
   | Var of {level : int; tp : Domain.t}
@@ -46,7 +44,7 @@ let read_back_level env x =
     | BVar i :: env -> if i = x then acc else go (acc + 1) env
     | Var {level; _} :: env -> if level = x then acc else go (acc + 1) env
     | Def _ :: env -> go (acc + 1) env
-    | [] -> raise Removed
+    | [] -> raise (Quote_failed "read back non-existent variable")
   in
   go 0 env
 
@@ -70,20 +68,15 @@ let do_stack root_inst rootf =
 exception Cannot_reduce_extent
 
 let rec reduce_extent_root env size (D.Ext {var = i; dom; ctx; varcase; _}) =
-  let restricted_env = restrict_env (D.BVar i) env in
-  let env_i = BVar i :: restricted_env in
+  let sem_env = env_to_sem_env env in
   let dom_i = E.do_bclos size dom (D.BVar i) in
-  let result =
-    try
-      Some (read_back_nf env_i size (D.Normal {tp = dom_i; term = ctx}))
-    with
-      Removed -> None
-  in
+  let i' = read_back_level env i in
+  let ctx' = read_back_nf env size (D.Normal {tp = dom_i; term = ctx}) in
   begin
-    match result with
+    match Unsubst.unsubst_bvar i' sem_env ctx' with
     | Some extract ->
       let extract_blam =
-        D.BLam (D.Clos {term = extract; env = env_to_sem_env restricted_env}) in
+        D.BLam (D.Clos {term = extract; env = E.restrict_env (Syn.BVar i') sem_env}) in
       let output_varcase = E.do_closbclos size varcase extract_blam (D.BVar i) in
       output_varcase
     | _ -> raise Cannot_reduce_extent

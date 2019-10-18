@@ -94,3 +94,35 @@ let extent_test4 : (A : U<0>) (B : U<0>) (f : ([x] A) -> [x] B) (q : [x] A)
   fun A B f q -> bri x -> refl (f q @ x)
 
 normalize def extent_test4
+
+-- Make sure that extent reduces correctly inside the context argument of another extent
+
+let extent_test5 : [y] (nat -> [x] nat)
+  =
+  bri y -> fun n -> bri x ->
+  extent x of
+  (extent y of n in _ -> nat at _ _ -> nat with | q y -> suc zero) in
+  _ -> nat at
+  _ _ -> nat with
+  | p x -> zero
+
+normalize def extent_test5
+
+let extent_test5a : Id ([y] (nat -> [x] nat)) extent_test5 (bri y -> fun n -> bri x -> zero)
+  =
+  refl (bri y -> fun n -> bri x -> zero)
+
+let extent_test6 : [x] (nat -> [y] nat)
+  =
+  bri x -> fun n -> bri y ->
+  extent x of
+  (extent y of n in _ -> nat at _ _ -> nat with | q y -> suc zero) in
+  _ -> nat at
+  _ _ -> nat with
+  | p x -> zero
+
+normalize def extent_test6
+
+let extent_test6a : Id ([x] (nat -> [y] nat)) extent_test6 (bri x -> fun n -> bri y -> zero)
+  =
+  refl (bri x -> fun n -> bri y -> zero)
