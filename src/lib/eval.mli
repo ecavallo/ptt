@@ -1,7 +1,5 @@
 exception Eval_failed of string
 
-val restrict_env : Syntax.bdim -> Domain.env -> Domain.env
-
 (* Evaluation *)
 val eval_bdim : Syntax.bdim -> Domain.env -> Domain.bdim
 val eval : Syntax.t -> Domain.env -> int -> Domain.t

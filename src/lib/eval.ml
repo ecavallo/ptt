@@ -3,17 +3,6 @@ module D = Domain
 
 exception Eval_failed of string
 
-let restrict_env r env =
-  let rec go i env =
-    match i, env with
-    | 0, D.BDim _ :: env -> env
-    | _, D.BDim s :: env -> D.BDim s :: go (i - 1) env
-    | _, D.Term _ :: env -> go (i - 1) env
-    | _ -> raise (Eval_failed "Failed to restrict semantic environment")
-  in
-  match r with
-  | Syn.BVar i -> go i env
-
 let eval_bdim r (env : D.env) =
   match r with
   | Syn.BVar i ->
@@ -206,7 +195,7 @@ and eval t (env : D.env) size =
   | Syn.Bridge dest -> D.Bridge (Clos {term = dest; env})
   | Syn.BApp (t,r) ->
     let r' = eval_bdim r env in
-    do_bapp size (eval t (restrict_env r env) size) r'
+    do_bapp size (eval t env size) r'
   | Syn.BLam t -> D.BLam (Clos {term = t; env})
   | Syn.Refl t -> D.Refl (eval t env size)
   | Syn.Id (tp, left, right) -> D.Id (eval tp env size, eval left env size, eval right env size)
@@ -218,15 +207,14 @@ and eval t (env : D.env) size =
       match r' with
       | D.BVar i ->
         let ctx' = eval ctx env size in
-        let restricted_env = restrict_env r env in
-        let final_tp = eval mot (D.Term ctx' :: D.BDim r' :: restricted_env) size in
+        let final_tp = eval mot (D.Term ctx' :: D.BDim r' :: env) size in
         let ext =
           D.Ext
             {var = i;
-             dom = D.Clos {term = dom; env = restricted_env};
-             mot = D.Clos2 {term = mot; env = restricted_env};
+             dom = D.Clos {term = dom; env};
+             mot = D.Clos2 {term = mot; env};
              ctx = ctx';
-             varcase = D.Clos2 {term = varcase; env = restricted_env}}
+             varcase = D.Clos2 {term = varcase; env}}
         in
         D.Extent {tp = final_tp; term = D.Root ext}
     end
@@ -234,13 +222,13 @@ and eval t (env : D.env) size =
     begin
       let r' = eval_bdim r env in
       match r' with
-      | D.BVar i -> D.Gel (i, eval t (restrict_env r env) size)
+      | D.BVar i -> D.Gel (i, eval t env size)
     end
   | Syn.Engel (r, t) ->
     begin
       let r' = eval_bdim r env in
       match r' with
-      | D.BVar i -> D.Engel (i, eval t (restrict_env r env) size)
+      | D.BVar i -> D.Engel (i, eval t env size)
     end
   | Syn.Ungel (mot, gel, case) ->
     do_ungel

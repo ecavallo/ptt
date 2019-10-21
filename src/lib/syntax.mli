@@ -18,6 +18,8 @@ type t =
 val equal_uni_level : uni_level -> uni_level -> bool
 val equal : t -> t -> bool
 
+val unsubst_bvar : int -> t -> t option
+
 val pp_uni_level : Format.formatter -> uni_level -> unit
 val show_uni_level : uni_level -> string
 
