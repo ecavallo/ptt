@@ -15,12 +15,9 @@ and clos2 = Clos2 of {term : Syntax.t; env : env}
 [@@deriving show, eq]
 and clos3 = Clos3 of {term : Syntax.t; env : env}
 [@@deriving show, eq]
-and extent_root = Ext of {var : int; dom : clos; mot : clos2; ctx : t; varcase : clos2}
-[@@deriving show, eq]
 and t =
   | Lam of clos
   | Neutral of {tp : t; term : ne}
-  | Extent of {tp : t; term : extent_root stack}
   | Nat
   | Zero
   | Suc of t
@@ -35,21 +32,31 @@ and t =
   | Engel of int * t
   | Uni of Syntax.uni_level
 [@@deriving show, eq]
-and 'a stack =
-  | Root of 'a
-  | Ap of 'a stack * nf
-  | Fst of 'a stack
-  | Snd of 'a stack
-  | BApp of 'a stack * int
-  | NRec of clos * t * clos2 * 'a stack
-  | J of clos3 * clos * t * t * t * 'a stack
-  | Ungel of t * clos * (* BBINDER *) int * 'a stack * clos * clos
+and extent_head = {var : int; dom : clos; mot : clos2; ctx : t; varcase : clos2}
 [@@deriving show, eq]
-and ne = int stack (* DeBruijn levels for variables *)
+and head =
+  | Var of int
+  | Ext of extent_head
+[@@deriving show, eq]
+and cell =
+  | Ap of nf
+  | Fst
+  | Snd
+  | BApp of int
+  | NRec of clos * t * clos2
+  | J of clos3 * clos * t * t * t
+  | Ungel of t * clos * (* BBINDER *) int * clos * clos
+[@@deriving show, eq]
+and spine = cell list
+[@@deriving show, eq]
+and ne = head * spine
 [@@deriving show, eq]
 and nf =
   | Normal of {tp : t; term : t}
 [@@deriving show, eq]
+
+let root h = (h, [])
+let (@:) cell (h, s) = (h, cell :: s)
 
 let instantiate_bvar r i j =
   if j = i then r else j
@@ -78,8 +85,6 @@ and instantiate r i = function
   | Lam clo -> Lam (instantiate_clos r i clo)
   | Neutral {tp; term} ->
     Neutral {tp = instantiate r i tp; term = instantiate_ne r i term}
-  | Extent {tp; term} ->
-    Extent {tp = instantiate r i tp; term = instantiate_extent r i term}
   | Nat -> Nat
   | Zero -> Zero
   | Suc t -> Suc (instantiate r i t)
@@ -94,52 +99,56 @@ and instantiate r i = function
   | Engel (j, t) -> Engel (instantiate_bvar r i j, t)
   | Uni i -> Uni i
 
-and instantiate_stack : 'a. (int -> int -> 'a -> 'a) -> int -> int -> 'a stack -> 'a stack =
-  fun rootf r i ->
-  function
-  | Root t -> Root (rootf r i t)
-  | Ap (s, t) -> Ap (instantiate_stack rootf r i s, instantiate_nf r i t)
-  | Fst s -> Fst (instantiate_stack rootf r i s)
-  | Snd s -> Snd (instantiate_stack rootf r i s)
-  | BApp (s, j) -> BApp (instantiate_stack rootf r i s, instantiate_bvar r i j)
-  | NRec (tp, zero, suc, s) ->
-    NRec
-      (instantiate_clos r i tp,
-       instantiate r i zero,
-       instantiate_clos2 r i suc,
-       instantiate_stack rootf r i s)
-  | J (mot, refl, tp, left, right, s) ->
-    J
-      (instantiate_clos3 r i mot,
-       instantiate_clos r i refl,
-       instantiate r i tp,
-       instantiate r i left,
-       instantiate r i right,
-       instantiate_stack rootf r i s)
-  | Ungel (tp, mot, j, s, clo, case) ->
-    if i = j
-    then
-      Ungel (tp, mot, j, s, clo, case)
-    else
+and instantiate_extent_head r i {var; dom; mot; ctx; varcase} =
+  {var = instantiate_bvar r i var;
+   dom = instantiate_clos r i dom;
+   mot = instantiate_clos2 r i mot;
+   ctx = instantiate r i ctx;
+   varcase = instantiate_clos2 r i varcase}  
+
+and instantiate_spine : 'a. (int -> int -> 'a -> 'a) -> int -> int -> 'a * spine -> 'a * spine =
+  fun head_inst ->
+  let rec go r i (h, s) =
+    match s with
+    | [] -> root (head_inst r i h)
+    | Ap t :: s -> Ap (instantiate_nf r i t) @: go r i (h, s)
+    | Fst :: s -> Fst @: go r i (h, s)
+    | Snd :: s -> Snd @: go r i (h, s)
+    | BApp j :: s -> BApp (instantiate_bvar r i j) @: go r i (h, s)
+    | NRec (tp, zero, suc) :: s ->
+      NRec
+        (instantiate_clos r i tp,
+         instantiate r i zero,
+         instantiate_clos2 r i suc)
+      @: go r i (h, s)
+    | J (mot, refl, tp, left, right) :: s ->
+      J
+        (instantiate_clos3 r i mot,
+         instantiate_clos r i refl,
+         instantiate r i tp,
+         instantiate r i left,
+         instantiate r i right)
+      @: go r i (h, s)
+    | Ungel (tp, mot, j, clo, case) :: s ->
+      let ne =
+        if i = j then (h, s) else go r i (h, s)
+      in
       Ungel
         (instantiate r i tp,
          instantiate_clos r i mot,
          j,
-         instantiate_stack rootf r i s,
          instantiate_clos r i clo,
          instantiate_clos r i case)
+      @: ne
+  in
+  go
 
-and instantiate_ne r i = instantiate_stack instantiate_bvar r i
-
-and instantiate_extent_root r i (Ext {var; dom; mot; ctx; varcase}) =
-  Ext
-    {var = instantiate_bvar r i var;
-     dom = instantiate_clos r i dom;
-     mot = instantiate_clos2 r i mot;
-     ctx = instantiate r i ctx;
-     varcase = instantiate_clos2 r i varcase}
-
-and instantiate_extent r i = instantiate_stack instantiate_extent_root r i
+and instantiate_ne r i ne =
+  let headf r i = function
+    | Var j -> Var (instantiate_bvar r i j)
+    | Ext e -> Ext (instantiate_extent_head r i e)
+  in
+  instantiate_spine headf r i ne
 
 and instantiate_nf r i (Normal {tp; term}) =
   Normal {tp = instantiate r i tp; term = instantiate r i term}

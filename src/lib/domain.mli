@@ -10,11 +10,9 @@ and clos =
   | ConstClos of t
 and clos2 = Clos2 of {term : Syntax.t; env : env}
 and clos3 = Clos3 of {term : Syntax.t; env : env}
-and extent_root = Ext of {var : int; dom : clos; mot : clos2; ctx : t; varcase : clos2}
 and t =
   | Lam of clos
   | Neutral of {tp : t; term : ne}
-  | Extent of {tp : t; term : extent_root stack}
   | Nat
   | Zero
   | Suc of t
@@ -28,23 +26,31 @@ and t =
   | Gel of int * t
   | Engel of int * t
   | Uni of Syntax.uni_level
-and 'a stack =
-  | Root of 'a
-  | Ap of 'a stack * nf
-  | Fst of 'a stack
-  | Snd of 'a stack
-  | BApp of 'a stack * int
-  | NRec of clos * t * clos2 * 'a stack
-  | J of clos3 * clos * t * t * t * 'a stack
-  | Ungel of t * clos * (* BBINDER *) int * 'a stack * clos * clos
-and ne = int stack (* DeBruijn levels for variables *)
+and extent_head = {var : int; dom : clos; mot : clos2; ctx : t; varcase : clos2}
+and head =
+  | Var of int
+  | Ext of extent_head
+and cell =
+  | Ap of nf
+  | Fst
+  | Snd
+  | BApp of int
+  | NRec of clos * t * clos2
+  | J of clos3 * clos * t * t * t
+  | Ungel of t * clos * (* BBINDER *) int * clos * clos
+and spine = cell list
+and ne = head * spine
 and nf =
   | Normal of {tp : t; term : t}
 
+val root : 'a -> 'a * spine
+val (@:) : cell -> 'a * spine -> 'a * spine
+
 val instantiate : int -> int -> t -> t
-val instantiate_stack : (int -> int -> 'a -> 'a) -> int -> int -> 'a stack -> 'a stack
 val instantiate_bvar : int -> int -> int -> int
-val instantiate_extent_root : int -> int -> extent_root -> extent_root
+val instantiate_extent_head : int -> int -> extent_head -> extent_head
+val instantiate_spine : (int -> int -> 'a -> 'a) -> int -> int -> 'a * spine -> 'a * spine
+val instantiate_ne : int -> int -> ne -> ne
 
 val equal : t -> t -> bool
 val equal_ne : ne -> ne -> bool

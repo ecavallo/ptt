@@ -55,7 +55,7 @@ let tp_error e = raise (Type_error e)
 let rec env_to_sem_env = function
   | [] -> []
   | BVar i :: env -> D.BDim (D.BVar i) :: env_to_sem_env env
-  | Var {level; tp} :: env -> D.Term (D.Neutral {tp; term = D.Root level}) :: env_to_sem_env env
+  | Var {level; tp} :: env -> D.Term (D.Neutral {tp; term = D.root (D.Var level)}) :: env_to_sem_env env
   | Def {term; _} :: env -> D.Term term :: env_to_sem_env env
   | Restrict _ :: env -> env_to_sem_env env
 
@@ -92,7 +92,7 @@ let mk_bvar env size =
   (D.BVar size, BVar size :: env)
 
 let mk_var tp env size =
-  (D.Neutral {tp; term = Root size}, Var {level = size; tp} :: env)
+  (D.Neutral {tp; term = D.root (D.Var size)}, Var {level = size; tp} :: env)
 
 let restrict_env r env =
   match r with

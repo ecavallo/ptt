@@ -42,19 +42,14 @@ and do_rec size tp zero suc n =
   | D.Suc n -> do_clos2 size suc n (do_rec size tp zero suc n)
   | D.Neutral {term; _} ->
     let final_tp = do_clos size tp n in
-    D.Neutral {tp = final_tp; term = D.NRec (tp, zero, suc, term)}
-  | D.Extent {term; _} ->
-    let final_tp = do_clos size tp n in
-    D.Extent {tp = final_tp; term = D.NRec (tp, zero, suc, term)}
+    D.Neutral {tp = final_tp; term = D.(NRec (tp, zero, suc) @: term)}
   | _ -> raise (Eval_failed "Not a number")
 
 and do_fst p =
   match p with
   | D.Pair (p1, _) -> p1
   | D.Neutral {tp = D.Sg (t, _); term} ->
-    D.Neutral {tp = t; term = D.Fst term}
-  | D.Extent {tp = D.Sg (t, _); term} ->
-    D.Extent {tp = t; term = D.Fst term}
+    D.Neutral {tp = t; term = D.(Fst @: term)}
   | _ -> raise (Eval_failed "Couldn't fst argument in do_fst")
 
 and do_snd size p =
@@ -62,10 +57,7 @@ and do_snd size p =
   | D.Pair (_, p2) -> p2
   | D.Neutral {tp = D.Sg (_, clo); term} ->
     let fst = do_fst p in
-    D.Neutral {tp = do_clos size clo fst; term = D.Snd term}
-  | D.Extent {tp = D.Sg (_, clo); term} ->
-    let fst = do_fst p in
-    D.Extent {tp = do_clos size clo fst; term = D.Snd term}
+    D.Neutral {tp = do_clos size clo fst; term = D.(Snd @: term)}
   | _ -> raise (Eval_failed "Couldn't snd argument in do_snd")
 
 and do_bapp size t r =
@@ -79,19 +71,7 @@ and do_bapp size t r =
           match tp with
           | D.Bridge dst ->
             let dst = do_bclos size dst r in
-            D.Neutral {tp = dst; term = D.BApp (term, i)}
-          | _ -> raise (Eval_failed "Not a bridge in do_bapp")
-        end
-    end
-  | D.Extent {tp; term} ->
-    begin
-      match r with
-      | D.BVar i ->
-        begin
-          match tp with
-          | D.Bridge dst ->
-            let dst = do_bclos size dst r in
-            D.Extent {tp = dst; term = D.BApp (term, i)}
+            D.Neutral {tp = dst; term = D.(BApp i @: term)}
           | _ -> raise (Eval_failed "Not a bridge in do_bapp")
         end
     end
@@ -106,16 +86,7 @@ and do_j size mot refl eq =
       | D.Id (tp, left, right) ->
         D.Neutral
           {tp = do_clos3 size mot left right eq;
-           term = D.J (mot, refl, tp, left, right, term)}
-      | _ -> raise (Eval_failed "Not an Id in do_j")
-    end
-  | D.Extent {tp; term = term} ->
-    begin
-      match tp with
-      | D.Id (tp, left, right) ->
-        D.Extent
-          {tp = do_clos3 size mot left right eq;
-           term = D.J (mot, refl, tp, left, right, term)}
+           term = D.(J (mot, refl, tp, left, right) @: term)}
       | _ -> raise (Eval_failed "Not an Id in do_j")
     end
   | _ -> raise (Eval_failed "Not a refl or neutral in do_j")
@@ -128,15 +99,7 @@ and do_ap size f a =
       match tp with
       | D.Pi (src, dst) ->
         let dst = do_clos size dst a in
-        D.Neutral {tp = dst; term = D.Ap (term, D.Normal {tp = src; term = a})}
-      | _ -> raise (Eval_failed "Not a Pi in do_ap")
-    end
-  | D.Extent {tp; term} ->
-    begin
-      match tp with
-      | D.Pi (src, dst) ->
-        let dst = do_clos size dst a in
-        D.Extent {tp = dst; term = D.Ap (term, D.Normal {tp = src; term = a})}
+        D.Neutral {tp = dst; term = D.(Ap (D.Normal {tp = src; term = a}) @: term)}
       | _ -> raise (Eval_failed "Not a Pi in do_ap")
     end
   | _ -> raise (Eval_failed "Not a function in do_ap")
@@ -150,15 +113,7 @@ and do_ungel size mot i gel clo case =
         match tp with
         | D.Gel (_, tp) ->
           let final_tp = do_clos size mot (D.BLam clo) in
-          D.Neutral {tp = final_tp; term = D.Ungel (tp, mot, i, term, clo, case)}
-        | _ -> raise (Eval_failed "Not a Gel in do_ungel")
-      end
-    | D.Extent {tp; term} ->
-      begin
-        match tp with
-        | D.Gel (_, tp) ->
-          let final_tp = do_clos size mot (D.BLam clo) in
-          D.Extent {tp = final_tp; term = D.Ungel (tp, mot, i, term, clo, case)}
+          D.Neutral {tp = final_tp; term = D.(Ungel (tp, mot, i, clo, case) @: term)}
         | _ -> raise (Eval_failed "Not a Gel in do_ungel")
       end
     | _ -> raise (Eval_failed "Not a gel or neutral in do_ungel")
@@ -216,7 +171,7 @@ and eval t (env : D.env) size =
              ctx = ctx';
              varcase = D.Clos2 {term = varcase; env}}
         in
-        D.Extent {tp = final_tp; term = D.Root ext}
+        D.Neutral {tp = final_tp; term = D.root ext}
     end
   | Syn.Gel (r, t) ->
     begin
