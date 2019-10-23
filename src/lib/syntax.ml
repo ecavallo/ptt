@@ -1,12 +1,15 @@
+type idx = int
+[@@deriving show{ with_path = false }, eq]
+
 type uni_level = int
 [@@deriving show{ with_path = false }, eq]
 
 type bdim =
-  | BVar of int
+  | BVar of idx
 [@@deriving eq]
 
 type t =
-  | Var of int (* DeBruijn indices for variables *)
+  | Var of idx (* DeBruijn indices for variables *)
   | Let of t * (* BINDS *) t | Check of t * t
   | Nat | Zero | Suc of t | NRec of (* BINDS *) t * t * (* BINDS 2 *) t * t
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t

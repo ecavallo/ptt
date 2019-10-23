@@ -5,9 +5,9 @@ module E = Eval
 exception Quote_failed of string
 
 type env_entry =
-  | BVar of int
-  | Var of {level : int; tp : Domain.t}
-  | Def of Domain.t
+  | BVar of D.lvl
+  | Var of {level : D.lvl; tp : D.t}
+  | Def of D.t
 type env = env_entry list
 
 let mk_bvar env size =

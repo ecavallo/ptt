@@ -1,10 +1,11 @@
+type idx = int
 type uni_level = int
 
 type bdim =
-  | BVar of int (* DeBruijn indices for variables *)
+  | BVar of idx (* DeBruijn indices for variables *)
 
 type t =
-  | Var of int (* DeBruijn indices for variables *)
+  | Var of idx (* DeBruijn indices for variables *)
   | Let of t * (* BINDS *) t | Check of t * t
   | Nat | Zero | Suc of t | NRec of (* BINDS *) t * t * (* BINDS 2 *) t * t
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
@@ -16,13 +17,15 @@ type t =
   | Uni of uni_level
 
 val equal_uni_level : uni_level -> uni_level -> bool
+val equal_idx : idx -> idx -> bool
 val equal : t -> t -> bool
 
-val unsubst_bvar : int -> t -> t option
+val unsubst_bvar : idx -> t -> t option
 
 val pp_uni_level : Format.formatter -> uni_level -> unit
 val show_uni_level : uni_level -> string
 
+val pp_idx : Format.formatter -> idx -> unit
 val pp_bdim : Format.formatter -> bdim -> unit
 
 val pp : Format.formatter -> t -> unit

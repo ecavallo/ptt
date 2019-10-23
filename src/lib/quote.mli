@@ -2,20 +2,20 @@ exception Quote_failed of string
 
 type env_entry =
   | BVar of int
-  | Var of {level : int; tp : Domain.t}
+  | Var of {level : Domain.lvl; tp : Domain.t}
   | Def of Domain.t
 type env = env_entry list
 
-val mk_bvar : env -> int -> Domain.bdim * env
-val mk_var : Domain.t -> env -> int -> Domain.t * env
+val mk_bvar : env -> Domain.lvl -> Domain.bdim * env
+val mk_var : Domain.t -> env -> Domain.lvl -> Domain.t * env
 
 val env_to_sem_env : env -> Domain.env
 
 (* Quotation *)
-val read_back_level : env -> int -> int
-val read_back_nf : env -> int ->  Domain.nf -> Syntax.t
-val read_back_tp : env -> int -> Domain.t -> Syntax.t
+val read_back_level : env -> Domain.lvl -> Domain.lvl
+val read_back_nf : env -> Domain.lvl ->  Domain.nf -> Syntax.t
+val read_back_tp : env -> Domain.lvl -> Domain.t -> Syntax.t
 
-val check_nf : env -> int -> Domain.nf -> Domain.nf -> bool
-val check_tp : subtype:bool -> env -> int -> Domain.t -> Domain.t -> bool
+val check_nf : env -> Domain.lvl -> Domain.nf -> Domain.nf -> bool
+val check_tp : subtype:bool -> env -> Domain.lvl -> Domain.t -> Domain.t -> bool
 

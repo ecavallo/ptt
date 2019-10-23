@@ -5,10 +5,10 @@ module E = Eval
 module Q = Quote
 
 type env_entry =
-  | BVar of int
-  | Var of {level : int; tp : Domain.t}
-  | Def of {term : Domain.t; tp : Domain.t}
-  | Restrict of int
+  | BVar of D.lvl
+  | Var of {level : D.lvl; tp : D.t}
+  | Def of {term : D.t; tp : D.t}
+  | Restrict of Syn.idx
 [@@deriving show, eq]
 type env = env_entry list
 [@@deriving show, eq]
@@ -18,7 +18,7 @@ type error =
   | BDim_mismatch of D.bdim * D.bdim
   | Type_mismatch of D.t * D.t
   | Expecting_universe of D.t
-  | Expecting_term of int
+  | Expecting_term of D.lvl
   | Misc of string
 
 let pp_error fmt = function

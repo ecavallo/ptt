@@ -1,5 +1,8 @@
+type lvl = int
+[@@deriving show{ with_path = false }, eq]
+
 type bdim =
-  | BVar of int
+  | BVar of lvl
 [@@deriving show, eq]
 
 type env_entry =
@@ -28,24 +31,24 @@ and t =
   | BLam of clos
   | Refl of t
   | Id of t * t * t
-  | Gel of int * t
-  | Engel of int * t
+  | Gel of lvl * t
+  | Engel of lvl * t
   | Uni of Syntax.uni_level
 [@@deriving show, eq]
-and extent_head = {var : int; dom : clos; mot : clos2; ctx : t; varcase : clos2}
+and extent_head = {var : lvl; dom : clos; mot : clos2; ctx : t; varcase : clos2}
 [@@deriving show, eq]
 and head =
-  | Var of int
+  | Var of lvl
   | Ext of extent_head
 [@@deriving show, eq]
 and cell =
   | Ap of nf
   | Fst
   | Snd
-  | BApp of int
+  | BApp of lvl
   | NRec of clos * t * clos2
   | J of clos3 * clos * t * t * t
-  | Ungel of t * clos * (* BBINDER *) int * clos * clos
+  | Ungel of t * clos * (* BBINDER *) lvl * clos * clos
 [@@deriving show, eq]
 and spine = cell list
 [@@deriving show, eq]
@@ -106,7 +109,7 @@ and instantiate_extent_head r i {var; dom; mot; ctx; varcase} =
    ctx = instantiate r i ctx;
    varcase = instantiate_clos2 r i varcase}  
 
-and instantiate_spine : 'a. (int -> int -> 'a -> 'a) -> int -> int -> 'a * spine -> 'a * spine =
+and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine -> 'a * spine =
   fun head_inst ->
   let rec go r i (h, s) =
     match s with
