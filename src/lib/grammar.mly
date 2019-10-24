@@ -41,7 +41,10 @@ sign:
 bdim:
   | r = name { BVar r }
   | n = NUMERAL { Const n };
-    
+
+endpoints:
+  | LCU; endpoints = separated_list(SEMI, term); RCU { endpoints }
+
 atomic:
   | LPR; t = term; RPR
     { t }
@@ -56,7 +59,7 @@ atomic:
   | NAT { Nat }
   | LANGLE left = term; COMMA; right = term; RANGLE
     { Pair (left, right) }
-  | LBR; name = name; RBR; body = term; LCU; endpoints = separated_list(SEMI, term); RCU
+  | LBR; name = name; RBR; body = term; endpoints = endpoints
     { Bridge(Binder {name; body}, endpoints) }
 
 spine:
@@ -122,13 +125,20 @@ term:
     { Sg ([Cell {name = ""; ty = dom}], cod)}
   | FST; t = term { Fst t }
   | SND; t = term { Snd t }
-  | GEL; bdim = bdim; t = atomic { Gel (bdim, t) }
-  | ENGEL; bdim = bdim; t = atomic { Engel (bdim, t) }
-  | UNGEL; gel_name = name; RIGHT_ARROW; gel_body = term; AT;
+  | GEL; bdim = bdim; endpoints = endpoints; LPR; names = nonempty_list(name); RIGHT_ARROW; body = term; RPR
+    { Gel (bdim, endpoints, BinderN {names; body}) }
+  | GEL; bdim = bdim; body = atomic
+    { Gel (bdim, [], BinderN {names = []; body}) }
+  | ENGEL; bdim = bdim; endpoints = endpoints; t = atomic
+    { Engel (bdim, endpoints, t) }
+  | ENGEL; bdim = bdim; t = atomic
+    { Engel (bdim, [], t) }
+  | UNGEL; gel_name = name; COLON; width = NUMERAL; RIGHT_ARROW; gel_body = term; AT;
     mot_name = name; RIGHT_ARROW; mot_body = term; WITH
     PIPE; ENGEL; case_name = name; RIGHT_ARROW; case_body = term;
     { Ungel
-        {mot = Binder {name = mot_name; body = mot_body};
+        {width;
+         mot = Binder {name = mot_name; body = mot_body};
          gel = Binder {name = gel_name; body = gel_body};
          case = Binder {name = case_name; body = case_body}} }
   

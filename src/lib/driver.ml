@@ -127,16 +127,20 @@ let rec bind env = function
        bind env ctx,
        List.map (function (CS.Binder {name; body}) -> bind (Term name :: env) body) endcase,
        bind (extent_env env names) var_body)
-  | CS.Gel (r, t) ->
-    S.Gel (bbind env r, [], bind env t)
-  | CS.Engel (r, t) ->
-    S.Engel (bbind env r, [], bind env t)
+  | CS.Gel (r, ends, BinderN {names; body}) ->
+    S.Gel
+      (bbind env r,
+       List.map (bind env) ends,
+       bind (List.rev_append (List.map (fun t -> Term t) names) env) body)
+  | CS.Engel (r, ts, t) ->
+    S.Engel (bbind env r, List.map (bind env) ts, bind env t)
   | CS.Ungel
-      {mot = Binder {name = mot_name; body = mot_body};
+      {width;
+       mot = Binder {name = mot_name; body = mot_body};
        gel = Binder {name = gel_name; body = gel_body};
        case = Binder {name = case_name; body = case_body}} ->
     S.Ungel
-      (0,
+      (width,
        bind (Term mot_name :: env) mot_body,
        bind (BDim gel_name :: env) gel_body,
        bind (Term case_name :: env) case_body)

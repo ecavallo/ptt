@@ -18,7 +18,7 @@ let gel_test3 : (A : U<0>) -> [x] Gel x A {} -> [x] Gel x A {} =
 normalize def gel_test3
 
 let gel_test4 : (A : U<0>) -> [x] Gel x A {} -> A =
-  fun A p -> ungel x -> p @ x at _ -> A with | gel a -> a
+  fun A p -> ungel x : 0 -> p @ x at _ -> A with | gel a -> a
 
 normalize def gel_test4
 
@@ -37,7 +37,7 @@ let gel_test6 : (A : U<0>) -> (p : [x] Gel x A {})
   -> Id ([x] Gel x A {}) (bri x -> gel x (gel_test4 A p)) p
   =
   fun A p ->
-  ungel x -> p @ x at q -> Id ([x] Gel x A {}) (bri x -> gel x (gel_test4 A q)) q with
+  ungel x : 0 -> p @ x at q -> Id ([x] Gel x A {}) (bri x -> gel x (gel_test4 A q)) q with
   | gel a -> refl (bri x -> gel x a)
 
 normalize def gel_test6
@@ -48,7 +48,7 @@ let gel_test7 : (A : U<0>) -> [x] [y] Gel y (Gel x A) {} {} -> A =
 normalize def gel_test7
 
 let gel_test8 : (A : U<0>) (B : U<0>) (f : A -> B) -> [x] Gel x A {} -> B =
-  fun A B f p -> ungel x -> p @ x at _ -> B with | gel a -> f a
+  fun A B f p -> ungel x : 0 -> p @ x at _ -> B with | gel a -> f a
 
 normalize def gel_test8
 

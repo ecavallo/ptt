@@ -32,9 +32,9 @@ and t =
   | Bridge of binder * t list
   | BLam of bindern
   | Extent of {bdim : bdim; dom : binder; mot : binder2; ctx : t; endcase : binder list; varcase : bindern}
-  | Gel of bdim * t
-  | Engel of bdim * t
-  | Ungel of {mot : binder; gel : binder; case : binder}
+  | Gel of bdim * t list * bindern
+  | Engel of bdim * t list * t
+  | Ungel of {width : int; mot : binder; gel : binder; case : binder}
   | Uni of uni_level
 
 type decl =

@@ -1,0 +1,13 @@
+let gelproj : (A : U<0>) (P : A -> U<0>) (a : A) -> [x] Gel x {A} (a -> P a) {a} -> P a =
+  fun A P a p ->
+  ungel x : 1 -> p @ x at _ -> P a with | gel r -> r
+
+normalize def gelproj
+
+let id_param1 : (F : (A : U<0>) -> A -> A) -> (A : U<0>) (a : A) -> Id A (F A a) a =
+  fun F A a ->
+  gelproj A (fun b -> Id A b a) (F A a) (bri x -> F (Gel x {A} (b -> Id A b a)) (gel x {a} (refl a)))
+
+normalize def id_param1
+
+normalize id_param1 (fun A a -> a) at (A : U<0>) (a : A) -> Id A a a

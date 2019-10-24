@@ -41,7 +41,7 @@ normalize def bapp_cong
 
 let ra_beta_fwd : (A : U<0>) -> (Bridge (ra A)) -> A =
   fun A p ->
-  ungel x -> p @ x at _ -> A with | gel a -> a
+  ungel x : 0 -> p @ x at _ -> A with | gel a -> a
 
 normalize def ra_beta_fwd
 
@@ -59,7 +59,7 @@ let ra_beta_bwd_fwd : (A : U<0>) -> (p : Bridge (ra A))
   -> Id (Bridge (ra A)) (ra_beta_bwd A (ra_beta_fwd A p)) p
   =
   fun A p ->
-  ungel x -> p @ x at q -> Id ([x] Gel x A {}) (ra_beta_bwd A (ra_beta_fwd A q)) q with
+  ungel x : 0 -> p @ x at q -> Id ([x] Gel x A {}) (ra_beta_bwd A (ra_beta_fwd A q)) q with
   | gel a -> refl (bri x -> gel x a)
 
 normalize def ra_beta_bwd_fwd
@@ -71,7 +71,7 @@ normalize def ra_beta_bwd_fwd
 let ra_eta_fwd : (P : [_] U<0> {}) -> [x] (ra (Bridge P) @ x) -> P @ x {} =
   fun P -> bri x -> fun g ->
   extent x of g in y -> ra (Bridge P) @ y at y _ -> P @ y with
-  | q y -> (ungel z -> q @ z at _ -> Bridge P with | gel t -> t) @ y
+  | q y -> (ungel z : 0 -> q @ z at _ -> Bridge P with | gel t -> t) @ y
 
 normalize def ra_eta_fwd
 

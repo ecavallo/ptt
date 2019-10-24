@@ -25,7 +25,7 @@ normalize def cong
 
 let gelproj : (A : U<0>) -> [x] Gel x A {} -> A =
   fun A p ->
-  ungel x -> p @ x at _ -> A with | gel a -> a
+  ungel x : 0 -> p @ x at _ -> A with | gel a -> a
 
 normalize def gelproj
 

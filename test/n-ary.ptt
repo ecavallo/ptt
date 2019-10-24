@@ -49,3 +49,10 @@ let bunext2_at1 : (A : U<0>) (B : U<0>) (f0 : A -> B) (f1 : A -> B)
   fun A B f0 f1 g -> bunext2 A B f0 f1 g @ 1
 
 normalize def bunext2_at1
+
+let gel_test1 : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
+  (a : A) (b : B) (r : R a b) -> [x] Gel x {A; B} (a b -> R a b) {a; b}
+  =
+  fun A B R a b r -> bri x -> gel x {a; b} r
+
+normalize def gel_test1
