@@ -50,8 +50,14 @@ let rec unravel_spine f = function
   | [] -> f
   | x :: xs -> unravel_spine (x f) xs
 
+let rec extent_env env = function
+  | [var_bridge; var_dim] -> BDim var_dim :: Term var_bridge :: env
+  | name :: names -> extent_env (Term name :: env) names
+  | _ -> raise (Check.Type_error (Check.Misc ("Bad length in extent")))
+
 let bbind env = function
   | CS.BVar i -> S.BVar (find_idx i env)
+  | CS.Const o -> S.Const o
 
 let rec bind env = function
   | CS.Var i -> S.Var (find_idx i env)
@@ -112,14 +118,15 @@ let rec bind env = function
        dom = Binder {name = dom_dim; body = dom_body};
        mot = Binder2 {name1 = mot_dim; name2 = mot_dom; body = mot_body};
        ctx;
-       varcase = Binder2 {name1 = var_bridge; name2 = var_dim; body = var_body}} ->
+       endcase;
+       varcase = BinderN {names; body = var_body}} ->
     S.Extent
       (bbind env bdim,
        bind (BDim dom_dim :: env) dom_body,
        bind (Term mot_dom :: BDim mot_dim :: env) mot_body,
        bind env ctx,
-       [],
-       bind (BDim var_dim :: Term var_bridge :: env) var_body)
+       List.map (function (CS.Binder {name; body}) -> bind (Term name :: env) body) endcase,
+       bind (extent_env env names) var_body)
   | CS.Gel (r, t) ->
     S.Gel (bbind env r, [], bind env t)
   | CS.Engel (r, t) ->

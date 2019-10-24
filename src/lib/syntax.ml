@@ -136,21 +136,25 @@ let rec pp fmt =
   | J (mot, refl, eq) ->
     fprintf fmt "J(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp mot pp refl pp eq;
   | Bridge (t, ts) ->
-    fprintf fmt "Bridge(@[<hov>@[<hov>%a@],@ @[<hov>[%a]@]@])" pp t (Format.pp_print_list pp) ts;
+    fprintf fmt "Bridge(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])"
+      pp t pp_list ts;
   | BLam t ->
     fprintf fmt "blam(@[<hov>%a@])" pp t;
   | BApp (t, r) ->
     fprintf fmt "bapp(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp t pp_bdim r;
   | Extent (r, dom, mot, ctx, endcase, varcase) ->
-   fprintf fmt "extent(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>[%a]@],@ @[<hov>%a@]@])"
-     pp_bdim r pp dom pp mot pp ctx (Format.pp_print_list pp) endcase pp varcase;
+    fprintf fmt "extent(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
+     pp_bdim r pp dom pp mot pp ctx pp_list endcase pp varcase;
   | Gel (r, ts, t) ->
-    fprintf fmt "Gel(@[<hov>@[<hov>%a@],@ @[<hov>[%a]@],@ @[<hov>%a@]@])" pp_bdim r (Format.pp_print_list pp) ts pp t;
+    fprintf fmt "Gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp_bdim r pp_list ts pp t;
   | Engel (r, ts, t) ->
-    fprintf fmt "gel(@[<hov>@[<hov>%a@],@ @[<hov>[%a]@],@ @[<hov>%a@]@])" pp_bdim r (Format.pp_print_list pp) ts pp t;
+    fprintf fmt "gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp_bdim r pp_list ts pp t;
   | Ungel (width, mot, gel, case) ->
     fprintf fmt "ungel(@[<hov>@[<hov>%d@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" width pp mot pp gel pp case
   | Uni i -> fprintf fmt "U<%d>" i
+
+and pp_list fmt =
+  Format.fprintf fmt "[%a]" (Format.pp_print_list ~pp_sep:(fun fmt _ -> Format.fprintf fmt "; ") pp)
 
 let show t =
   let b = Buffer.create 100 in

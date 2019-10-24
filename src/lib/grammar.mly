@@ -39,7 +39,8 @@ sign:
   | d = decl; s = sign { d :: s };
 
 bdim:
-  | r = name { BVar r };
+  | r = name { BVar r }
+  | n = NUMERAL { Const n };
     
 atomic:
   | LPR; t = term; RPR
@@ -61,6 +62,12 @@ atomic:
 spine:
   | t = atomic { Term t }
   | ATSIGN; b = bdim { BDim b };
+
+extent_cases:
+  | name = name; RIGHT_ARROW; body = term; PIPE; ext = extent_cases
+    { let (endcases, varcase) = ext in (Binder {name; body} :: endcases, varcase) }
+  | name = name; names = nonempty_list(name); RIGHT_ARROW; varcase = term;
+    { ([], BinderN {names = name :: names; body = varcase}) };
 
 term:
   | f = atomic; args = list(spine)
@@ -91,14 +98,16 @@ term:
   | EXTENT; bdim = bdim; OF; ctx = term;
     IN; dom_dim = name; RIGHT_ARROW; dom = term;
     AT; mot_dim = name; mot_var = name; RIGHT_ARROW; mot = term;
-    WITH;
-    PIPE; varcase_bridge = name; varcase_dim = name; RIGHT_ARROW; varcase = term;
-    { Extent
+    WITH; PIPE;
+    cases = extent_cases
+    { let (endcase, varcase) = cases in
+      Extent
         {bdim;
          dom = Binder {name = dom_dim; body = dom};
          mot = Binder2 {name1 = mot_dim; name2 = mot_var; body = mot};
          ctx;
-         varcase = Binder2 {name1 = varcase_bridge; name2 = varcase_dim; body = varcase}} }
+         endcase;
+         varcase} }
   | LAM; names = nonempty_list(name); RIGHT_ARROW; body = term
     { Lam (BinderN {names; body}) }
   | BRI; names = nonempty_list(name); RIGHT_ARROW; body = term

@@ -15,3 +15,37 @@ let ap3 : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A) (a2 : A)
 
 normalize def ap3
 
+let two : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A) (a2 : A)
+  -> [_] A {a0; a1; a2} -> B
+  =
+  fun A B f a0 a1 a2 p -> ap3 A B f a0 a1 a2 p @ 2
+
+normalize def two
+
+let bunext1 : (A : U<0>) (B : U<0>) (f : A -> B)
+  -> ((a : A) -> [x] A {a} -> [x] B {f a}) -> [x] A -> B {f}
+  =
+  fun A B f g -> bri x -> fun a ->
+  extent x of a in _ -> A at _ _ -> B with
+  | a0 -> f a0
+  | a0 q y -> g a0 q @ y
+
+normalize def bunext1
+
+let bunext2 : (A : U<0>) (B : U<0>) (f0 : A -> B) (f1 : A -> B)
+  -> ((a0 : A) (a1 : A) -> [x] A {a0; a1} -> [x] B {f0 a0; f1 a1}) -> [x] A -> B {f0; f1}
+  =
+  fun A B f0 f1 g -> bri x -> fun a ->
+  extent x of a in _ -> A at _ _ -> B with
+  | a0 -> f0 a0
+  | a1 -> f1 a1
+  | a0 a1 q y -> g a0 a1 q @ y
+
+normalize def bunext2
+
+let bunext2_at1 : (A : U<0>) (B : U<0>) (f0 : A -> B) (f1 : A -> B)
+  -> ((a0 : A) (a1 : A) -> [x] A {a0; a1} -> [x] B {f0 a0; f1 a1}) -> (A -> B)
+  =
+  fun A B f0 f1 g -> bunext2 A B f0 f1 g @ 1
+
+normalize def bunext2_at1
