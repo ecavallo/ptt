@@ -103,7 +103,7 @@ let rec bind env = function
   | CS.Bridge ([], body) ->
     bind env body
   | CS.Bridge (r :: tele, body) ->
-    S.Bridge (bind (BDim r :: env) (CS.Bridge (tele, body)))
+    S.Bridge (bind (BDim r :: env) (CS.Bridge (tele, body)), [])
   | CS.BLam (BinderN {names = []; body}) ->
     bind env body
   | CS.BLam (BinderN {names = i :: names; body}) ->
@@ -120,17 +120,19 @@ let rec bind env = function
        bind (BDim dom_dim :: env) dom_body,
        bind (Term mot_dom :: BDim mot_dim :: env) mot_body,
        bind env ctx,
+       [],
        bind (BDim var_dim :: Term var_bridge :: env) var_body)
   | CS.Gel (r, t) ->
-    S.Gel (bbind env r, bind env t)
+    S.Gel (bbind env r, [], bind env t)
   | CS.Engel (r, t) ->
-    S.Engel (bbind env r, bind env t)
+    S.Engel (bbind env r, [], bind env t)
   | CS.Ungel
       {mot = Binder {name = mot_name; body = mot_body};
        gel = Binder {name = gel_name; body = gel_body};
        case = Binder {name = case_name; body = case_body}} ->
     S.Ungel
-      (bind (Term mot_name :: env) mot_body,
+      (0,
+       bind (Term mot_name :: env) mot_body,
        bind (BDim gel_name :: env) gel_body,
        bind (Term case_name :: env) case_body)
   | CS.Uni i -> S.Uni i

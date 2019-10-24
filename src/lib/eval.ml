@@ -11,6 +11,7 @@ let eval_bdim r (env : D.env) =
       | D.BDim s -> s
       | D.Term _ -> raise (Eval_failed "Not a dimension term")
     end
+  | Syn.Const o -> D.Const o
 
 (* TODO organize these closure functions in a better way *)
 
@@ -35,6 +36,17 @@ and do_closbclos size (D.Clos2 {term; env}) a r =
 
 and do_clos3 size (D.Clos3 {term; env}) a1 a2 a3 =
   eval term (D.Term a3 :: D.Term a2 :: D.Term a1 :: env) size
+
+and do_closN size (D.ClosN {term; env}) aN =
+  eval term (List.rev_append (List.map (fun a -> D.Term a) aN) env) size
+
+and do_clos_extent size (D.ClosN {term; env}) aN a r =
+  eval term (D.BDim r :: D.Term a :: List.rev_append (List.map (fun a -> D.Term a) aN) env) size
+
+and do_consts size clo width =
+  match clo with
+  | D.Clos {term; env} -> List.init width (fun o -> eval term (D.BDim (D.Const o) :: env) size)
+  | D.ConstClos t -> List.init width (fun _ -> t)
 
 and do_rec size tp zero suc n =
   match n with
@@ -65,15 +77,16 @@ and do_bapp size t r =
   | D.BLam bclo -> do_bclos size bclo r
   | D.Neutral {tp; term} ->
     begin
-      match r with
-      | D.BVar i ->
-        begin
-          match tp with
-          | D.Bridge dst ->
-            let dst = do_bclos size dst r in
-            D.Neutral {tp = dst; term = D.(BApp i @: term)}
-          | _ -> raise (Eval_failed "Not a bridge in do_bapp")
-        end
+      match tp with
+      | D.Bridge (dst, ts) ->
+         begin
+           match r with
+           | D.BVar i ->
+              let dst = do_bclos size dst r in
+              D.Neutral {tp = dst; term = D.(BApp i @: term)}
+           | Const o -> List.nth ts o
+         end
+      | _ -> raise (Eval_failed "Not a bridge in do_bapp")
     end
   | _ -> raise (Eval_failed "Not a bridge or neutral in bapp")
 
@@ -107,13 +120,16 @@ and do_ap size f a =
 and do_ungel size mot i gel clo case =
   begin
     match gel with
-    | D.Engel (_, t) -> do_clos size case t
+    | D.Engel (_, _, t) -> do_clos size case t
     | D.Neutral {tp; term} ->
       begin
         match tp with
-        | D.Gel (_, tp) ->
+        | D.Gel (_, endtps, rel) ->
+          let ends =
+            List.mapi (fun o tp -> D.Normal {tp; term = do_bclos size clo (D.Const o)}) endtps
+          in
           let final_tp = do_clos size mot (D.BLam clo) in
-          D.Neutral {tp = final_tp; term = D.(Ungel (tp, mot, i, clo, case) @: term)}
+          D.Neutral {tp = final_tp; term = D.(Ungel (ends, rel, mot, i, clo, case) @: term)}
         | _ -> raise (Eval_failed "Not a Gel in do_ungel")
       end
     | _ -> raise (Eval_failed "Not a gel or neutral in do_ungel")
@@ -147,7 +163,7 @@ and eval t (env : D.env) size =
   | Syn.Pair (t1, t2) -> D.Pair (eval t1 env size, eval t2 env size)
   | Syn.Fst t -> do_fst (eval t env size)
   | Syn.Snd t -> do_snd size (eval t env size)
-  | Syn.Bridge dest -> D.Bridge (Clos {term = dest; env})
+  | Syn.Bridge (dest, ts) -> D.Bridge (Clos {term = dest; env}, List.map (fun t -> eval t env size) ts)
   | Syn.BApp (t,r) ->
     let r' = eval_bdim r env in
     do_bapp size (eval t env size) r'
@@ -156,12 +172,12 @@ and eval t (env : D.env) size =
   | Syn.Id (tp, left, right) -> D.Id (eval tp env size, eval left env size, eval right env size)
   | Syn.J (mot, refl, eq) ->
     do_j size (D.Clos3 {term = mot; env}) (D.Clos {term = refl; env}) (eval eq env size)
-  | Syn.Extent (r, dom, mot, ctx, varcase) ->
+  | Syn.Extent (r, dom, mot, ctx, endcase, varcase) ->
     let r' = eval_bdim r env in
+    let ctx' = eval ctx env size in
     begin
       match r' with
       | D.BVar i ->
-        let ctx' = eval ctx env size in
         let final_tp = eval mot (D.Term ctx' :: D.BDim r' :: env) size in
         let ext =
           D.Ext
@@ -169,23 +185,28 @@ and eval t (env : D.env) size =
              dom = D.Clos {term = dom; env};
              mot = D.Clos2 {term = mot; env};
              ctx = ctx';
-             varcase = D.Clos2 {term = varcase; env}}
+             endcase = List.map (fun t -> D.Clos {term = t; env}) endcase;
+             varcase = D.ClosN {term = varcase; env}}
         in
         D.Neutral {tp = final_tp; term = D.root ext}
+      | D.Const o ->
+        eval (List.nth endcase o) (D.Term ctx' :: env) size
     end
-  | Syn.Gel (r, t) ->
+  | Syn.Gel (r, endtps, rel) ->
     begin
       let r' = eval_bdim r env in
       match r' with
-      | D.BVar i -> D.Gel (i, eval t env size)
+      | D.BVar i -> D.Gel (i, List.map (fun t -> eval t env size) endtps, D.ClosN {term = rel; env})
+      | D.Const o -> eval (List.nth endtps o) env size
     end
-  | Syn.Engel (r, t) ->
+  | Syn.Engel (r, ts, t) ->
     begin
       let r' = eval_bdim r env in
       match r' with
-      | D.BVar i -> D.Engel (i, eval t env size)
+      | D.BVar i -> D.Engel (i, List.map (fun t -> eval t env size) ts, eval t env size)
+      | Const o -> eval (List.nth ts o) env size
     end
-  | Syn.Ungel (mot, gel, case) ->
+  | Syn.Ungel (_, mot, gel, case) ->
     do_ungel
       size
       (D.Clos {term = mot; env})

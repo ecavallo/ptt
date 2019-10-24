@@ -3,6 +3,7 @@ type lvl = int
 
 type bdim =
   | BVar of lvl
+  | Const of int
 [@@deriving show, eq]
 
 type env_entry =
@@ -18,6 +19,8 @@ and clos2 = Clos2 of {term : Syntax.t; env : env}
 [@@deriving show, eq]
 and clos3 = Clos3 of {term : Syntax.t; env : env}
 [@@deriving show, eq]
+and closN = ClosN of {term : Syntax.t; env : env}
+[@@deriving show, eq]
 and t =
   | Lam of clos
   | Neutral of {tp : t; term : ne}
@@ -27,15 +30,15 @@ and t =
   | Pi of t * clos
   | Sg of t * clos
   | Pair of t * t
-  | Bridge of clos
+  | Bridge of clos * t list
   | BLam of clos
   | Refl of t
   | Id of t * t * t
-  | Gel of lvl * t
-  | Engel of lvl * t
+  | Gel of lvl * t list * closN
+  | Engel of lvl * t list * t
   | Uni of Syntax.uni_level
 [@@deriving show, eq]
-and extent_head = {var : lvl; dom : clos; mot : clos2; ctx : t; varcase : clos2}
+and extent_head = {var : lvl; dom : clos; mot : clos2; ctx : t; endcase : clos list; varcase : closN}
 [@@deriving show, eq]
 and head =
   | Var of lvl
@@ -48,7 +51,7 @@ and cell =
   | BApp of lvl
   | NRec of clos * t * clos2
   | J of clos3 * clos * t * t * t
-  | Ungel of t * clos * (* BBINDER *) lvl * clos * clos
+  | Ungel of nf list * closN * clos * (* BBINDER *) lvl * clos * clos
 [@@deriving show, eq]
 and spine = cell list
 [@@deriving show, eq]
@@ -66,6 +69,7 @@ let instantiate_bvar r i j =
 
 let instantiate_bdim r i = function
   | BVar j -> BVar (instantiate_bvar r i j)
+  | Const o -> Const o
 
 let rec instantiate_entry r i = function
   | BDim s -> BDim (instantiate_bdim r i s)
@@ -84,6 +88,9 @@ and instantiate_clos2 r i (Clos2 {term; env = env}) =
 and instantiate_clos3 r i (Clos3 {term; env = env}) =
   Clos3 {term; env = instantiate_env r i env}
 
+and instantiate_closN r i (ClosN {term; env = env}) =
+  ClosN {term; env = instantiate_env r i env}
+
 and instantiate r i = function
   | Lam clo -> Lam (instantiate_clos r i clo)
   | Neutral {tp; term} ->
@@ -94,20 +101,21 @@ and instantiate r i = function
   | Pi (src, dst) -> Pi (instantiate r i src, instantiate_clos r i dst)
   | Sg (src, dst) -> Sg (instantiate r i src, instantiate_clos r i dst)
   | Pair (t, u) -> Pair (instantiate r i t, instantiate r i u)
-  | Bridge dst -> Bridge (instantiate_clos r i dst)
+  | Bridge (dst, ts) -> Bridge (instantiate_clos r i dst, List.map (instantiate r i) ts)
   | BLam clo -> BLam (instantiate_clos r i clo)
   | Refl t -> Refl (instantiate r i t)
   | Id (ty, t, u) -> Id (instantiate r i ty, instantiate r i t, instantiate r i u)
-  | Gel (j, t) -> Gel (instantiate_bvar r i j, t)
-  | Engel (j, t) -> Engel (instantiate_bvar r i j, t)
+  | Gel (j, ts, t) -> Gel (instantiate_bvar r i j, List.map (instantiate r i) ts, instantiate_closN r i t)
+  | Engel (j, ts, t) -> Engel (instantiate_bvar r i j, List.map (instantiate r i) ts, instantiate r i t)
   | Uni i -> Uni i
 
-and instantiate_extent_head r i {var; dom; mot; ctx; varcase} =
+and instantiate_extent_head r i {var; dom; mot; ctx; endcase; varcase} =
   {var = instantiate_bvar r i var;
    dom = instantiate_clos r i dom;
    mot = instantiate_clos2 r i mot;
    ctx = instantiate r i ctx;
-   varcase = instantiate_clos2 r i varcase}  
+   endcase = List.map (instantiate_clos r i) endcase;
+   varcase = instantiate_closN r i varcase}  
 
 and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine -> 'a * spine =
   fun head_inst ->
@@ -132,12 +140,13 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
          instantiate r i left,
          instantiate r i right)
       @: go r i (h, s)
-    | Ungel (tp, mot, j, clo, case) :: s ->
+    | Ungel (ends, rel, mot, j, clo, case) :: s ->
       let ne =
         if i = j then (h, s) else go r i (h, s)
       in
       Ungel
-        (instantiate r i tp,
+        (List.map (instantiate_nf r i) ends,
+         instantiate_closN r i rel,
          instantiate_clos r i mot,
          j,
          instantiate_clos r i clo,
