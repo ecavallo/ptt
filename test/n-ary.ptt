@@ -1,0 +1,17 @@
+let ap1 : (A : U<0>) (B : U<0>) (f : A -> B) (a : A) -> [_] A {a} -> [_] B {f a} =
+  fun A B f a p -> bri x -> f (p @ x)
+
+normalize def ap1
+
+let ap2 : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A) -> [_] A {a0; a1} -> [_] B {f a0; f a1} =
+  fun A B f a0 a1 p -> bri x -> f (p @ x)
+
+normalize def ap2
+
+let ap3 : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A) (a2 : A)
+  -> [_] A {a0; a1; a2} -> [_] B {f a0; f a1; f a2}
+  =
+  fun A B f a0 a1 a2 p -> bri x -> f (p @ x)
+
+normalize def ap3
+
