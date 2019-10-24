@@ -4,8 +4,8 @@
 
 %token <int> NUMERAL
 %token <string> ATOM
-%token COLON PIPE AT COMMA RIGHT_ARROW UNDERSCORE
-%token LPR RPR LANGLE RANGLE LBR RBR
+%token COLON SEMI PIPE AT COMMA RIGHT_ARROW UNDERSCORE
+%token LPR RPR LANGLE RANGLE LBR RBR LCU RCU
 %token EQUALS
 %token TIMES FST SND
 %token LAM LET IN END WITH OF DEF
@@ -55,6 +55,8 @@ atomic:
   | NAT { Nat }
   | LANGLE left = term; COMMA; right = term; RANGLE
     { Pair (left, right) }
+  | LBR; name = name; RBR; body = term; LCU; endpoints = separated_list(SEMI, term); RCU
+    { Bridge(Binder {name; body}, endpoints) }
 
 spine:
   | t = atomic { Term t }
@@ -120,8 +122,6 @@ term:
         {mot = Binder {name = mot_name; body = mot_body};
          gel = Binder {name = gel_name; body = gel_body};
          case = Binder {name = case_name; body = case_body}} }
-  | LBR; names = nonempty_list(name); RBR; body = term
-    { Bridge(names,body) }
   
 tele_cell:
   | LPR name = name; COLON ty = term; RPR

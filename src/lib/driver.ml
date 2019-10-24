@@ -100,10 +100,8 @@ let rec bind env = function
   | CS.Id (tp, left, right) ->
     S.Id (bind env tp, bind env left, bind env right)
   | CS.Refl t -> S.Refl (bind env t)
-  | CS.Bridge ([], body) ->
-    bind env body
-  | CS.Bridge (r :: tele, body) ->
-    S.Bridge (bind (BDim r :: env) (CS.Bridge (tele, body)), [])
+  | CS.Bridge (Binder {name; body}, endpoints) ->
+    S.Bridge (bind (BDim name :: env) body, List.map (bind env) endpoints)
   | CS.BLam (BinderN {names = []; body}) ->
     bind env body
   | CS.BLam (BinderN {names = i :: names; body}) ->
