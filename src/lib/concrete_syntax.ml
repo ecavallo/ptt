@@ -19,6 +19,10 @@ and t =
   | Suc of t
   | Lit of int
   | NRec of {mot : binder; zero : t; suc : binder2; nat : t}
+  | Bool
+  | True
+  | False
+  | If of {mot : binder; tt : t; ff : t; bool : t}
   | Pi of cell list * t
   | Lam of bindern
   | Ap of t * spine list

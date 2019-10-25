@@ -68,15 +68,20 @@ let rec bind env = function
   | CS.Suc t -> S.Suc (bind env t)
   | CS.Lit i -> int_to_term i
   | CS.NRec
-      { mot = Binder {name = mot_name; body = mot_body};
-        zero;
-        suc = Binder2 {name1 = suc_name1; name2 = suc_name2; body = suc_body};
-        nat} ->
+      {mot = Binder {name = mot_name; body = mot_body};
+       zero;
+       suc = Binder2 {name1 = suc_name1; name2 = suc_name2; body = suc_body};
+       nat} ->
     S.NRec
       (bind (Term mot_name :: env) mot_body,
        bind env zero,
        bind (Term suc_name2 :: Term suc_name1 :: env) suc_body,
        bind env nat)
+  | CS.Bool -> S.Bool
+  | CS.True -> S.True
+  | CS.False -> S.False
+  | CS.If {mot = Binder {name = mot_name; body = mot_body}; tt; ff; bool} ->
+    S.If (bind (Term mot_name :: env) mot_body, bind env tt, bind env ff, bind env bool)
   | CS.Lam (BinderN {names = []; body}) ->
     bind env body
   | CS.Lam (BinderN {names = x :: names; body}) ->

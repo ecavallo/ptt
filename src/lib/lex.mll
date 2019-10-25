@@ -21,10 +21,14 @@ let keywords =
     ("zero", ZERO);
     ("suc", SUC);
     ("nat", NAT);
+    ("tt", TRUE);
+    ("ff", FALSE);
+    ("bool", BOOL);
     ("let", LET);
     ("in", IN);
     ("with", WITH);
     ("end", END);
+    ("if", IF);
     ("rec", REC);
     ("fst", FST);
     ("snd", SND);

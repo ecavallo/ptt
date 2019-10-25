@@ -12,6 +12,7 @@
 %token BRI ATSIGN EXTENT
 %token GEL ENGEL UNGEL
 %token REC SUC NAT ZERO
+%token IF TRUE FALSE BOOL
 %token UNIV
 %token QUIT NORMALIZE
 %token ID REFL MATCH
@@ -52,11 +53,16 @@ atomic:
     { Var a }
   | ZERO
     { Lit 0 }
+  | TRUE
+    { True }
+  | FALSE
+    { False }
   | n = NUMERAL
     { Lit n }
   | UNIV; LANGLE; i = NUMERAL; RANGLE
     { Uni i }
   | NAT { Nat }
+  | BOOL { Bool }
   | LANGLE left = term; COMMA; right = term; RANGLE
     { Pair (left, right) }
   | LBR; name = name; RBR; body = term; endpoints = endpoints
@@ -90,6 +96,15 @@ term:
         zero = zero_case;
         suc = Binder2 {name1 = suc_var; name2 = ih_var; body = suc_case};
         nat = n
+      } }
+  | IF; b = term; AT; mot_name = name; RIGHT_ARROW; mot = term; WITH;
+    PIPE; TRUE; RIGHT_ARROW; true_case = term;
+    PIPE; FALSE; RIGHT_ARROW; false_case = term;
+    { If {
+        mot = Binder {name = mot_name; body = mot};
+        tt = true_case;
+        ff = false_case;
+        bool = b
       } }
   | ID; tp = atomic; left = atomic; right = atomic
     { Id (tp, left, right) }
