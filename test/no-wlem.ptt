@@ -1,0 +1,106 @@
+--------------------------------------------------------------------------------
+-- Refutation of the weak law of the excluded middle, which decides negated
+-- types. In cubical type theory this would suffice to refute the excluded
+-- middle for homotopy propositions, but that implication requires function
+-- extensionality (to show that negated types are always propositions). It
+-- should still be possible to refute the excluded middle for propositions by
+-- other means, but this is not done here.
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- General definitions and lemmas
+--------------------------------------------------------------------------------
+
+let symm : (A : U<0>) (a : A) (b : A) -> (Id A a b) -> Id A b a =
+  fun A a b eq ->
+  match eq at x y _ -> Id A y x with
+  | refl z -> refl z
+
+let trans : (A : U<0>) (a : A) (b : A) (c : A) -> (Id A a b) -> (Id A b c) -> Id A a c =
+  fun A a b c eq0 ->
+  match eq0 at x y _ -> (Id A y c) -> Id A x c with
+  | refl z -> fun eq1 -> eq1
+
+let gelproj : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
+  (a : A) (b : B) -> [x] Gel x {A; B} (a b -> R a b) {a; b} -> R a b
+  =
+  fun A B R a b p ->
+  ungel x : 2 -> p @ x at _ -> R a b with | gel r -> r
+
+let empty : U<0> = Id bool tt ff
+
+let not : U<0> -> U<0> = fun A -> A -> empty
+
+let or : U<0> -> U<0> -> U<0> =
+  fun A B ->
+  (b : bool) * if b at _ -> U<0> with | tt -> A | ff -> B
+
+--------------------------------------------------------------------------------
+-- Bridge-discreteness of bool (one direction)
+--------------------------------------------------------------------------------
+
+let shannon : bool -> bool =
+  fun b ->
+  if b at _ -> bool with | tt -> tt | ff -> ff
+
+let bool_eta : (b : bool) -> Id bool (shannon b) b =
+  fun b ->
+  if b at b -> Id bool (shannon b) b with
+  | tt -> refl tt
+  | ff -> refl ff
+
+let bridge_to_id : (b0 : bool) (b1 : bool) -> [_] bool {b0; b1} -> Id bool b0 b1 =
+  fun b0 b1 p ->
+  let lemma : Id bool (shannon b0) (shannon b1) =
+    gelproj bool bool (fun c d -> Id bool c d) (shannon b0) (shannon b1)
+      (bri x ->
+       if (p @ x) at _ -> Gel x {bool; bool} (c d -> Id bool c d) with
+       | tt -> gel x {tt; tt} (refl tt)
+       | ff -> gel x {ff; ff} (refl ff))
+  in
+  trans bool b0 (shannon b1) b1
+    (trans bool b0 (shannon b0) (shannon b1)
+      (symm bool (shannon b0) b0 (bool_eta b0))
+      lemma)
+    (bool_eta b1)
+
+--------------------------------------------------------------------------------
+-- Refutation of WLEM
+--------------------------------------------------------------------------------
+
+let WLEM : U<1> = (A : U<0>) -> or (not A) (not (not A))
+
+let WLEM_is_not_const : (wlem : WLEM) (A : U<0>)
+  -> (Id bool (fst (wlem A)) (fst (wlem (not A)))) -> empty
+  =
+  fun wlem A p ->
+  let P : U<0> -> bool -> U<0> =
+    fun T b -> if b at _ -> U<0> with | tt -> not T | ff -> not (not T)
+  in
+  let Q1 : U<0> -> bool -> U<0> =
+    fun T b -> Id bool b (fst (wlem (not A)))
+  in
+  (if (fst (wlem A)) at b -> (P A b) -> (Q1 A b) -> empty with
+   | tt ->
+     fun na q1 ->
+     (if (fst (wlem (not A))) at c -> (P (not A) c) -> (Id bool tt c) -> empty with
+      | tt -> fun nna _ -> nna na
+      | ff -> fun _ q2 -> q2)
+     (snd (wlem (not A)))
+     q1
+   | ff ->
+     fun nna q1 ->
+     (if (fst (wlem (not A))) at c -> (P (not A) c) -> (Id bool ff c) -> empty with
+      | tt -> fun _ q2 -> symm bool ff tt q2
+      | ff -> fun nnna _ -> nnna nna)
+     (snd (wlem (not A)))
+     q1)
+  (snd (wlem A))
+  p
+
+let WLEM_is_false : WLEM -> empty =
+  fun wlem ->
+  let T : U<0> = bool in -- choice of type is arbitrary
+  WLEM_is_not_const wlem T
+    (bridge_to_id (fst (wlem T)) (fst (wlem (not T)))
+      (bri x -> fst (wlem (Gel x {T; not T} (_ _ -> empty)))))
