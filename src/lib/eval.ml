@@ -154,6 +154,8 @@ and eval t (env : D.env) size =
     end
   | Syn.Let (def, body) -> eval body (D.Term (eval def env size) :: env) size
   | Syn.Check (term, _) -> eval term env size
+  | Syn.Unit -> D.Unit
+  | Syn.Triv -> D.Triv
   | Syn.Nat -> D.Nat
   | Syn.Zero -> D.Zero
   | Syn.Suc t -> D.Suc (eval t env size)

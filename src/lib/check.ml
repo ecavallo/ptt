@@ -147,6 +147,12 @@ let rec check ~env ~size ~term ~tp =
     let def_tp = synth ~env ~size ~term:def in
     let def_val = E.eval def (env_to_sem_env env) size in
     check ~env:(Def {term = def_val; tp = def_tp} :: env) ~size ~term:body ~tp
+  | Unit ->
+    begin
+      match tp with
+      | D.Uni _ -> ()
+      | t -> tp_error (Expecting_universe t)
+    end
   | Nat ->
     begin
       match tp with
@@ -291,6 +297,7 @@ and synth ~env ~size ~term =
     let tp = E.eval tp' (env_to_sem_env env) size in
     check ~env ~size ~term ~tp;
     tp
+  | Triv -> D.Unit
   | Zero -> D.Nat
   | Suc term -> check ~env ~size ~term ~tp:Nat; D.Nat
   | True -> D.Bool
@@ -431,6 +438,7 @@ and synth ~env ~size ~term =
 
 and check_tp ~env ~size ~term =
   match term with
+  | Syn.Unit -> ()
   | Syn.Nat -> ()
   | Syn.Bool -> ()
   | Uni _ -> ()

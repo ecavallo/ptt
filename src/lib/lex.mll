@@ -18,6 +18,8 @@ let make_table num elems =
 
 let keywords =
   make_table 0 [
+    ("unit", UNIT);
+    ("triv", TRIV);
     ("zero", ZERO);
     ("suc", SUC);
     ("nat", NAT);
@@ -54,7 +56,7 @@ let number = ['0'-'9']['0'-'9']*
 let whitespace = [' ' '\t']+
 let line_ending = '\r' | '\n' | "\r\n"
 let atom_first = ['a'-'z' 'A'-'Z' '_']
-let atom_next = ['a'-'z' 'A'-'Z' '_' '-' '*' '/' '0'-'9']
+let atom_next = ['a'-'z' 'A'-'Z' '_' '-' '*' '/' '0'-'9' '\'']
 let atom = atom_first atom_next*
 
 rule token = parse

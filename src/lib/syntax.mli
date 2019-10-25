@@ -8,6 +8,7 @@ type bdim =
 type t =
   | Var of idx (* DeBruijn indices for variables *)
   | Let of t * (* BINDS *) t | Check of t * t
+  | Unit | Triv
   | Nat | Zero | Suc of t | NRec of (* BINDS *) t * t * (* BINDS 2 *) t * t
   | Bool | True | False | If of (* BINDS *) t * t * t * t
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t

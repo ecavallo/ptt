@@ -64,6 +64,8 @@ let rec bind env = function
   | CS.Let (tp, Binder {name; body}) ->
     S.Let (bind env tp, bind (Term name :: env) body)
   | CS.Check {term; tp} -> S.Check (bind env term, bind env tp)
+  | CS.Unit -> S.Unit
+  | CS.Triv -> S.Triv
   | CS.Nat -> S.Nat
   | CS.Suc t -> S.Suc (bind env t)
   | CS.Lit i -> int_to_term i

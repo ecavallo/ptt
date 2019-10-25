@@ -17,6 +17,8 @@ and closN = ClosN of {term : Syntax.t; env : env}
 and t =
   | Lam of clos
   | Neutral of {tp : t; term : ne}
+  | Unit
+  | Triv
   | Nat
   | Zero
   | Suc of t

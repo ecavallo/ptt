@@ -15,6 +15,8 @@ and t =
   | Var of ident
   | Let of t * binder
   | Check of {term : t; tp : t}
+  | Unit
+  | Triv
   | Nat
   | Suc of t
   | Lit of int

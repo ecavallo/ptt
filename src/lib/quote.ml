@@ -105,6 +105,8 @@ and read_back_nf env size nf =
      Syn.Pair
        (read_back_nf env size (D.Normal {tp = fst; term = fst'}),
         read_back_nf env size (D.Normal {tp = snd; term = snd'}))
+  (* Unit *)
+  | D.Normal {tp = D.Unit; term = _} -> Syn.Triv
   (* Numbers *)
   | D.Normal {tp = D.Nat; term = D.Zero} -> Syn.Zero
   | D.Normal {tp = D.Nat; term = D.Suc nf} ->
@@ -143,6 +145,7 @@ and read_back_nf env size nf =
 
 and read_back_tp env size d =
   match d with
+  | D.Unit -> Syn.Unit
   | D.Nat -> Syn.Nat
   | D.Bool -> Syn.Bool
   | D.Pi (src, dest) ->
@@ -314,6 +317,9 @@ let rec check_nf env size nf1 nf2 =
     let p12, p22 = E.do_snd size p1, E.do_snd size p2 in
     check_nf env size (D.Normal {tp = fst1; term = p11}) (D.Normal {tp = fst2; term = p21})
     && check_nf env size (D.Normal {tp = snd1; term = p12}) (D.Normal {tp = snd2; term = p22})
+  (* Unit *)
+  | D.Normal {tp = D.Unit; term = _},
+    D.Normal {tp = D.Unit; term = _} -> true
   (* Numbers *)
   | D.Normal {tp = D.Nat; term = D.Zero},
     D.Normal {tp = D.Nat; term = D.Zero} -> true
@@ -527,6 +533,7 @@ and check_extent_head env size
 
 and check_tp ~subtype env size d1 d2 =
   match d1, d2 with
+  | D.Unit, D.Unit -> true
   | D.Nat, D.Nat -> true
   | D.Bool, D.Bool -> true
   | D.Id (tp1, left1, right1), D.Id (tp2, left2, right2) ->

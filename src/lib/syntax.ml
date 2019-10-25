@@ -12,6 +12,7 @@ type bdim =
 type t =
   | Var of idx (* DeBruijn indices for variables *)
   | Let of t * (* BINDS *) t | Check of t * t
+  | Unit | Triv
   | Nat | Zero | Suc of t | NRec of (* BINDS *) t * t * (* BINDS 2 *) t * t
   | Bool | True | False | If of (* BINDS *) t * t * t * t
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
@@ -41,6 +42,8 @@ let unsubst_bvar i t =
       else Var (j + 1)
     | Let (def, body) -> Let (go depth def, go (depth + 1) body)
     | Check (term, tp) -> Check (go depth term, go depth tp)
+    | Unit -> Unit
+    | Triv -> Triv
     | Nat -> Nat
     | Zero -> Zero
     | Suc t -> Suc (go depth t)
@@ -108,6 +111,8 @@ let rec pp fmt =
     fprintf fmt "let@,@[<hov>%a@]@,in@,@[<hov%a@]" pp def pp body
   | Check (term, tp) ->
     fprintf fmt "(@[<hov>%a@]@ :@,@[<hov>%a@])" pp term pp tp
+  | Unit -> fprintf fmt "unit"
+  | Triv -> fprintf fmt "triv"
   | Nat -> fprintf fmt "nat"
   | Zero -> fprintf fmt "0"
   | Suc t ->

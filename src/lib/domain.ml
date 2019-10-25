@@ -24,6 +24,8 @@ and closN = ClosN of {term : Syntax.t; env : env}
 and t =
   | Lam of clos
   | Neutral of {tp : t; term : ne}
+  | Unit
+  | Triv
   | Nat
   | Zero
   | Suc of t
@@ -99,6 +101,8 @@ and instantiate r i = function
   | Lam clo -> Lam (instantiate_clos r i clo)
   | Neutral {tp; term} ->
     Neutral {tp = instantiate r i tp; term = instantiate_ne r i term}
+  | Unit -> Unit
+  | Triv -> Triv
   | Nat -> Nat
   | Zero -> Zero
   | Suc t -> Suc (instantiate r i t)

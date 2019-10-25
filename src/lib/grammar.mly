@@ -11,6 +11,7 @@
 %token LAM LET IN END WITH OF DEF
 %token BRI ATSIGN EXTENT
 %token GEL ENGEL UNGEL
+%token UNIT TRIV
 %token REC SUC NAT ZERO
 %token IF TRUE FALSE BOOL
 %token UNIV
@@ -51,6 +52,10 @@ atomic:
     { t }
   | a = name
     { Var a }
+  | UNIT
+    { Unit }
+  | TRIV
+    { Triv }
   | ZERO
     { Lit 0 }
   | TRUE
@@ -67,6 +72,8 @@ atomic:
     { Pair (left, right) }
   | LBR; name = name; RBR; body = term; endpoints = endpoints
     { Bridge(Binder {name; body}, endpoints) }
+  | FST; t = atomic { Fst t }
+  | SND; t = atomic { Snd t }
 
 spine:
   | t = atomic { Term t }
@@ -138,8 +145,6 @@ term:
     { Pi ([Cell {name = ""; ty = dom}], cod)}
   | dom = atomic; TIMES; cod = term
     { Sg ([Cell {name = ""; ty = dom}], cod)}
-  | FST; t = term { Fst t }
-  | SND; t = term { Snd t }
   | GEL; bdim = bdim; endpoints = endpoints; LPR; names = nonempty_list(name); RIGHT_ARROW; body = term; RPR
     { Gel (bdim, endpoints, BinderN {names; body}) }
   | GEL; bdim = bdim; body = atomic
