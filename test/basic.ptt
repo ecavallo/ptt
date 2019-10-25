@@ -7,11 +7,11 @@ let fun_id : (A : U<0>) (B : A -> U<0>) -> ((x : A) -> B x) -> ((x : A) -> B x) 
 
 normalize def fun_id
 
-let swap : (A : [_ _] U<0>) -> ([x y] (A @ x @ y)) -> ([x y] (A @ y @ x)) =
+let swap : (A : [_] [_] U<0> {} {}) -> ([x] [y] A @ x @ y {} {}) -> ([x] [y] A @ y @ x {} {}) =
   fun A sq -> bri x y -> sq @ y @ x
 
 normalize def swap
 
 -- Should not check
--- let diagonal : (A : U<0>) (p : [x y] A) -> ([x] A) =
+-- let diagonal : (A : U<0>) (p : [x] [y] A {} {}) -> ([x] A {}) =
 --   fun A p -> bri x -> p @ x @ x

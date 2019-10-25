@@ -2,6 +2,7 @@ type lvl = int
 
 type bdim =
   | BVar of lvl
+  | Const of int
 
 type env_entry =
   | BDim of bdim
@@ -12,6 +13,7 @@ and clos =
   | ConstClos of t
 and clos2 = Clos2 of {term : Syntax.t; env : env}
 and clos3 = Clos3 of {term : Syntax.t; env : env}
+and closN = ClosN of {term : Syntax.t; env : env}
 and t =
   | Lam of clos
   | Neutral of {tp : t; term : ne}
@@ -21,14 +23,14 @@ and t =
   | Pi of t * clos
   | Sg of t * clos
   | Pair of t * t
-  | Bridge of clos
+  | Bridge of clos * t list
   | BLam of clos
   | Refl of t
   | Id of t * t * t
-  | Gel of lvl * t
-  | Engel of lvl * t
+  | Gel of lvl * t list * closN
+  | Engel of lvl * t list * t
   | Uni of Syntax.uni_level
-and extent_head = {var : lvl; dom : clos; mot : clos2; ctx : t; varcase : clos2}
+and extent_head = {var : lvl; dom : clos; mot : clos2; ctx : t; endcase : clos list; varcase : closN}
 and head =
   | Var of lvl
   | Ext of extent_head
@@ -39,7 +41,7 @@ and cell =
   | BApp of lvl
   | NRec of clos * t * clos2
   | J of clos3 * clos * t * t * t
-  | Ungel of t * clos * (* BBINDER *) lvl * clos * clos
+  | Ungel of nf list * closN * clos * (* BBINDER *) lvl * clos * clos
 and spine = cell list
 and ne = head * spine
 and nf =

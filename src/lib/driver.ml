@@ -50,8 +50,14 @@ let rec unravel_spine f = function
   | [] -> f
   | x :: xs -> unravel_spine (x f) xs
 
+let rec extent_env env = function
+  | [var_bridge; var_dim] -> BDim var_dim :: Term var_bridge :: env
+  | name :: names -> extent_env (Term name :: env) names
+  | _ -> raise (Check.Type_error (Check.Misc ("Bad length in extent")))
+
 let bbind env = function
   | CS.BVar i -> S.BVar (find_idx i env)
+  | CS.Const o -> S.Const o
 
 let rec bind env = function
   | CS.Var i -> S.Var (find_idx i env)
@@ -100,10 +106,8 @@ let rec bind env = function
   | CS.Id (tp, left, right) ->
     S.Id (bind env tp, bind env left, bind env right)
   | CS.Refl t -> S.Refl (bind env t)
-  | CS.Bridge ([], body) ->
-    bind env body
-  | CS.Bridge (r :: tele, body) ->
-    S.Bridge (bind (BDim r :: env) (CS.Bridge (tele, body)))
+  | CS.Bridge (Binder {name; body}, endpoints) ->
+    S.Bridge (bind (BDim name :: env) body, List.map (bind env) endpoints)
   | CS.BLam (BinderN {names = []; body}) ->
     bind env body
   | CS.BLam (BinderN {names = i :: names; body}) ->
@@ -114,23 +118,30 @@ let rec bind env = function
        dom = Binder {name = dom_dim; body = dom_body};
        mot = Binder2 {name1 = mot_dim; name2 = mot_dom; body = mot_body};
        ctx;
-       varcase = Binder2 {name1 = var_bridge; name2 = var_dim; body = var_body}} ->
+       endcase;
+       varcase = BinderN {names; body = var_body}} ->
     S.Extent
       (bbind env bdim,
        bind (BDim dom_dim :: env) dom_body,
        bind (Term mot_dom :: BDim mot_dim :: env) mot_body,
        bind env ctx,
-       bind (BDim var_dim :: Term var_bridge :: env) var_body)
-  | CS.Gel (r, t) ->
-    S.Gel (bbind env r, bind env t)
-  | CS.Engel (r, t) ->
-    S.Engel (bbind env r, bind env t)
+       List.map (function (CS.Binder {name; body}) -> bind (Term name :: env) body) endcase,
+       bind (extent_env env names) var_body)
+  | CS.Gel (r, ends, BinderN {names; body}) ->
+    S.Gel
+      (bbind env r,
+       List.map (bind env) ends,
+       bind (List.rev_append (List.map (fun t -> Term t) names) env) body)
+  | CS.Engel (r, ts, t) ->
+    S.Engel (bbind env r, List.map (bind env) ts, bind env t)
   | CS.Ungel
-      {mot = Binder {name = mot_name; body = mot_body};
+      {width;
+       mot = Binder {name = mot_name; body = mot_body};
        gel = Binder {name = gel_name; body = gel_body};
        case = Binder {name = case_name; body = case_body}} ->
     S.Ungel
-      (bind (Term mot_name :: env) mot_body,
+      (width,
+       bind (Term mot_name :: env) mot_body,
        bind (BDim gel_name :: env) gel_body,
        bind (Term case_name :: env) case_body)
   | CS.Uni i -> S.Uni i

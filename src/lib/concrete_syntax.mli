@@ -3,6 +3,7 @@ type uni_level = int
 
 type bdim =
   | BVar of ident
+  | Const of int
 
 type binder = Binder of {name : ident; body : t}
 and bindern = BinderN of {names : ident list; body : t}
@@ -28,12 +29,12 @@ and t =
   | Id of t * t * t
   | Refl of t
   | J of {mot : binder3; refl : binder; eq : t}
-  | Bridge of ident list * t
+  | Bridge of binder * t list
   | BLam of bindern
-  | Extent of {bdim : bdim; dom : binder; mot : binder2; ctx : t; varcase : binder2}
-  | Gel of bdim * t
-  | Engel of bdim * t
-  | Ungel of {mot : binder; gel : binder; case : binder}
+  | Extent of {bdim : bdim; dom : binder; mot : binder2; ctx : t; endcase : binder list; varcase : bindern}
+  | Gel of bdim * t list * bindern
+  | Engel of bdim * t list * t
+  | Ungel of {width : int; mot : binder; gel : binder; case : binder}
   | Uni of uni_level
 
 type decl =

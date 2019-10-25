@@ -23,27 +23,27 @@ normalize def cong
 
 -- Gel type lemmas
 
-let gelproj : (A : U<0>) -> ([x] Gel x A) -> A =
+let gelproj : (A : U<0>) -> [x] Gel x A {} -> A =
   fun A p ->
-  ungel x -> p @ x at _ -> A with | gel a -> a
+  ungel x : 0 -> p @ x at _ -> A with | gel a -> a
 
 normalize def gelproj
 
-let mapGel : (A : U<0>) (B : U<0>) -> (A -> B) -> [x] (Gel x A) -> Gel x B =
+let mapGel : (A : U<0>) (B : U<0>) -> (A -> B) -> [x] (Gel x A) -> Gel x B {} =
   fun A B f -> bri x -> fun g ->
   extent x of g in y -> Gel y A at y _ -> Gel y B with
   | q y -> gel y (f (gelproj A q))
 
 normalize def mapGel
 
--- nat is a retract of ([x] nat)
+-- nat is a retract of [x] nat {}
 
-let stretch : nat -> ([x] nat) =
+let stretch : nat -> [x] nat {} =
   fun n -> bri _ -> n
 
 normalize def stretch
 
-let flatten_aux : [x] nat -> Gel x nat =
+let flatten_aux : [x] nat -> Gel x nat {} =
   bri x -> fun n ->
   rec n at _ -> Gel x nat with
   | zero -> gel x zero
@@ -51,7 +51,7 @@ let flatten_aux : [x] nat -> Gel x nat =
 
 normalize def flatten_aux
 
-let flatten : ([x] nat) -> nat =
+let flatten : [x] nat {} -> nat =
   fun p -> gelproj nat (bri x -> flatten_aux @ x (p @ x))
 
 normalize def flatten
@@ -66,4 +66,4 @@ normalize def flatten_stretch
 
 -- can we prove that this is an equivalence (modulo bridge extensionality),
 -- or do we need binary parametricity?
--- let stretch_flatten : (p : [x] nat) -> Id ([x] nat) (stretch (flatten p)) p =
+-- let stretch_flatten : (p : [x] nat {}) -> Id ([x] nat {}) (stretch (flatten p)) p =

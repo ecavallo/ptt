@@ -1,0 +1,51 @@
+let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
+  -> (Id A a0 a1) -> Id B (f a0) (f a1)
+  =
+  fun A B f a0 a1 eq ->
+  match eq at x0 x1 _ -> Id B (f x0) (f x1) with
+  | refl z -> refl (f z)
+
+let gelproj : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
+  (a : A) (b : B) -> [x] Gel x {A; B} (a b -> R a b) {a; b} -> R a b
+  =
+  fun A B R a b p ->
+  ungel x : 2 -> p @ x at _ -> R a b with | gel r -> r
+
+normalize def gelproj
+
+let iter : (A : U<0>) (f : A -> A) -> nat -> A -> A =
+  fun A f n a ->
+  rec n at _ -> A with
+  | zero -> a
+  | suc _, b -> f b
+
+normalize def iter
+
+let church_param : (F : (A : U<0>) -> (A -> A) -> (A -> A))
+  -> (A : U<0>) (f : A -> A) (a : A)
+  -> Id A (F A f a) (iter A f (F nat (fun n -> suc n) zero) a)
+  =
+  fun F A f a ->
+  let R : A -> nat -> U<0> = fun b n -> Id A b (iter A f n a) in
+  let G : [x] U<0> {A; nat} = bri x -> Gel x {A; nat} (a b -> R a b) in
+  gelproj A nat (fun b n -> R b n) (F A f a) (F nat (fun n -> suc n) zero)
+    (bri x ->
+      let fx : (G @ x) -> G @ x =
+        fun g ->
+        extent x of g in y -> G @ y at y _ -> G @ y with
+        | b -> f b
+        | n -> suc n
+        | b n q y ->
+          gel y {f b; suc n}
+            (cong A A f b (iter A f n a)
+              (gelproj A nat (fun b n -> R b n) b n q))
+      in
+      F (G @ x) fx (gel x {a; zero} (refl a)))
+
+normalize def church_param
+
+normalize church_param (fun A f -> f) at
+  (A : U<0>) (f : A -> A) (a : A) -> Id A (f a) (f a)
+
+normalize church_param (fun A f a -> (f (f a))) at
+  (A : U<0>) (f : A -> A) (a : A) -> Id A (f (f a)) (f (f a))

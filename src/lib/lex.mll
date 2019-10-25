@@ -56,8 +56,6 @@ let atom = atom_first atom_next*
 rule token = parse
   | number
     { (NUMERAL (int_of_string (Lexing.lexeme lexbuf))) }
-  | ';'
-    {comment lexbuf}
   | '('
     { LPR }
   | ')'
@@ -72,6 +70,8 @@ rule token = parse
     { TIMES }
   | ':'
     { COLON }
+  | ';'
+    { SEMI }
   | "="
     { EQUALS }
   | "->"
@@ -84,6 +84,10 @@ rule token = parse
     { LBR }
   | "]"
     { RBR }
+  | "{"
+    { LCU }
+  | "}"
+    { RCU }
   | "λ"
     { LAM }
   | '_'

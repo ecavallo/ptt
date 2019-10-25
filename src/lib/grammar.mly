@@ -4,8 +4,8 @@
 
 %token <int> NUMERAL
 %token <string> ATOM
-%token COLON PIPE AT COMMA RIGHT_ARROW UNDERSCORE
-%token LPR RPR LANGLE RANGLE LBR RBR
+%token COLON SEMI PIPE AT COMMA RIGHT_ARROW UNDERSCORE
+%token LPR RPR LANGLE RANGLE LBR RBR LCU RCU
 %token EQUALS
 %token TIMES FST SND
 %token LAM LET IN END WITH OF DEF
@@ -39,8 +39,12 @@ sign:
   | d = decl; s = sign { d :: s };
 
 bdim:
-  | r = name { BVar r };
-    
+  | r = name { BVar r }
+  | n = NUMERAL { Const n };
+
+endpoints:
+  | LCU; endpoints = separated_list(SEMI, term); RCU { endpoints }
+
 atomic:
   | LPR; t = term; RPR
     { t }
@@ -55,10 +59,18 @@ atomic:
   | NAT { Nat }
   | LANGLE left = term; COMMA; right = term; RANGLE
     { Pair (left, right) }
+  | LBR; name = name; RBR; body = term; endpoints = endpoints
+    { Bridge(Binder {name; body}, endpoints) }
 
 spine:
   | t = atomic { Term t }
   | ATSIGN; b = bdim { BDim b };
+
+extent_cases:
+  | name = name; RIGHT_ARROW; body = term; PIPE; ext = extent_cases
+    { let (endcases, varcase) = ext in (Binder {name; body} :: endcases, varcase) }
+  | name = name; names = nonempty_list(name); RIGHT_ARROW; varcase = term;
+    { ([], BinderN {names = name :: names; body = varcase}) };
 
 term:
   | f = atomic; args = list(spine)
@@ -89,14 +101,16 @@ term:
   | EXTENT; bdim = bdim; OF; ctx = term;
     IN; dom_dim = name; RIGHT_ARROW; dom = term;
     AT; mot_dim = name; mot_var = name; RIGHT_ARROW; mot = term;
-    WITH;
-    PIPE; varcase_bridge = name; varcase_dim = name; RIGHT_ARROW; varcase = term;
-    { Extent
+    WITH; PIPE;
+    cases = extent_cases
+    { let (endcase, varcase) = cases in
+      Extent
         {bdim;
          dom = Binder {name = dom_dim; body = dom};
          mot = Binder2 {name1 = mot_dim; name2 = mot_var; body = mot};
          ctx;
-         varcase = Binder2 {name1 = varcase_bridge; name2 = varcase_dim; body = varcase}} }
+         endcase;
+         varcase} }
   | LAM; names = nonempty_list(name); RIGHT_ARROW; body = term
     { Lam (BinderN {names; body}) }
   | BRI; names = nonempty_list(name); RIGHT_ARROW; body = term
@@ -111,17 +125,22 @@ term:
     { Sg ([Cell {name = ""; ty = dom}], cod)}
   | FST; t = term { Fst t }
   | SND; t = term { Snd t }
-  | GEL; bdim = bdim; t = atomic { Gel (bdim, t) }
-  | ENGEL; bdim = bdim; t = atomic { Engel (bdim, t) }
-  | UNGEL; gel_name = name; RIGHT_ARROW; gel_body = term; AT;
+  | GEL; bdim = bdim; endpoints = endpoints; LPR; names = nonempty_list(name); RIGHT_ARROW; body = term; RPR
+    { Gel (bdim, endpoints, BinderN {names; body}) }
+  | GEL; bdim = bdim; body = atomic
+    { Gel (bdim, [], BinderN {names = []; body}) }
+  | ENGEL; bdim = bdim; endpoints = endpoints; t = atomic
+    { Engel (bdim, endpoints, t) }
+  | ENGEL; bdim = bdim; t = atomic
+    { Engel (bdim, [], t) }
+  | UNGEL; gel_name = name; COLON; width = NUMERAL; RIGHT_ARROW; gel_body = term; AT;
     mot_name = name; RIGHT_ARROW; mot_body = term; WITH
     PIPE; ENGEL; case_name = name; RIGHT_ARROW; case_body = term;
     { Ungel
-        {mot = Binder {name = mot_name; body = mot_body};
+        {width;
+         mot = Binder {name = mot_name; body = mot_body};
          gel = Binder {name = gel_name; body = gel_body};
          case = Binder {name = case_name; body = case_body}} }
-  | LBR; names = nonempty_list(name); RBR; body = term
-    { Bridge(names,body) }
   
 tele_cell:
   | LPR name = name; COLON ty = term; RPR
