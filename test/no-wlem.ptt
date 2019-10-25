@@ -77,10 +77,7 @@ let WLEM_is_not_const : (wlem : WLEM) (A : U<0>)
   let P : U<0> -> bool -> U<0> =
     fun T b -> if b at _ -> U<0> with | tt -> not T | ff -> not (not T)
   in
-  let Q1 : U<0> -> bool -> U<0> =
-    fun T b -> Id bool b (fst (wlem (not A)))
-  in
-  (if (fst (wlem A)) at b -> (P A b) -> (Q1 A b) -> empty with
+  (if (fst (wlem A)) at b -> (P A b) -> (Id bool b (fst (wlem (not A)))) -> empty with
    | tt ->
      fun na q1 ->
      (if (fst (wlem (not A))) at c -> (P (not A) c) -> (Id bool tt c) -> empty with
