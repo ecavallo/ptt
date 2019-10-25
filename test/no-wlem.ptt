@@ -2,9 +2,8 @@
 -- Refutation of the weak law of the excluded middle, which decides negated
 -- types. In cubical type theory this would suffice to refute the excluded
 -- middle for homotopy propositions, but that implication requires function
--- extensionality (to show that negated types are always propositions). It
--- should still be possible to refute the excluded middle for propositions by
--- other means, but this is not done here.
+-- extensionality (to show that negated types are always propositions).
+-- See no-lem.ptt for a separate refutation of that principle.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------

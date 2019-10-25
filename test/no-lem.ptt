@@ -1,0 +1,243 @@
+--------------------------------------------------------------------------------
+-- Refutation of the law of the excluded middle for homotopy propositions.
+-- The main lemma in this proof is the fact that the universe of propositions
+-- is closed under Gel-types, that is, that a Gel-type made from propositional
+-- endpoints and a proposition-valued relation is itself a proposition.
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- General definitions and lemmas
+--------------------------------------------------------------------------------
+
+let is_prop : U<0> -> U<0> =
+  fun A -> (a : A) (b : A) -> Id A a b
+
+let Uprop : U<1> = (A : U<0>) * is_prop A
+
+let or : U<0> -> U<0> -> U<0> =
+  fun A B ->
+  (b : bool) * if b at _ -> U<0> with | tt -> A | ff -> B
+
+let symm : (A : U<0>) (a : A) (b : A) -> (Id A a b) -> Id A b a =
+  fun A a b eq ->
+  match eq at x y _ -> Id A y x with
+  | refl z -> refl z
+
+let trans : (A : U<0>) (a : A) (b : A) (c : A) -> (Id A a b) -> (Id A b c) -> Id A a c =
+  fun A a b c eq0 ->
+  match eq0 at x y _ -> (Id A y c) -> Id A x c with
+  | refl z -> fun eq1 -> eq1
+
+let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
+  -> (Id A a0 a1) -> Id B (f a0) (f a1)
+  =
+  fun A B f a0 a1 eq ->
+  match eq at x0 x1 _ -> Id B (f x0) (f x1) with
+  | refl z -> refl (f z)
+
+let subst : (A : U<0>) (B : A -> U<0>) (a0 : A) (a1 : A)
+  -> (Id A a0 a1) -> (B a0) -> B a1
+  =
+  fun A B a0 a1 eq ->
+  match eq at x y _ -> (B x) -> B y with
+  | refl _ -> fun b -> b
+
+let subst2 : (A : U<0>) (B : U<0>) (C : A -> B -> U<0>)
+  (a0 : A) (a1 : A) (b0 : B) (b1 : B)
+  -> (Id A a0 a1) -> (Id B b0 b1) -> (C a0 b0) -> C a1 b1
+  =
+  fun A B C a0 a1 b0 b1 eqa ->
+  match eqa at x y _ -> (Id B b0 b1) -> (C x b0) -> C y b1 with
+  | refl a -> subst B (C a) b0 b1
+
+let cong_bapp : (A0 : U<0>) (A1 : U<0>) (A : [_] U<0> {A0; A1}) (a0 : A0) (a1 : A1)
+  (b0 : [x] A @ x {a0; a1}) (b1 : [x] A @ x {a0; a1})
+  -> (Id ([x] A @ x {a0; a1}) b0 b1)
+  -> [x] Id (A @ x) (b0 @ x) (b1 @ x) {refl a0; refl a1}
+  =
+  fun A0 A1 A a0 a1 b0 b1 eq ->
+  match eq at c0 c1 _ -> [x] Id (A @ x) (c0 @ x) (c1 @ x) {refl a0; refl a1} with
+  | refl c -> bri x -> refl (c @ x)
+
+let gelproj : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
+  (a : A) (b : B) -> [x] Gel x {A; B} (a b -> R a b) {a; b} -> R a b
+  =
+  fun A B R a b p ->
+  ungel x : 2 -> p @ x at _ -> R a b with | gel r -> r
+
+let gel_eta : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>) (a : A) (b : B)
+  -> (p : [x] Gel x {A; B} (a b -> R a b) {a; b})
+  -> Id ([x] Gel x {A; B} (a b -> R a b) {a; b})
+     p
+     (bri x -> gel x {a; b} (gelproj A B R a b p))
+  =
+  fun A B R a b p ->
+  ungel x : 2 -> p @ x at
+  q -> Id ([x] Gel x {A; B} (a b -> R a b) {a; b}) q (bri x -> gel x {a; b} (gelproj A B R a b q))
+  with
+  | gel r -> refl (bri x -> gel x {a;b} r)
+
+--------------------------------------------------------------------------------
+-- Uprop is closed under Gel-types
+--------------------------------------------------------------------------------
+
+let cong_gel : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
+  (a : A) (a' : A) (eqa : Id A a a')
+  (b : B) (b' : B) (eqb : Id B b b')
+  (r : R a b) (r' : R a' b')
+  -> (Id (R a' b') (subst2 A B R a a' b b' eqa eqb r) r')
+  -> [x] (Id (Gel x {A;B} (a b -> R a b)) (gel x {a;b} r) (gel x {a';b'} r')) {eqa; eqb}
+  =
+  fun A B R a a' eqa ->
+  match eqa at
+  a a' eqa ->
+    (b : B) (b' : B) (eqb : Id B b b')
+    (r : R a b) (r' : R a' b')
+    -> (Id (R a' b') (subst2 A B R a a' b b' eqa eqb r) r')
+    -> [x] (Id (Gel x {A;B} (a b -> R a b)) (gel x {a;b} r) (gel x {a';b'} r')) {eqa; eqb}
+  with
+  | refl a -> fun b b' eqb ->
+    match eqb at
+    b b' eqb ->
+      (r : R a b) (r' : R a b')
+      -> (Id (R a b') (subst B (R a) b b' eqb r) r')
+      -> [x] (Id (Gel x {A;B} (a b -> R a b)) (gel x {a;b} r) (gel x {a;b'} r')) {refl a; eqb}
+    with
+    | refl b -> fun r r' eqr ->
+      match eqr at
+      r r' _ ->
+        [x] (Id (Gel x {A;B} (a b -> R a b)) (gel x {a;b} r) (gel x {a;b} r')) {refl a; refl b}
+      with
+      | refl r -> bri x -> refl (gel x {a; b} r)
+
+let Gel_is_prop : (A0 : Uprop) (A1 : Uprop) (R : (fst A0) -> (fst A1) -> Uprop)
+  -> [x] is_prop (Gel x {fst A0; fst A1} (a0 a1 -> fst (R a0 a1))) {snd A0; snd A1}
+  =
+  fun A0p A1p Rp ->
+  let A0 : U<0> = fst A0p in
+  let A1 : U<0> = fst A1p in
+  let R : A0 -> A1 -> U<0> = fun a0 a1 -> fst (Rp a0 a1) in
+  let G : [x] U<0> {A0; A1} = bri x -> Gel x {A0; A1} (a0 a1 -> R a0 a1) in
+  bri x ->
+  fun g ->
+  extent x of g in y -> G @ y at y g -> (g' : G @ y) -> Id (G @ y) g g' with
+  | a0 -> fun a0' -> snd A0p a0 a0'
+  | a1 -> fun a1' -> snd A1p a1 a1'
+  | a0 a1 q y -> fun g' ->
+    extent y of g' in z -> G @ z at z g' -> Id (G @ z) (q @ z) g' with
+    | a0' -> snd A0p a0 a0'
+    | a1' -> snd A1p a1 a1'
+    | a0' a1' q' z ->
+      trans (G @ z) (q @ z) (gel z {a0; a1} (gelproj A0 A1 R a0 a1 q)) (q' @ z)
+        (cong_bapp A0 A1 G a0 a1 q (bri z -> gel z {a0; a1} (gelproj A0 A1 R a0 a1 q))
+          (gel_eta A0 A1 R a0 a1 q)
+          @ z)
+        (trans (G @ z)
+          (gel z {a0; a1} (gelproj A0 A1 R a0 a1 q))
+          (gel z {a0'; a1'} (gelproj A0 A1 R a0' a1' q'))
+          (q' @ z)
+          (cong_gel A0 A1 R
+            a0 a0' (snd A0p a0 a0')
+            a1 a1' (snd A1p a1 a1')
+            (gelproj A0 A1 R a0 a1 q) (gelproj A0 A1 R a0' a1' q')
+            (snd (Rp a0' a1')
+              (subst2 A0 A1 R a0 a0' a1 a1' (snd A0p a0 a0') (snd A1p a1 a1')
+                (gelproj A0 A1 R a0 a1 q))
+              (gelproj A0 A1 R a0' a1' q'))
+            @ z)
+          (symm (G @ z) (q' @ z) (gel z {a0'; a1'} (gelproj A0 A1 R a0' a1' q'))
+            (cong_bapp A0 A1 G a0' a1' q' (bri z -> gel z {a0'; a1'} (gelproj A0 A1 R a0' a1' q'))
+              (gel_eta A0 A1 R a0' a1' q')
+              @ z)))
+
+let Gel_prop : (A0 : Uprop) (A1 : Uprop) (R : (fst A0) -> (fst A1) -> Uprop)
+  -> [x] Uprop {A0; A1}
+  =
+  fun A0 A1 R -> bri x ->
+  <Gel x {fst A0; fst A1} (a0 a1 -> fst (R a0 a1)), Gel_is_prop A0 A1 R @ x>
+
+--------------------------------------------------------------------------------
+-- unit is a proposition
+--------------------------------------------------------------------------------
+
+let unit_is_prop : is_prop unit =
+  fun _ _ -> refl triv
+
+let unit_prop : Uprop = <unit, unit_is_prop>
+
+--------------------------------------------------------------------------------
+-- empty is a proposition
+--------------------------------------------------------------------------------
+
+let empty : U<0> = Id bool tt ff
+
+let empty_is_prop : is_prop empty =
+  fun no0 no1 ->
+  cong bool empty
+    (fun b -> if b at _ -> empty with | tt -> no0 | ff -> no1)
+     tt ff no0
+
+let empty_prop : Uprop = <empty, empty_is_prop>
+
+--------------------------------------------------------------------------------
+-- Bridge-discreteness of bool (one direction)
+--------------------------------------------------------------------------------
+
+let shannon : bool -> bool =
+  fun b ->
+  if b at _ -> bool with | tt -> tt | ff -> ff
+
+let bool_eta : (b : bool) -> Id bool (shannon b) b =
+  fun b ->
+  if b at b -> Id bool (shannon b) b with
+  | tt -> refl tt
+  | ff -> refl ff
+
+let bridge_to_id : (b0 : bool) (b1 : bool) -> [_] bool {b0; b1} -> Id bool b0 b1 =
+  fun b0 b1 p ->
+  let lemma : Id bool (shannon b0) (shannon b1) =
+    gelproj bool bool (fun c d -> Id bool c d) (shannon b0) (shannon b1)
+      (bri x ->
+       if (p @ x) at _ -> Gel x {bool; bool} (c d -> Id bool c d) with
+       | tt -> gel x {tt; tt} (refl tt)
+       | ff -> gel x {ff; ff} (refl ff))
+  in
+  trans bool b0 (shannon b1) b1
+    (trans bool b0 (shannon b0) (shannon b1)
+      (symm bool (shannon b0) b0 (bool_eta b0))
+      lemma)
+    (bool_eta b1)
+
+--------------------------------------------------------------------------------
+-- Refutation of LEM
+--------------------------------------------------------------------------------
+
+let not : U<0> -> U<0> = fun A -> A -> empty
+
+let LEM : U<1> = (A : Uprop) -> or (fst A) (not (fst A))
+
+let LEM_is_not_const : (lem : LEM)
+  -> (Id bool (fst (lem unit_prop)) (fst (lem empty_prop))) -> empty
+  =
+  fun lem p ->
+  let P : Uprop -> bool -> U<0> =
+    fun T b -> if b at _ -> U<0> with | tt -> fst T | ff -> not (fst T)
+  in
+  (if (fst (lem unit_prop)) at
+   b -> (P unit_prop b) -> (Id bool b (fst (lem empty_prop))) -> empty
+   with
+   | tt ->
+     fun a q1 ->
+     (if (fst (lem empty_prop)) at c -> (P empty_prop c) -> (Id bool tt c) -> empty with
+      | tt -> fun e _ -> e
+      | ff -> fun _ q2 -> q2)
+     (snd (lem empty_prop))
+     q1
+   | ff -> fun no _ -> no triv)
+  (snd (lem unit_prop))
+  p
+
+let LEM_is_false : LEM -> empty =
+  fun lem ->
+  LEM_is_not_const lem
+    (bridge_to_id (fst (lem unit_prop)) (fst (lem empty_prop))
+      (bri x -> fst (lem (Gel_prop unit_prop empty_prop (fun _ _ -> empty_prop) @ x))))
