@@ -6,7 +6,8 @@ normalize def gelproj
 
 let id_param1 : (F : (A : U<0>) -> A -> A) -> (A : U<0>) (a : A) -> Id A (F A a) a =
   fun F A a ->
-  gelproj A (fun b -> Id A b a) (F A a) (bri x -> F (Gel x {A} (b -> Id A b a)) (gel x {a} (refl a)))
+  let P : A -> U<0> = fun b -> Id A b a in
+  gelproj A (fun b -> P b) (F A a) (bri x -> F (Gel x {A} (b -> P b)) (gel x {a} (refl a)))
 
 normalize def id_param1
 
