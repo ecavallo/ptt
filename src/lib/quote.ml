@@ -73,6 +73,7 @@ and reduce_extent env size es =
     | [] -> reduce_extent_head env size e
     | D.Ap (Normal {term;_}) :: s -> E.do_ap size (go env size (e, s)) term
     | D.NRec (tp, zero, suc) :: s -> E.do_rec size tp zero suc (go env size (e, s))
+    | D.If (mot, tt, ff) :: s -> E.do_if size mot tt ff (go env size (e, s))
     | D.Fst :: s -> E.do_fst (go env size (e, s))
     | D.Snd :: s -> E.do_snd size (go env size (e, s))
     | D.BApp i :: s -> E.do_bapp size (go env size (e, s)) (D.BVar i)
@@ -108,6 +109,9 @@ and read_back_nf env size nf =
   | D.Normal {tp = D.Nat; term = D.Zero} -> Syn.Zero
   | D.Normal {tp = D.Nat; term = D.Suc nf} ->
      Syn.Suc (read_back_nf env size (D.Normal {tp = D.Nat; term = nf}))
+  (* Booleans *)
+  | D.Normal {tp = D.Bool; term = D.True} -> Syn.True
+  | D.Normal {tp = D.Bool; term = D.False} -> Syn.False
   (* Bridge *)
   | D.Normal {tp = D.Bridge (dest, _); term} ->
      let (arg, arg_env) = mk_bvar env size in
@@ -140,6 +144,7 @@ and read_back_nf env size nf =
 and read_back_tp env size d =
   match d with
   | D.Nat -> Syn.Nat
+  | D.Bool -> Syn.Bool
   | D.Pi (src, dest) ->
     let (arg, arg_env) = mk_var src env size in
     Syn.Pi (read_back_tp env size src, read_back_tp arg_env (size + 1) (E.do_clos (size + 1) dest arg))
@@ -203,6 +208,15 @@ and read_back_inert_ne env size (h, s) =
     let applied_suc = E.do_clos2 (size + 2) suc nat_arg suc_arg in
     let suc' = read_back_nf suc_env (size + 2) (D.Normal {tp = applied_suc_tp; term = applied_suc}) in
     Syn.NRec (tp', zero', suc', read_back_inert_ne env size (h, s))
+  | D.If (mot, tt, ff) :: s ->
+    let (bool_arg, bool_env) = mk_var D.Bool env size in
+    let applied_mot = E.do_clos (size + 1) mot bool_arg in
+    let mot' = read_back_tp bool_env (size + 1) applied_mot in
+    let tt_tp = E.do_clos size mot D.True in
+    let tt' = read_back_nf env size (D.Normal {tp = tt_tp; term = tt}) in
+    let ff_tp = E.do_clos size mot D.False in
+    let ff' = read_back_nf env size (D.Normal {tp = ff_tp; term = ff}) in
+    Syn.If (mot', tt', ff', read_back_inert_ne env size (h, s))
   | D.Fst :: s -> Syn.Fst (read_back_inert_ne env size (h, s))
   | D.Snd :: s -> Syn.Snd (read_back_inert_ne env size (h, s))
   | D.BApp i :: s ->
@@ -306,6 +320,11 @@ let rec check_nf env size nf1 nf2 =
   | D.Normal {tp = D.Nat; term = D.Suc nf1},
     D.Normal {tp = D.Nat; term = D.Suc nf2} ->
     check_nf env size (D.Normal {tp = D.Nat; term = nf1}) (D.Normal {tp = D.Nat; term = nf2})
+  (* Booleans *)
+  | D.Normal {tp = D.Bool; term = D.True},
+    D.Normal {tp = D.Bool; term = D.True} -> true
+  | D.Normal {tp = D.Bool; term = D.False},
+    D.Normal {tp = D.Bool; term = D.False} -> true
   (* Id *)
   | D.Normal {tp = D.Id (tp, _, _); term = D.Refl term1},
     D.Normal {tp = D.Id (_, _, _); term = D.Refl term2} ->
@@ -397,6 +416,16 @@ and check_inert_ne env size (h1, s1) (h2, s2) =
     check_nf suc_env (size + 2)
       (D.Normal {tp = applied_suc_tp; term = applied_suc1})
       (D.Normal {tp = applied_suc_tp; term = applied_suc2}) &&
+    check_inert_ne env size (h1, s1) (h2, s2)
+  | D.If (mot1, tt1, ff1) :: s1, D.If (mot2, tt2, ff2) :: s2 ->
+    let (bool_arg, bool_env) = mk_var D.Bool env size in
+    let applied_mot1 = E.do_clos (size + 1) mot1 bool_arg in
+    let applied_mot2 = E.do_clos (size + 1) mot2 bool_arg in
+    check_tp ~subtype:false bool_env (size + 1) applied_mot1 applied_mot2 &&
+    let tt_tp = E.do_clos size mot1 D.True in
+    check_nf env size (D.Normal {tp = tt_tp; term = tt1}) (D.Normal {tp = tt_tp; term = tt2}) &&
+    let ff_tp = E.do_clos size mot1 D.False in
+    check_nf env size (D.Normal {tp = ff_tp; term = ff1}) (D.Normal {tp = ff_tp; term = ff2}) &&
     check_inert_ne env size (h1, s1) (h2, s2)
   | D.Fst :: s1, D.Fst :: s2  -> check_inert_ne env size (h1, s1) (h2, s2)
   | D.Snd :: s1, D.Snd :: s2 -> check_inert_ne env size (h1, s1) (h2, s2)
@@ -499,6 +528,7 @@ and check_extent_head env size
 and check_tp ~subtype env size d1 d2 =
   match d1, d2 with
   | D.Nat, D.Nat -> true
+  | D.Bool, D.Bool -> true
   | D.Id (tp1, left1, right1), D.Id (tp2, left2, right2) ->
     check_tp ~subtype env size tp1 tp2 &&
     check_nf env size (D.Normal {tp = tp1; term = left1}) (D.Normal {tp = tp1; term = left2}) &&

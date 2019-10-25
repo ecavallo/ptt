@@ -153,6 +153,12 @@ let rec check ~env ~size ~term ~tp =
       | D.Uni _ -> ()
       | t -> tp_error (Expecting_universe t)
     end
+  | Bool ->
+    begin
+      match tp with
+      | D.Uni _ -> ()
+      | t -> tp_error (Expecting_universe t)
+    end
   | Id (tp', l, r) ->
     begin
       match tp with
@@ -287,6 +293,8 @@ and synth ~env ~size ~term =
     tp
   | Zero -> D.Nat
   | Suc term -> check ~env ~size ~term ~tp:Nat; D.Nat
+  | True -> D.Bool
+  | False -> D.Bool
   | Fst p ->
     begin
       match synth ~env ~size ~term:p with
@@ -322,6 +330,16 @@ and synth ~env ~size ~term =
     let suc_tp = E.eval mot (D.Term (Suc nat_arg) :: sem_env) (size + 2) in
     check ~env:ih_env ~size:(size + 2) ~term:suc ~tp:suc_tp;
     E.eval mot (D.Term (E.eval n sem_env size) :: sem_env) size
+  | If (mot, tt, ff, b) ->
+    check ~env ~size ~term:b ~tp:Bool;
+    let sem_env = env_to_sem_env env in
+    let (_, bool_env) = mk_var Bool env size in
+    check_tp ~env:bool_env ~size:(size + 1) ~term:mot;
+    let tt_tp = E.eval mot (D.Term D.True :: sem_env) size in
+    check ~env ~size ~term:tt ~tp:tt_tp;
+    let ff_tp = E.eval mot (D.Term D.False :: sem_env) size in
+    check ~env ~size ~term:ff ~tp:ff_tp;
+    E.eval mot (D.Term (E.eval b sem_env size) :: sem_env) size
   | BApp (term, r) ->
     let restricted_env = restrict_env r env in
     begin
@@ -414,6 +432,7 @@ and synth ~env ~size ~term =
 and check_tp ~env ~size ~term =
   match term with
   | Syn.Nat -> ()
+  | Syn.Bool -> ()
   | Uni _ -> ()
   | Bridge (term, ends) ->
     let width = List.length ends in

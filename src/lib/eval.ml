@@ -57,6 +57,15 @@ and do_rec size tp zero suc n =
     D.Neutral {tp = final_tp; term = D.(NRec (tp, zero, suc) @: term)}
   | _ -> raise (Eval_failed "Not a number")
 
+and do_if size mot tt ff b =
+  match b with
+  | D.True -> tt
+  | D.False -> ff
+  | D.Neutral {term; _} ->
+    let final_tp = do_clos size mot b in
+    D.Neutral {tp = final_tp; term = D.(If (mot, tt, ff) @: term)}
+  | _ -> raise (Eval_failed "Not a number")
+
 and do_fst p =
   match p with
   | D.Pair (p1, _) -> p1
@@ -154,6 +163,15 @@ and eval t (env : D.env) size =
       (eval zero env size)
       (Clos2 {term = suc; env})
       (eval n env size)
+  | Syn.Bool -> D.Bool
+  | Syn.True -> D.True
+  | Syn.False -> D.False
+  | Syn.If (mot, tt, ff, b) ->
+    do_if size
+      (Clos {term = mot; env})
+      (eval tt env size)
+      (eval ff env size)
+      (eval b env size)
   | Syn.Pi (src, dest) ->
     D.Pi (eval src env size, (Clos {term = dest; env}))
   | Syn.Lam t -> D.Lam (Clos {term = t; env})

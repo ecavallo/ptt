@@ -13,6 +13,7 @@ type t =
   | Var of idx (* DeBruijn indices for variables *)
   | Let of t * (* BINDS *) t | Check of t * t
   | Nat | Zero | Suc of t | NRec of (* BINDS *) t * t * (* BINDS 2 *) t * t
+  | Bool | True | False | If of (* BINDS *) t * t * t * t
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
   | Sg of t * (* BINDS *) t | Pair of t * t | Fst of t | Snd of t
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
@@ -45,6 +46,11 @@ let unsubst_bvar i t =
     | Suc t -> Suc (go depth t)
     | NRec (mot, zero, suc, n) ->
       NRec (go (depth + 1) mot, go depth zero, go (depth + 2) suc, go depth n)
+    | Bool -> Bool
+    | True -> True
+    | False -> False
+    | If (mot, tt, ff, b) ->
+      If (go (depth + 1) mot, go depth tt, go depth ff, go depth b)
     | Pi (l, r) -> Pi (go depth l, go (depth + 1) r)
     | Lam body -> Lam (go (depth + 1) body)
     | Ap (l, r) -> Ap (go depth l, go depth r)
@@ -115,6 +121,12 @@ let rec pp fmt =
   | NRec (mot, zero, suc, n) ->
     fprintf fmt "rec(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
       pp mot pp zero pp suc pp n;
+  | Bool -> fprintf fmt "bool"
+  | True -> fprintf fmt "true"
+  | False -> fprintf fmt "false"
+  | If (mot, tt, ff, b) ->
+    fprintf fmt "if(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
+      pp mot pp tt pp ff pp b;
   | Pi (l, r) ->
     fprintf fmt "Pi(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp l pp r;
   | Lam body ->

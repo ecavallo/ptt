@@ -20,6 +20,9 @@ and t =
   | Nat
   | Zero
   | Suc of t
+  | Bool
+  | True
+  | False
   | Pi of t * clos
   | Sg of t * clos
   | Pair of t * t
@@ -40,6 +43,7 @@ and cell =
   | Snd
   | BApp of lvl
   | NRec of clos * t * clos2
+  | If of clos * t * t
   | J of clos3 * clos * t * t * t
   | Ungel of nf list * closN * clos * (* BBINDER *) lvl * clos * clos
 and spine = cell list

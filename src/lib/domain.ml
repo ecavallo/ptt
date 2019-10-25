@@ -27,6 +27,9 @@ and t =
   | Nat
   | Zero
   | Suc of t
+  | Bool
+  | True
+  | False
   | Pi of t * clos
   | Sg of t * clos
   | Pair of t * t
@@ -50,6 +53,7 @@ and cell =
   | Snd
   | BApp of lvl
   | NRec of clos * t * clos2
+  | If of clos * t * t
   | J of clos3 * clos * t * t * t
   | Ungel of nf list * closN * clos * (* BBINDER *) lvl * clos * clos
 [@@deriving show, eq]
@@ -98,6 +102,9 @@ and instantiate r i = function
   | Nat -> Nat
   | Zero -> Zero
   | Suc t -> Suc (instantiate r i t)
+  | Bool -> Bool
+  | True -> True
+  | False -> False
   | Pi (src, dst) -> Pi (instantiate r i src, instantiate_clos r i dst)
   | Sg (src, dst) -> Sg (instantiate r i src, instantiate_clos r i dst)
   | Pair (t, u) -> Pair (instantiate r i t, instantiate r i u)
@@ -131,6 +138,12 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
         (instantiate_clos r i tp,
          instantiate r i zero,
          instantiate_clos2 r i suc)
+      @: go r i (h, s)
+    | If (mot, tt, ff) :: s ->
+      If
+        (instantiate_clos r i mot,
+         instantiate r i tt,
+         instantiate r i ff)
       @: go r i (h, s)
     | J (mot, refl, tp, left, right) :: s ->
       J
