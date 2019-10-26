@@ -11,6 +11,8 @@ val mk_var : Domain.t -> env -> Domain.lvl -> Domain.t * env
 
 val env_to_sem_env : env -> Domain.env
 
+val reduce_extent : env -> Domain.lvl -> Domain.extent_head * Domain.spine -> Domain.t option
+
 (* Quotation *)
 val read_back_level : env -> Domain.lvl -> Domain.lvl
 val read_back_nf : env -> Domain.lvl ->  Domain.nf -> Syntax.t

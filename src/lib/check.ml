@@ -142,6 +142,16 @@ let check_bdim ~env ~bdim ~width =
     else tp_error (Misc "Dimension constant out of bounds\n")
 
 let rec check ~env ~size ~term ~tp =
+  match tp with
+  | D.Neutral {term = (D.Ext e, tp_spine); _} ->
+    begin
+      match Q.reduce_extent (env_to_quote_env env) size (e, tp_spine) with
+      | Some tp -> check ~env ~size ~term ~tp
+      | None -> check_inert ~env ~size ~term ~tp
+    end
+  | _ -> check_inert ~env ~size ~term ~tp
+
+and check_inert ~env ~size ~term ~tp =
   match term with
   | Syn.Let (def, body) ->
     let def_tp = synth ~env ~size ~term:def in
