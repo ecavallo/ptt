@@ -1,0 +1,71 @@
+--------------------------------------------------------------------------------
+-- A "proof by example" that iterated binary parametricity can be used to
+-- simulate quarternary parametricity. By iterating this construction we can
+-- expect to recover n-ary parametricity for all n. However, it isn't clear to
+-- me whether we can get binary from unary parametricity.
+--------------------------------------------------------------------------------
+
+let quarternary_Gel :
+  (A : U<0>) (B : U<0>) (C : U<0>) (D : U<0>)
+  (R : A -> B -> C -> D -> U<0>)
+  -> [x] [y] U<0> {Gel x {A;B} (_ _ -> unit); Gel x {C;D} (_ _ -> unit)}
+       {bri y -> Gel y {A;C} (_ _ -> unit); bri y -> Gel y {B;D} (_ _ -> unit)}
+  =
+  fun A B C D R ->
+  bri x y ->
+  Gel x
+    { Gel y {A;C} (_ _ -> unit)
+    ; Gel y {B;D} (_ _ -> unit)
+    }
+    (ac bd ->
+      extent y of <ac,bd> in
+      z -> (Gel z {A;C} (_ _ -> unit)) * (Gel z {B;D} (_ _ -> unit)) at
+      _ _ -> U<0> with
+      | _ -> unit
+      | _ -> unit
+      | ab cd _ z ->
+        Gel z {unit; unit} (_ _ -> R (fst ab) (snd ab) (fst cd) (snd cd)))
+
+let quarternary_engel :
+  (A : U<0>) (B : U<0>) (C : U<0>) (D : U<0>)
+  (R : A -> B -> C -> D -> U<0>)
+  (a : A) (b : B) (c : C) (d : D)
+  -> (R a b c d)
+  -> [x] [y] quarternary_Gel A B C D R @ x @ y {gel x {a;b} triv; gel x {c;d} triv}
+    {bri y -> gel y {a;c} triv; bri y -> gel y {b;d} triv}
+  =
+  fun A B C D R a b c d r -> bri x y ->
+  gel x {gel y {a;c} triv; gel y {b;d} triv} (gel y {triv;triv} r)
+
+let quarternary_gelproj :
+  (A : U<0>) (B : U<0>) (C : U<0>) (D : U<0>)
+  (R : A -> B -> C -> D -> U<0>)
+  (a : A) (b : B) (c : C) (d : D)
+  (ab : [x] Gel x {A;B} (_ _ -> unit) {a;b}) (cd : [x] Gel x {C;D} (_ _ -> unit) {c;d})
+  (ac : [y] Gel y {A;C} (_ _ -> unit) {a;c}) (bd : [y] Gel y {B;D} (_ _ -> unit) {b;d})
+  -> [x] [y] quarternary_Gel A B C D R @ x @ y {ab @ x; cd @ x} {ac; bd}
+  -> R a b c d
+  =
+  fun A B C D R a b c d ab cd ac bd g ->
+  ungel y : 2 ->
+    (ungel x : 2 -> g @ x @ y at _ -> Gel y {unit; unit} (_ _ -> R a b c d) with
+     | gel g' -> g')
+  at
+  _ -> R a b c d with
+  | gel r -> r
+
+let quarternary_example : (F : (X : U<0>) -> X -> X)
+  (A : U<0>) (B : U<0>) (C : U<0>) (D : U<0>)
+  (R : A -> B -> C -> D -> U<0>)
+  (a : A) (b : B) (c : C) (d : D)
+  -> (R a b c d) -> R (F A a) (F B b) (F C c) (F D d)
+  =
+  fun F A B C D R a b c d r ->
+  quarternary_gelproj A B C D R (F A a) (F B b) (F C c) (F D d)
+    (bri x -> F (Gel x {A;B} (_ _ -> unit)) (gel x {a;b} triv))
+    (bri x -> F (Gel x {C;D} (_ _ -> unit)) (gel x {c;d} triv))
+    (bri y -> F (Gel y {A;C} (_ _ -> unit)) (gel y {a;c} triv))
+    (bri y -> F (Gel y {B;D} (_ _ -> unit)) (gel y {b;d} triv))
+    (bri x y ->
+      F (quarternary_Gel A B C D R @ x @ y)
+        (quarternary_engel A B C D R a b c d r @ x @ y))
