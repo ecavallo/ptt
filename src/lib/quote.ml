@@ -79,9 +79,8 @@ and reduce_extent env size es =
     | D.BApp i :: s -> E.do_bapp size (go env size (e, s)) (D.BVar i)
     | D.J (mot, refl, _, _, _) :: s -> E.do_j size mot refl (go env size (e, s))
     | D.Ungel (_, _, mot, i, clo, case) :: s ->
-      let i' = size in
-      let es' = D.instantiate_spine D.instantiate_extent_head i' i (e, s) in
-      E.do_ungel size mot i' (go (BVar size :: env) (size + 1) es') clo case
+      let es' = D.instantiate_spine D.instantiate_extent_head size i (e, s) in
+      E.do_ungel size mot (go (BVar size :: env) (size + 1) es') clo case
   in
   try
     Some (go env size es)

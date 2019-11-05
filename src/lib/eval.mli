@@ -12,7 +12,7 @@ val do_if : Domain.lvl -> Domain.clos -> Domain.t -> Domain.t -> Domain.t -> Dom
 val do_fst : Domain.t -> Domain.t
 val do_snd : Domain.lvl -> Domain.t -> Domain.t
 val do_j : Domain.lvl -> Domain.clos3 -> Domain.clos -> Domain.t -> Domain.t
-val do_ungel : Domain.lvl -> Domain.clos -> Domain.lvl -> Domain.t -> Domain.clos -> Domain.clos -> Domain.t
+val do_ungel : Domain.lvl -> Domain.clos -> Domain.t -> Domain.clos -> Domain.clos -> Domain.t
 
 val do_bclos : Domain.lvl -> Domain.clos -> Domain.bdim -> Domain.t
 val do_clos : Domain.lvl -> Domain.clos -> Domain.t -> Domain.t

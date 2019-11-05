@@ -126,7 +126,7 @@ and do_ap size f a =
     end
   | _ -> raise (Eval_failed "Not a function in do_ap")
 
-and do_ungel size mot i gel clo case =
+and do_ungel size mot gel clo case =
   begin
     match gel with
     | D.Engel (_, _, t) -> do_clos size case t
@@ -138,7 +138,7 @@ and do_ungel size mot i gel clo case =
             List.mapi (fun o tp -> D.Normal {tp; term = do_bclos size clo (D.Const o)}) endtps
           in
           let final_tp = do_clos size mot (D.BLam clo) in
-          D.Neutral {tp = final_tp; term = D.(Ungel (ends, rel, mot, i, clo, case) @: term)}
+          D.Neutral {tp = final_tp; term = D.(Ungel (ends, rel, mot, size, clo, case) @: term)}
         | _ -> raise (Eval_failed "Not a Gel in do_ungel")
       end
     | _ -> raise (Eval_failed "Not a gel or neutral in do_ungel")
@@ -230,7 +230,6 @@ and eval t (env : D.env) size =
     do_ungel
       size
       (D.Clos {term = mot; env})
-      size
       (eval gel (D.BDim (D.BVar size) :: env) (size + 1))
       (D.Clos {term = gel; env})
       (D.Clos {term = case; env})
