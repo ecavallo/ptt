@@ -138,9 +138,9 @@ and read_back_nf env size nf =
     begin
       match reduce_extent env size (e, tp_spine) with
       | Some tp -> read_back_nf env size (D.Normal {tp; term})
-      | None -> read_back_ne env size term
+      | None -> read_back_quasi_ne env size term
     end
-  | D.Normal {term; _} -> read_back_ne env size term
+  | D.Normal {term; _} -> read_back_quasi_ne env size term
 
 and read_back_tp env size d =
   match d with
@@ -173,23 +173,23 @@ and read_back_tp env size d =
        List.map (read_back_tp env size) endtps,
        read_back_tp rel_env rel_size (E.do_closN rel_size rel rel_args))
   | D.Uni k -> Syn.Uni k
-  | _ -> read_back_ne env size d
+  | _ -> read_back_quasi_ne env size d
 
-and read_back_ne env size = function
+and read_back_quasi_ne env size = function
   | D.Neutral {tp; term = (h, s)} ->
     begin
       match h with
-      | D.Var _ -> read_back_inert_ne env size (h, s)
+      | D.Var _ -> read_back_ne env size (h, s)
       | D.Ext e ->
         begin
           match reduce_extent env size (e, s) with
           | Some term -> read_back_nf env size (D.Normal {tp; term})
-          | None -> read_back_inert_ne env size (h, s)
+          | None -> read_back_ne env size (h, s)
         end
     end
-  | _ -> raise (Quote_failed "Ill-typed read_back_ne")
+  | _ -> raise (Quote_failed "Ill-typed read_back_quasi_ne")
 
-and read_back_inert_ne env size (h, s) =
+and read_back_ne env size (h, s) =
   match s with
   | [] ->
     begin
@@ -198,7 +198,7 @@ and read_back_inert_ne env size (h, s) =
       | D.Ext e -> read_back_extent_head env size e
     end
   | D.Ap arg :: s ->
-    Syn.Ap (read_back_inert_ne env size (h, s), read_back_nf env size arg)
+    Syn.Ap (read_back_ne env size (h, s), read_back_nf env size arg)
   | D.NRec (tp, zero, suc) :: s ->
     let (nat_arg, nat_env) = mk_var D.Nat env size in
     let applied_tp = E.do_clos (size + 1) tp nat_arg in
@@ -209,7 +209,7 @@ and read_back_inert_ne env size (h, s) =
     let applied_suc_tp = E.do_clos (size + 2) tp (D.Suc nat_arg) in
     let applied_suc = E.do_clos2 (size + 2) suc nat_arg suc_arg in
     let suc' = read_back_nf suc_env (size + 2) (D.Normal {tp = applied_suc_tp; term = applied_suc}) in
-    Syn.NRec (tp', zero', suc', read_back_inert_ne env size (h, s))
+    Syn.NRec (tp', zero', suc', read_back_ne env size (h, s))
   | D.If (mot, tt, ff) :: s ->
     let (bool_arg, bool_env) = mk_var D.Bool env size in
     let applied_mot = E.do_clos (size + 1) mot bool_arg in
@@ -218,12 +218,12 @@ and read_back_inert_ne env size (h, s) =
     let tt' = read_back_nf env size (D.Normal {tp = tt_tp; term = tt}) in
     let ff_tp = E.do_clos size mot D.False in
     let ff' = read_back_nf env size (D.Normal {tp = ff_tp; term = ff}) in
-    Syn.If (mot', tt', ff', read_back_inert_ne env size (h, s))
-  | D.Fst :: s -> Syn.Fst (read_back_inert_ne env size (h, s))
-  | D.Snd :: s -> Syn.Snd (read_back_inert_ne env size (h, s))
+    Syn.If (mot', tt', ff', read_back_ne env size (h, s))
+  | D.Fst :: s -> Syn.Fst (read_back_ne env size (h, s))
+  | D.Snd :: s -> Syn.Snd (read_back_ne env size (h, s))
   | D.BApp i :: s ->
     let i' = read_back_level env i in
-    Syn.BApp (read_back_inert_ne env size (h, s), Syn.BVar i')
+    Syn.BApp (read_back_ne env size (h, s), Syn.BVar i')
   | D.J (mot, refl, tp, left, right) :: s ->
     let (mot_arg1, mot_env1) = mk_var tp env size in
     let (mot_arg2, mot_env2) = mk_var tp mot_env1 (size + 1) in
@@ -238,7 +238,7 @@ and read_back_inert_ne env size (h, s) =
         (D.Normal
            {term = E.do_clos (size + 1) refl refl_arg;
             tp = E.do_clos3 (size + 1) mot refl_arg refl_arg (D.Refl refl_arg)}) in
-    Syn.J (mot_syn, refl_syn, read_back_inert_ne env size (h, s))
+    Syn.J (mot_syn, refl_syn, read_back_ne env size (h, s))
   | D.Ungel (ends, rel, mot, i, _, case) :: s ->
     let sem_env = env_to_sem_env env in
     let (_, dim_env) = mk_bvar env size in
@@ -265,7 +265,7 @@ and read_back_inert_ne env size (h, s) =
            {term = E.do_clos (size + 1) case wit_arg;
             tp = E.do_clos (size + 1) mot gel_term}) in
     let ne' = D.instantiate_ne size i (h, s) in
-    Syn.Ungel (List.length ends, mot', read_back_inert_ne (BVar size :: env) (size + 1) ne', case')
+    Syn.Ungel (List.length ends, mot', read_back_ne (BVar size :: env) (size + 1) ne', case')
 
 and read_back_extent_head env size ({var = i; dom; mot; ctx; endcase; varcase} : D.extent_head) =
   let i' = read_back_level env i in
@@ -354,9 +354,9 @@ let rec check_nf env size nf1 nf2 =
   | D.Normal {tp = D.Uni _; term = t1}, D.Normal {tp = D.Uni _; term = t2} ->
     check_tp ~subtype:false env size t1 t2
   | D.Normal {tp = _; term = term1}, D.Normal {tp = _; term = term2} ->
-    check_ne env size term1 term2
+    check_quasi_ne env size term1 term2
 
-and check_ne env size term1 term2 =
+and check_quasi_ne env size term1 term2 =
   match term1, term2 with
   (* Extent term on the left *)
   | D.Neutral {term = (D.Ext e1, s1); tp = tp1}, _ ->
@@ -372,7 +372,7 @@ and check_ne env size term1 term2 =
               match reduce_extent env size (e2, s2) with
               | Some term2 ->
                 check_nf env size (D.Normal {tp = tp2; term = term1}) (D.Normal {tp = tp2; term = term2})
-              | None -> check_inert_ne env size (D.Ext e1, s1) (D.Ext e2, s2)
+              | None -> check_ne env size (D.Ext e1, s1) (D.Ext e2, s2)
             end
           | _ -> false
         end
@@ -387,15 +387,15 @@ and check_ne env size term1 term2 =
         begin
           match term1 with
           | D.Neutral {term = (D.Ext e1, s1); tp = _} ->
-            check_inert_ne env size (D.Ext e1, s1) (D.Ext e2, s2)
+            check_ne env size (D.Ext e1, s1) (D.Ext e2, s2)
           | _ -> false
         end
     end
   | D.Neutral {term = ne1; _}, D.Neutral {term = ne2; _} ->
-    check_inert_ne env size ne1 ne2
+    check_ne env size ne1 ne2
   | _ -> false
 
-and check_inert_ne env size (h1, s1) (h2, s2) =
+and check_ne env size (h1, s1) (h2, s2) =
   match s1, s2 with
   | [], [] ->
     begin
@@ -406,7 +406,7 @@ and check_inert_ne env size (h1, s1) (h2, s2) =
     end
   | D.Ap arg1 :: s1, D.Ap arg2 :: s2 ->
     check_nf env size arg1 arg2 &&
-    check_inert_ne env size (h1, s1) (h2, s2)
+    check_ne env size (h1, s1) (h2, s2)
   | D.NRec (tp1, zero1, suc1) :: s1, D.NRec (tp2, zero2, suc2) :: s2 ->
     let (nat_arg, nat_env) = mk_var D.Nat env size in
     let applied_tp1 = E.do_clos (size + 1) tp1 nat_arg in
@@ -421,7 +421,7 @@ and check_inert_ne env size (h1, s1) (h2, s2) =
     check_nf suc_env (size + 2)
       (D.Normal {tp = applied_suc_tp; term = applied_suc1})
       (D.Normal {tp = applied_suc_tp; term = applied_suc2}) &&
-    check_inert_ne env size (h1, s1) (h2, s2)
+    check_ne env size (h1, s1) (h2, s2)
   | D.If (mot1, tt1, ff1) :: s1, D.If (mot2, tt2, ff2) :: s2 ->
     let (bool_arg, bool_env) = mk_var D.Bool env size in
     let applied_mot1 = E.do_clos (size + 1) mot1 bool_arg in
@@ -431,12 +431,12 @@ and check_inert_ne env size (h1, s1) (h2, s2) =
     check_nf env size (D.Normal {tp = tt_tp; term = tt1}) (D.Normal {tp = tt_tp; term = tt2}) &&
     let ff_tp = E.do_clos size mot1 D.False in
     check_nf env size (D.Normal {tp = ff_tp; term = ff1}) (D.Normal {tp = ff_tp; term = ff2}) &&
-    check_inert_ne env size (h1, s1) (h2, s2)
-  | D.Fst :: s1, D.Fst :: s2  -> check_inert_ne env size (h1, s1) (h2, s2)
-  | D.Snd :: s1, D.Snd :: s2 -> check_inert_ne env size (h1, s1) (h2, s2)
+    check_ne env size (h1, s1) (h2, s2)
+  | D.Fst :: s1, D.Fst :: s2  -> check_ne env size (h1, s1) (h2, s2)
+  | D.Snd :: s1, D.Snd :: s2 -> check_ne env size (h1, s1) (h2, s2)
   | D.BApp i1 :: s1, D.BApp i2 :: s2 ->
     i1 = i2 &&
-    check_inert_ne env size (h1, s1) (h2, s2)
+    check_ne env size (h1, s1) (h2, s2)
   | D.J (mot1, refl1, tp1, left1, right1) :: s1,
     D.J (mot2, refl2, tp2, left2, right2) :: s2 ->
     check_tp ~subtype:false env size tp1 tp2 &&
@@ -456,7 +456,7 @@ and check_inert_ne env size (h1, s1) (h2, s2) =
       (D.Normal
          {term = E.do_clos (size + 1) refl2 refl_arg;
           tp = E.do_clos3 (size + 1) mot2 refl_arg refl_arg (D.Refl refl_arg)}) &&
-    check_inert_ne env size (h1, s1) (h2, s2)
+    check_ne env size (h1, s1) (h2, s2)
   | D.Ungel (ends1, rel1, mot1, i1, _, case1) :: s1,
     D.Ungel (_, _, mot2, i2, _, case2) :: s2 ->
     let sem_env = env_to_sem_env env in
@@ -488,7 +488,7 @@ and check_inert_ne env size (h1, s1) (h2, s2) =
           tp = E.do_clos (size + 1) mot2 gel_term}) &&
     let ne1' = D.instantiate_ne size i1 (h1, s1) in
     let ne2' = D.instantiate_ne size i2 (h2, s2) in
-    check_inert_ne (BVar size :: env) (size + 1) ne1' ne2'
+    check_ne (BVar size :: env) (size + 1) ne1' ne2'
   | _ -> false
 
 and check_extent_head env size
@@ -568,4 +568,4 @@ and check_tp ~subtype env size d1 d2 =
       (E.do_closN rel_size rel rel_args)
       (E.do_closN rel_size rel' rel_args)
   | D.Uni k, D.Uni j -> if subtype then k <= j else k = j
-  | _ -> check_ne env size d1 d2
+  | _ -> check_quasi_ne env size d1 d2
