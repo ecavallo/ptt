@@ -158,14 +158,14 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
          instantiate r i right)
       @: go r i (h, s)
     | Ungel (ends, rel, mot, j, clo, case) :: s ->
-      let ne =
-        if i = j then (h, s) else go r i (h, s)
+      let j' = if i = j then j else max (r + 1) j in
+      let ne = if i = j then (h, s) else go r i (go j' j (h, s))
       in
       Ungel
         (List.map (instantiate_nf r i) ends,
          instantiate_closN r i rel,
          instantiate_clos r i mot,
-         j,
+         j',
          instantiate_clos r i clo,
          instantiate_clos r i case)
       @: ne

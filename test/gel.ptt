@@ -52,3 +52,14 @@ let gel_test8 : (A : U<0>) (B : U<0>) (f : A -> B) -> [x] Gel x A {} -> B =
 
 normalize def gel_test8
 
+-- test of capture-avoiding substitution in ungel
+
+let gel_test10 : (A : U<0>) (g : [x] [y] Gel y (Gel x A) {} {}) (b : bool)
+  -> Id A (gel_test7 A g) (gel_test7 A g)
+  =
+  fun A g ->
+  let t : A = gel_test4 A (bri x -> (gel_test4 (Gel x A) (g @ x)))
+  in
+  fun _ -> refl t
+
+normalize def gel_test10
