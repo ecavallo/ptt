@@ -66,16 +66,6 @@ let rec env_to_quote_env = function
   | Def {term; _} :: env -> Q.Def term :: env_to_quote_env env
   | Restrict _ :: env -> env_to_quote_env env
 
-let read_back_level env x =
-  let rec go acc = function
-    | BVar {level; _} :: env -> if level = x then acc else go (acc + 1) env
-    | Var {level; _} :: env -> if level = x then acc else go (acc + 1) env
-    | Def _ :: env -> go (acc + 1) env
-    | Restrict _ :: env -> go acc env
-    | [] -> tp_error (Misc "read back non-existent variable\n")
-  in
-  go 0 env
-
 let rec get_tp env x =
   match x, env with
   | _, [] -> tp_error (Misc "Tried to access non-existent variable\n")
