@@ -66,17 +66,17 @@ let rec env_to_quote_env = function
   | Def {term; _} :: env -> Q.Def term :: env_to_quote_env env
   | Restrict _ :: env -> env_to_quote_env env
 
-let rec get_tp env x =
+let rec synth_var env x =
   match x, env with
   | _, [] -> tp_error (Misc "Tried to access non-existent variable\n")
   | x, Restrict j :: env ->
     if x < j
     then tp_error (Misc "Tried to use restricted term variable\n")
-    else get_tp env x
+    else synth_var env x
   | 0, Var {tp; _} :: _ -> tp
   | 0, Def {tp; _} :: _ -> tp
   | 0, BVar {level; _} :: _ -> tp_error (Expecting_term level)
-  | x, _ :: env -> get_tp env (x - 1)
+  | x, _ :: env -> synth_var env (x - 1)
 
 let mk_bvar width env size =
   (D.BVar size, BVar {level = size; width} :: env)
@@ -292,7 +292,7 @@ and check_inert ~env ~size ~term ~tp =
 
 and synth ~env ~size ~term =
   match term with
-  | Syn.Var i -> get_tp env i
+  | Syn.Var i -> synth_var env i
   | Check (term, tp') ->
     let tp = E.eval tp' (env_to_sem_env env) size in
     check ~env ~size ~term ~tp;
