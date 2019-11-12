@@ -8,7 +8,9 @@ type env_entry =
   | Dim of dim
   | Tm of t
 and env = env_entry list
-and clos = Clos of {term : Syntax.t; env : env}
+and clos =
+  | Clos of {term : Syntax.t; env : env}
+  | Pseudo of {var : lvl; term : t; ends : t list}
 and clos2 = Clos2 of {term : Syntax.t; env : env}
 and clos3 = Clos3 of {term : Syntax.t; env : env}
 and closN = ClosN of {term : Syntax.t; env : env}

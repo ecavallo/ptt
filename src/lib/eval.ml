@@ -13,13 +13,16 @@ let eval_dim r (env : D.env) =
     end
   | Syn.Const o -> D.Const o
 
-(* TODO organize these closure functions in a better way *)
-
-let rec do_bclos size (D.Clos {term; env}) r =
-  eval term (D.Dim r :: env) size
-
-and do_clos size (D.Clos {term; env}) a =
-  eval term (a :: env) size
+let rec do_clos size clo a =
+  match clo with
+  | D.Clos {term; env} -> eval term (a :: env) size
+  | D.Pseudo {var; term; ends} ->
+    begin
+      match a with
+      | D.Dim (D.DVar i) -> D.instantiate i var term
+      | D.Dim (D.Const o) -> List.nth ends o
+      | D.Tm _ -> raise (Eval_failed "Applied psuedo-closure to term")
+    end
 
 and do_clos2 size (D.Clos2 {term; env}) a1 a2 =
   eval term (a2 :: a1 :: env) size
@@ -33,8 +36,11 @@ and do_closN size (D.ClosN {term; env}) tN =
 and do_clos_extent size (D.ClosN {term; env}) tN t r =
   eval term (D.Dim r :: D.Tm t :: List.rev_append (List.map (fun t -> D.Tm t) tN) env) size
 
-and do_consts size (D.Clos {term; env}) width =
-  List.init width (fun o -> eval term (D.Dim (D.Const o) :: env) size)
+and do_consts size clo width =
+  match clo with
+  | D.Clos {term; env} ->
+    List.init width (fun o -> eval term (D.Dim (D.Const o) :: env) size)
+  | D.Pseudo {ends; _} -> ends
 
 and do_rec size tp zero suc n =
   match n with

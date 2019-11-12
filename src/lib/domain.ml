@@ -11,7 +11,9 @@ type env_entry =
   | Tm of t
 and env = env_entry list
 [@@deriving show, eq]
-and clos = Clos of {term : Syntax.t; env : env}
+and clos =
+  | Clos of {term : Syntax.t; env : env}
+  | Pseudo of {var : lvl; term : t; ends : t list}
 [@@deriving show, eq]
 and clos2 = Clos2 of {term : Syntax.t; env : env}
 [@@deriving show, eq]
@@ -82,8 +84,14 @@ let rec instantiate_entry r i = function
 and instantiate_env r i env =
   List.map (instantiate_entry r i) env
 
-and instantiate_clos r i (Clos {term; env}) =
-  Clos {term; env = instantiate_env r i env}
+and instantiate_clos r i = function
+  | Clos {term; env} ->
+    Clos {term; env = instantiate_env r i env}
+  | Pseudo {var; term; ends} ->
+    let var' = if i = var then var else max (r + 1) var in
+    let term' = if i = var then term else instantiate r i (instantiate var' var term) in
+    let ends' = List.map (instantiate r i) ends in
+    Pseudo {var = var'; term = term'; ends = ends'}
 
 and instantiate_clos2 r i (Clos2 {term; env}) =
   Clos2 {term; env = instantiate_env r i env}
