@@ -1,13 +1,13 @@
 type lvl = int
 [@@deriving show{ with_path = false }, eq]
 
-type bdim =
-  | BVar of lvl
+type dim =
+  | DVar of lvl
   | Const of int
 [@@deriving show, eq]
 
 type env_entry =
-  | BDim of bdim
+  | Dim of dim
   | Term of t
 and env = env_entry list
 [@@deriving show, eq]
@@ -71,12 +71,12 @@ let (@:) cell (h, s) = (h, cell :: s)
 let instantiate_bvar r i j =
   if j = i then r else j
 
-let instantiate_bdim r i = function
-  | BVar j -> BVar (instantiate_bvar r i j)
+let instantiate_dim r i = function
+  | DVar j -> DVar (instantiate_bvar r i j)
   | Const o -> Const o
 
 let rec instantiate_entry r i = function
-  | BDim s -> BDim (instantiate_bdim r i s)
+  | Dim s -> Dim (instantiate_dim r i s)
   | Term t -> Term (instantiate r i t)
 
 and instantiate_env r i env =

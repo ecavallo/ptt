@@ -1,8 +1,8 @@
 type ident = string
 type uni_level = int
 
-type bdim =
-  | BVar of ident
+type dim =
+  | DVar of ident
   | Const of int
 
 type binder = Binder of {name : ident; body : t}
@@ -10,7 +10,7 @@ and bindern = BinderN of {names : ident list; body : t}
 and binder2 = Binder2 of {name1 : ident; name2 : ident; body : t}
 and binder3 = Binder3 of {name1 : ident; name2 : ident; name3 : ident; body : t}
 and cell = Cell of {name : ident; ty : t}
-and spine = Term of t | BDim of bdim
+and spine = Term of t | Dim of dim
 and t =
   | Var of ident
   | Let of t * binder
@@ -37,9 +37,9 @@ and t =
   | J of {mot : binder3; refl : binder; eq : t}
   | Bridge of binder * t list
   | BLam of bindern
-  | Extent of {bdim : bdim; dom : binder; mot : binder2; ctx : t; endcase : binder list; varcase : bindern}
-  | Gel of bdim * t list * bindern
-  | Engel of bdim * t list * t
+  | Extent of {dim : dim; dom : binder; mot : binder2; ctx : t; endcase : binder list; varcase : bindern}
+  | Gel of dim * t list * bindern
+  | Engel of dim * t list * t
   | Ungel of {width : int; mot : binder; gel : binder; case : binder}
   | Uni of uni_level
 

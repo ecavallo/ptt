@@ -5,7 +5,7 @@ module E = Eval
 module Q = Quote
 
 type env_entry =
-  | BVar of {level : D.lvl; width : int}
+  | DVar of {level : D.lvl; width : int}
   | Var of {level : D.lvl; tp : D.t}
   | Def of {term : D.t; tp : D.t}
   | Restrict of Syn.idx
@@ -15,7 +15,7 @@ type env = env_entry list
 
 type error =
     Cannot_synth_term of Syn.t
-  | BDim_mismatch of D.bdim * D.bdim
+  | Dim_mismatch of D.dim * D.dim
   | Type_mismatch of D.t * D.t
   | Expecting_universe of D.t
   | Expecting_term of D.lvl
@@ -26,11 +26,11 @@ let pp_error fmt = function
     Format.fprintf fmt "@[<v> Cannot synthesize the type of: @[<hov 2>  ";
     Syn.pp fmt t;
     Format.fprintf fmt "@]@]@,"
-  | BDim_mismatch (b1, b2) ->
+  | Dim_mismatch (b1, b2) ->
     Format.fprintf fmt "@[<v>Cannot equate@,@[<hov 2>  ";
-    D.pp_bdim fmt b1;
+    D.pp_dim fmt b1;
     Format.fprintf fmt "@]@ with@,@[<hov 2>  ";
-    D.pp_bdim fmt b2;
+    D.pp_dim fmt b2;
     Format.fprintf fmt "@]@]@,"
   | Type_mismatch (t1, t2) ->
     Format.fprintf fmt "@[<v>Cannot equate@,@[<hov 2>  ";
@@ -54,14 +54,14 @@ let tp_error e = raise (Type_error e)
 
 let rec env_to_sem_env = function
   | [] -> []
-  | BVar {level; _} :: env -> D.BDim (D.BVar level) :: env_to_sem_env env
+  | DVar {level; _} :: env -> D.Dim (D.DVar level) :: env_to_sem_env env
   | Var {level; tp} :: env -> D.Term (D.Neutral {tp; term = D.root (D.Var level)}) :: env_to_sem_env env
   | Def {term; _} :: env -> D.Term term :: env_to_sem_env env
   | Restrict _ :: env -> env_to_sem_env env
 
 let rec env_to_quote_env = function
   | [] -> []
-  | BVar {level; _} :: env -> Q.BVar level :: env_to_quote_env env
+  | DVar {level; _} :: env -> Q.DVar level :: env_to_quote_env env
   | Var {level; tp} :: env -> Q.Var {level; tp} :: env_to_quote_env env
   | Def {term; _} :: env -> Q.Def term :: env_to_quote_env env
   | Restrict _ :: env -> env_to_quote_env env
@@ -75,11 +75,11 @@ let rec synth_var env x =
     else synth_var env x
   | 0, Var {tp; _} :: _ -> tp
   | 0, Def {tp; _} :: _ -> tp
-  | 0, BVar {level; _} :: _ -> tp_error (Expecting_term level)
+  | 0, DVar {level; _} :: _ -> tp_error (Expecting_term level)
   | x, _ :: env -> synth_var env (x - 1)
 
 let mk_bvar width env size =
-  (D.BVar size, BVar {level = size; width} :: env)
+  (D.DVar size, DVar {level = size; width} :: env)
 
 let mk_var tp env size =
   (D.Neutral {tp; term = D.root (D.Var size)}, Var {level = size; tp} :: env)
@@ -92,7 +92,7 @@ let mk_vars tps env size =
 
 let restrict_env r env =
   match r with
-  | Syn.BVar i -> Restrict i :: env
+  | Syn.DVar i -> Restrict i :: env
   | Syn.Const _ -> env
 
 let assert_subtype env size t1 t2 =
@@ -105,11 +105,11 @@ let assert_equal env size t1 t2 tp =
   then ()
   else tp_error (Type_mismatch (t1, t2))
 
-let assert_bdim_equal b1 b2 =
+let assert_dim_equal b1 b2 =
   if b1 = b2 then ()
-  else tp_error (BDim_mismatch (b1, b2))
+  else tp_error (Dim_mismatch (b1, b2))
 
-let check_bdim ~env ~bdim ~width =
+let check_dim ~env ~dim ~width =
   let rec go i env =
     match i, env with
     | _, [] -> tp_error (Misc "Tried to access non-existent variable\n")
@@ -117,15 +117,15 @@ let check_bdim ~env ~bdim ~width =
       if i = j
       then tp_error (Misc "Tried to use restricted dimension\n")
       else go i env
-    | 0, BVar {width = w; _} :: _ ->
+    | 0, DVar {width = w; _} :: _ ->
       if width = w
       then ()
       else tp_error (Misc "Dimension width mismatch\n")
     | 0, _ :: _ -> tp_error (Misc "Expected bridge dimension\n")
     | i, _ :: env -> go (i - 1) env
   in
-  match bdim with
-  | Syn.BVar i -> go i env
+  match dim with
+  | Syn.DVar i -> go i env
   | Syn.Const o ->
     if o < width
     then ()
@@ -233,14 +233,14 @@ and check_inert ~env ~size ~term ~tp =
       | Bridge (clos, ends) ->
         let width = List.length ends in
         let (arg, arg_env) = mk_bvar width env size in
-        let dest_tp = E.do_clos (size + 1) clos (D.BDim arg) in
+        let dest_tp = E.do_clos (size + 1) clos (D.Dim arg) in
         check ~env:arg_env ~size:(size + 1) ~term:body ~tp:dest_tp;
         let quote_env = env_to_quote_env env in
         let sem_env = Q.env_to_sem_env quote_env in
         List.iteri
           (fun o pt ->
-             let body_o = E.eval body (D.BDim (D.Const o) :: sem_env) size in
-             let tp = E.do_clos size clos (D.BDim (D.Const o)) in
+             let body_o = E.eval body (D.Dim (D.Const o) :: sem_env) size in
+             let tp = E.do_clos size clos (D.Dim (D.Const o)) in
              assert_equal quote_env size body_o pt tp)
           ends
       | t -> tp_error (Misc ("Expecting Bridge but found\n" ^ D.show t))
@@ -250,7 +250,7 @@ and check_inert ~env ~size ~term ~tp =
       match tp with
       | Uni _ ->
         let width = List.length ends in
-        check_bdim ~env ~bdim:r ~width;
+        check_dim ~env ~dim:r ~width;
         let res_env = restrict_env r env in
         List.iter (fun term -> check ~env:res_env ~size ~term ~tp) ends;
         let sem_env = env_to_sem_env res_env in
@@ -264,9 +264,9 @@ and check_inert ~env ~size ~term ~tp =
       match tp with
       | Gel (j, ends, rel) ->
         let width = List.length ts in
-        check_bdim ~env ~bdim:r ~width;
+        check_dim ~env ~dim:r ~width;
         let sem_env = env_to_sem_env env in
-        assert_bdim_equal (E.eval_bdim r sem_env) (D.BVar j);
+        assert_dim_equal (E.eval_dim r sem_env) (D.DVar j);
         let res_env = restrict_env r env in
         List.iter2 (fun term tp -> check ~env:res_env ~size ~term ~tp) ts ends;
         let ts' = List.map (fun t -> E.eval t sem_env size) ts in
@@ -347,9 +347,9 @@ and synth ~env ~size ~term =
       match synth ~env:restricted_env ~size ~term with
       | Bridge (clos, ends) ->
         let width = List.length ends in
-        check_bdim ~width ~env ~bdim:r;
-        let r' = E.eval_bdim r (env_to_sem_env env) in
-        E.do_clos size clos (D.BDim r')
+        check_dim ~width ~env ~dim:r;
+        let r' = E.eval_dim r (env_to_sem_env env) in
+        E.do_clos size clos (D.Dim r')
       | t -> tp_error (Misc ("Expecting Bridge but found\n" ^ D.show t ^ "\n" ^ Syn.show term))
     end
   | J (mot, refl, eq) ->
@@ -371,22 +371,22 @@ and synth ~env ~size ~term =
     end
   | Extent (r, dom, mot, ctx, endcase, varcase) ->
     let width = List.length endcase in
-    check_bdim ~env ~bdim:r ~width;
+    check_dim ~env ~dim:r ~width;
     let sem_env = env_to_sem_env env in
-    let r' = E.eval_bdim r sem_env in
+    let r' = E.eval_dim r sem_env in
     let res_env = restrict_env r env in
     let (_, dim_env) = mk_bvar width res_env size in
     check_tp ~env:dim_env ~size:(size + 1) ~term:dom;
     let dom' = E.eval dom (env_to_sem_env dim_env) (size + 1) in
     let (_, dom_env) = mk_var dom' dim_env (size + 1) in
     check_tp ~env:dom_env ~size:(size + 2) ~term:mot;
-    let dom_r = E.eval dom (D.BDim r' :: sem_env) size in
+    let dom_r = E.eval dom (D.Dim r' :: sem_env) size in
     check ~env ~size ~term:ctx ~tp:dom_r;
     List.iteri
       (fun o case ->
-         let dom_o = E.eval dom (D.BDim (D.Const o) :: sem_env) size in
+         let dom_o = E.eval dom (D.Dim (D.Const o) :: sem_env) size in
          let (case_arg, case_env) = mk_var dom_o res_env size in
-         let mot_o = E.eval mot (D.Term case_arg :: D.BDim (D.Const o) :: sem_env) size in
+         let mot_o = E.eval mot (D.Term case_arg :: D.Dim (D.Const o) :: sem_env) size in
          check ~env:case_env ~size:(size + 1) ~term:case ~tp:mot_o)
       endcase;
     let end_tps = E.do_consts size (D.Clos {term = dom; env = sem_env}) width in
@@ -396,15 +396,15 @@ and synth ~env ~size ~term =
     let (varcase_barg, varcase_benv) = mk_bvar width bridge_env (size + width + 1) in
     let varcase_inst = E.do_bapp (size + width + 2) bridge_arg varcase_barg in
     let varcase_mot =
-      E.eval mot (D.Term varcase_inst :: D.BDim varcase_barg :: sem_env) (size + width + 2) in
+      E.eval mot (D.Term varcase_inst :: D.Dim varcase_barg :: sem_env) (size + width + 2) in
     check ~env:varcase_benv ~size:(size + width + 2) ~term:varcase ~tp:varcase_mot;
-    E.eval mot (D.Term (E.eval ctx sem_env size) :: D.BDim r' :: sem_env) size
+    E.eval mot (D.Term (E.eval ctx sem_env size) :: D.Dim r' :: sem_env) size
   | Ungel (width, mot, term, case) ->
     let (var_arg, var_env) = mk_bvar width env size in
     begin
       match synth ~env:var_env ~size:(size + 1) ~term with
       | D.Gel (i, end_tps, rel) ->
-        assert_bdim_equal (D.BVar i) var_arg;
+        assert_dim_equal (D.DVar i) var_arg;
         let sem_env = env_to_sem_env env in
         let end_tms = E.do_consts size (D.Clos {term; env = sem_env}) width in
         let syn_gel =
@@ -443,7 +443,7 @@ and check_tp ~env ~size ~term =
     let sem_env = env_to_sem_env env in
     List.iteri
       (fun o pt ->
-         check ~env ~size ~term:pt ~tp:(E.eval term (D.BDim (D.Const o) :: sem_env) size))
+         check ~env ~size ~term:pt ~tp:(E.eval term (D.Dim (D.Const o) :: sem_env) size))
       ends
   | Pi (l, r) | Sg (l, r) ->
     check_tp ~env ~size ~term:l;
@@ -462,7 +462,7 @@ and check_tp ~env ~size ~term =
     check ~env ~size ~term:r ~tp
   | Gel (r, ends, rel) ->
     let width = List.length ends in
-    check_bdim ~env ~bdim:r ~width;
+    check_dim ~env ~dim:r ~width;
     let res_env = restrict_env r env in
     let sem_env = env_to_sem_env res_env in
     List.iter (fun term -> check_tp ~env:res_env ~size ~term) ends;

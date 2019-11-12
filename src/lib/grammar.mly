@@ -40,8 +40,8 @@ sign:
   | EOF { [] }
   | d = decl; s = sign { d :: s };
 
-bdim:
-  | r = name { BVar r }
+dim:
+  | r = name { DVar r }
   | n = NUMERAL { Const n };
 
 endpoints:
@@ -77,7 +77,7 @@ atomic:
 
 spine:
   | t = atomic { Term t }
-  | ATSIGN; b = bdim { BDim b };
+  | ATSIGN; b = dim { Dim b };
 
 extent_cases:
   | name = name; RIGHT_ARROW; body = term; PIPE; ext = extent_cases
@@ -120,14 +120,14 @@ term:
   | MATCH; eq = term; AT; name1 = name; name2 = name; name3 = name; RIGHT_ARROW; mot_term = term; WITH
     PIPE; REFL; name = name; RIGHT_ARROW; refl = term;
     { J {mot = Binder3 {name1; name2; name3; body = mot_term}; refl = Binder {name; body = refl}; eq} }
-  | EXTENT; bdim = bdim; OF; ctx = term;
+  | EXTENT; dim = dim; OF; ctx = term;
     IN; dom_dim = name; RIGHT_ARROW; dom = term;
     AT; mot_dim = name; mot_var = name; RIGHT_ARROW; mot = term;
     WITH; PIPE;
     cases = extent_cases
     { let (endcase, varcase) = cases in
       Extent
-        {bdim;
+        {dim;
          dom = Binder {name = dom_dim; body = dom};
          mot = Binder2 {name1 = mot_dim; name2 = mot_var; body = mot};
          ctx;
@@ -145,14 +145,14 @@ term:
     { Pi ([Cell {name = ""; ty = dom}], cod)}
   | dom = atomic; TIMES; cod = term
     { Sg ([Cell {name = ""; ty = dom}], cod)}
-  | GEL; bdim = bdim; endpoints = endpoints; LPR; names = nonempty_list(name); RIGHT_ARROW; body = term; RPR
-    { Gel (bdim, endpoints, BinderN {names; body}) }
-  | GEL; bdim = bdim; body = atomic
-    { Gel (bdim, [], BinderN {names = []; body}) }
-  | ENGEL; bdim = bdim; endpoints = endpoints; t = atomic
-    { Engel (bdim, endpoints, t) }
-  | ENGEL; bdim = bdim; t = atomic
-    { Engel (bdim, [], t) }
+  | GEL; dim = dim; endpoints = endpoints; LPR; names = nonempty_list(name); RIGHT_ARROW; body = term; RPR
+    { Gel (dim, endpoints, BinderN {names; body}) }
+  | GEL; dim = dim; body = atomic
+    { Gel (dim, [], BinderN {names = []; body}) }
+  | ENGEL; dim = dim; endpoints = endpoints; t = atomic
+    { Engel (dim, endpoints, t) }
+  | ENGEL; dim = dim; t = atomic
+    { Engel (dim, [], t) }
   | UNGEL; gel_name = name; COLON; width = NUMERAL; RIGHT_ARROW; gel_body = term; AT;
     mot_name = name; RIGHT_ARROW; mot_body = term; WITH
     PIPE; ENGEL; case_name = name; RIGHT_ARROW; case_body = term;

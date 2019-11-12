@@ -14,13 +14,13 @@ let for_all2i f l1 l2 =
   go 0 l1 l2
 
 type env_entry =
-  | BVar of D.lvl
+  | DVar of D.lvl
   | Var of {level : D.lvl; tp : D.t}
   | Def of D.t
 type env = env_entry list
 
 let mk_bvar env size =
-  (D.BVar size, BVar size :: env)
+  (D.DVar size, DVar size :: env)
 
 let mk_var tp env size =
   (D.Neutral {tp; term = D.root (D.Var size)}, Var {level = size; tp} :: env)
@@ -33,7 +33,7 @@ let mk_vars tps env size =
 
 let env_to_sem_env env =
   let go = function
-    | BVar i -> D.BDim (D.BVar i)
+    | DVar i -> D.Dim (D.DVar i)
     | Var {level; tp} -> D.Term (D.Neutral {tp; term = D.root (D.Var level)})
     | Def term -> D.Term term
   in
@@ -41,7 +41,7 @@ let env_to_sem_env env =
 
 let read_back_level env x =
   let rec go acc = function
-    | BVar i :: env -> if i = x then acc else go (acc + 1) env
+    | DVar i :: env -> if i = x then acc else go (acc + 1) env
     | Var {level; _} :: env -> if level = x then acc else go (acc + 1) env
     | Def _ :: env -> go (acc + 1) env
     | [] -> raise (Quote_failed "read back non-existent variable")
@@ -52,17 +52,17 @@ exception Cannot_reduce_extent
 
 let rec reduce_extent_head env size ({var = i; dom; ctx; endcase; varcase; _} : D.extent_head) =
   let sem_env = env_to_sem_env env in
-  let dom_i = E.do_clos size dom (D.BDim (D.BVar i)) in
+  let dom_i = E.do_clos size dom (D.Dim (D.DVar i)) in
   let i' = read_back_level env i in
   let ctx' = read_back_nf env size (D.Normal {tp = dom_i; term = ctx}) in
   begin
     match Syntax.unsubst_bvar i' ctx' with
     | Some extract ->
       let extract_ends =
-        List.init (List.length endcase) (fun o -> E.eval extract (D.BDim (D.Const o) :: sem_env) size) in
+        List.init (List.length endcase) (fun o -> E.eval extract (D.Dim (D.Const o) :: sem_env) size) in
       let extract_blam =
         D.BLam (D.Clos {term = extract; env = sem_env}) in
-      let output_varcase = E.do_clos_extent size varcase extract_ends extract_blam (D.BVar i) in
+      let output_varcase = E.do_clos_extent size varcase extract_ends extract_blam (D.DVar i) in
       output_varcase
     | _ -> raise Cannot_reduce_extent
   end
@@ -76,11 +76,11 @@ and reduce_extent env size es =
     | D.If (mot, tt, ff) :: s -> E.do_if size mot tt ff (go env size (e, s))
     | D.Fst :: s -> E.do_fst (go env size (e, s))
     | D.Snd :: s -> E.do_snd size (go env size (e, s))
-    | D.BApp i :: s -> E.do_bapp size (go env size (e, s)) (D.BVar i)
+    | D.BApp i :: s -> E.do_bapp size (go env size (e, s)) (D.DVar i)
     | D.J (mot, refl, _, _, _) :: s -> E.do_j size mot refl (go env size (e, s))
     | D.Ungel (_, _, mot, i, clo, case) :: s ->
       let es' = D.instantiate_spine D.instantiate_extent_head size i (e, s) in
-      E.do_ungel size mot (go (BVar size :: env) (size + 1) es') clo case
+      E.do_ungel size mot (go (DVar size :: env) (size + 1) es') clo case
   in
   try
     Some (go env size es)
@@ -117,7 +117,7 @@ and read_back_nf env size nf =
   | D.Normal {tp = D.Bridge (dest, _); term} ->
      let (arg, arg_env) = mk_bvar env size in
      let nf = D.Normal
-         {tp = E.do_clos (size + 1) dest (D.BDim arg);
+         {tp = E.do_clos (size + 1) dest (D.Dim arg);
           term = E.do_bapp (size + 1) term arg} in
      Syn.BLam (read_back_nf arg_env (size + 1) nf)
   (* Id *)
@@ -128,7 +128,7 @@ and read_back_nf env size nf =
     let i' = read_back_level env i in
     let applied_rel = E.do_closN size rel ts in
     Syn.Engel
-      (Syn.BVar i',
+      (Syn.DVar i',
        List.map2 (fun tp term -> read_back_nf env size (D.Normal {tp; term})) endtps ts,
        read_back_nf env size (D.Normal {tp = applied_rel; term = t}))
   (* Types *)
@@ -161,7 +161,7 @@ and read_back_tp env size d =
     let width = List.length ends in
     let (arg, arg_env) = mk_bvar env size in
     Syn.Bridge
-      (read_back_tp arg_env (size + 1) (E.do_clos (size + 1) dest (D.BDim arg)),
+      (read_back_tp arg_env (size + 1) (E.do_clos (size + 1) dest (D.Dim arg)),
        List.map2 (fun tp term -> read_back_nf env size (D.Normal {tp; term}))
          (E.do_consts size dest width) ends)
   | D.Id (tp, left, right) ->
@@ -174,7 +174,7 @@ and read_back_tp env size d =
     let (rel_args, rel_env) = mk_vars endtps env size in
     let rel_size = size + List.length endtps in
     Syn.Gel
-      (Syn.BVar i',
+      (Syn.DVar i',
        List.map (read_back_tp env size) endtps,
        read_back_tp rel_env rel_size (E.do_closN rel_size rel rel_args))
   | D.Uni k -> Syn.Uni k
@@ -228,7 +228,7 @@ and read_back_ne env size (h, s) =
   | D.Snd :: s -> Syn.Snd (read_back_ne env size (h, s))
   | D.BApp i :: s ->
     let i' = read_back_level env i in
-    Syn.BApp (read_back_ne env size (h, s), Syn.BVar i')
+    Syn.BApp (read_back_ne env size (h, s), Syn.DVar i')
   | D.J (mot, refl, tp, left, right) :: s ->
     let (mot_arg1, mot_env1) = mk_var tp env size in
     let (mot_arg2, mot_env2) = mk_var tp mot_env1 (size + 1) in
@@ -270,24 +270,24 @@ and read_back_ne env size (h, s) =
            {term = E.do_clos (size + 1) case (D.Term wit_arg);
             tp = E.do_clos (size + 1) mot (D.Term gel_term)}) in
     let ne' = D.instantiate_ne size i (h, s) in
-    Syn.Ungel (List.length ends, mot', read_back_ne (BVar size :: env) (size + 1) ne', case')
+    Syn.Ungel (List.length ends, mot', read_back_ne (DVar size :: env) (size + 1) ne', case')
 
 and read_back_extent_head env size ({var = i; dom; mot; ctx; endcase; varcase} : D.extent_head) =
   let i' = read_back_level env i in
   let (barg, benv) = mk_bvar env size in
-  let applied_dom = E.do_clos (size + 1) dom (D.BDim barg) in
+  let applied_dom = E.do_clos (size + 1) dom (D.Dim barg) in
   let dom' = read_back_tp benv (size + 1) applied_dom in
   let (dom_arg, dom_env) = mk_var applied_dom benv (size + 1) in
-  let applied_mot = E.do_clos2 (size + 2) mot (D.BDim barg) (D.Term dom_arg) in
+  let applied_mot = E.do_clos2 (size + 2) mot (D.Dim barg) (D.Term dom_arg) in
   let mot' = read_back_tp dom_env (size + 2) applied_mot in
-  let dom_i = E.do_clos size dom (D.BDim (D.BVar i)) in
+  let dom_i = E.do_clos size dom (D.Dim (D.DVar i)) in
   let ctx' = read_back_nf env size (D.Normal {tp = dom_i; term = ctx}) in
   let endcase' =
     List.mapi
       (fun o case ->
-         let case_dom = E.do_clos size dom (D.BDim (D.Const o)) in
+         let case_dom = E.do_clos size dom (D.Dim (D.Const o)) in
          let (case_arg, case_env) = mk_var case_dom env size in
-         let case_mot = E.do_clos2 (size + 1) mot (D.BDim (D.Const o)) (D.Term case_arg) in
+         let case_mot = E.do_clos2 (size + 1) mot (D.Dim (D.Const o)) (D.Term case_arg) in
          let applied_case = E.do_clos (size + 1) case (D.Term case_arg) in
          read_back_nf case_env (size + 1) (D.Normal {tp = case_mot; term = applied_case}))
       endcase in
@@ -297,12 +297,12 @@ and read_back_extent_head env size ({var = i; dom; mot; ctx; endcase; varcase} :
   let (bridge_arg, bridge_env) = mk_var (D.Bridge (dom, end_args)) ends_env (size + width) in
   let (varcase_barg, varcase_benv) = mk_bvar bridge_env (size + width + 1) in
   let varcase_inst = E.do_bapp (size + width + 2) bridge_arg varcase_barg in
-  let varcase_mot = E.do_clos2 (size + width + 2) mot (D.BDim varcase_barg) (D.Term varcase_inst) in
+  let varcase_mot = E.do_clos2 (size + width + 2) mot (D.Dim varcase_barg) (D.Term varcase_inst) in
   let applied_varcase = E.do_clos_extent (size + width + 2) varcase end_args bridge_arg varcase_barg in
   let varcase' =
     read_back_nf varcase_benv (size + width + 2) (D.Normal {tp = varcase_mot; term = applied_varcase})
   in
-  Syn.Extent (Syn.BVar i', dom', mot', ctx', endcase', varcase')
+  Syn.Extent (Syn.DVar i', dom', mot', ctx', endcase', varcase')
 
 let rec check_nf env size nf1 nf2 =
   match nf1, nf2 with
@@ -343,8 +343,8 @@ let rec check_nf env size nf1 nf2 =
   | D.Normal {tp = D.Bridge (dest1, _); term = p1},
     D.Normal {tp = D.Bridge (dest2, _); term = p2} ->
     let (arg, arg_env) = mk_bvar env size in
-    let nf1 = D.Normal {tp = E.do_clos (size + 1) dest1 (D.BDim arg); term = E.do_bapp (size + 1) p1 arg} in
-    let nf2 = D.Normal {tp = E.do_clos (size + 1) dest2 (D.BDim arg); term = E.do_bapp (size + 1) p2 arg} in
+    let nf1 = D.Normal {tp = E.do_clos (size + 1) dest1 (D.Dim arg); term = E.do_bapp (size + 1) p1 arg} in
+    let nf2 = D.Normal {tp = E.do_clos (size + 1) dest2 (D.Dim arg); term = E.do_bapp (size + 1) p2 arg} in
     check_nf arg_env (size + 1) nf1 nf2
   (* Gel *)
   | D.Normal {tp = D.Gel (_, endtps1, rel1); term = D.Engel (_, ts1, t1)},
@@ -493,7 +493,7 @@ and check_ne env size (h1, s1) (h2, s2) =
           tp = E.do_clos (size + 1) mot2 (D.Term gel_term)}) &&
     let ne1' = D.instantiate_ne size i1 (h1, s1) in
     let ne2' = D.instantiate_ne size i2 (h2, s2) in
-    check_ne (BVar size :: env) (size + 1) ne1' ne2'
+    check_ne (DVar size :: env) (size + 1) ne1' ne2'
   | _ -> false
 
 and check_extent_head env size
@@ -502,20 +502,20 @@ and check_extent_head env size
   =
   i1 = i2 &&
   let (barg, benv) = mk_bvar env size in
-  let applied_dom1 = E.do_clos (size + 1) dom1 (D.BDim barg) in
-  let applied_dom2 = E.do_clos (size + 1) dom2 (D.BDim barg) in
+  let applied_dom1 = E.do_clos (size + 1) dom1 (D.Dim barg) in
+  let applied_dom2 = E.do_clos (size + 1) dom2 (D.Dim barg) in
   check_tp ~subtype:false benv (size + 1) applied_dom1 applied_dom2 &&
   let (dom_arg, dom_env) = mk_var applied_dom1 benv (size + 1) in
-  let applied_mot1 = E.do_clos2 (size + 2) mot1 (D.BDim barg) (D.Term dom_arg) in
-  let applied_mot2 = E.do_clos2 (size + 2) mot2 (D.BDim barg) (D.Term dom_arg) in
+  let applied_mot1 = E.do_clos2 (size + 2) mot1 (D.Dim barg) (D.Term dom_arg) in
+  let applied_mot2 = E.do_clos2 (size + 2) mot2 (D.Dim barg) (D.Term dom_arg) in
   check_tp ~subtype:false dom_env (size + 2) applied_mot1 applied_mot2 &&
-  let dom_i = E.do_clos size dom1 (D.BDim (D.BVar i1)) in
+  let dom_i = E.do_clos size dom1 (D.Dim (D.DVar i1)) in
   check_nf env size (D.Normal {tp = dom_i; term = ctx1}) (D.Normal {tp = dom_i; term = ctx2}) &&
   for_all2i
     (fun o case1 case2 ->
-       let case_dom = E.do_clos size dom1 (D.BDim (D.Const o)) in
+       let case_dom = E.do_clos size dom1 (D.Dim (D.Const o)) in
        let (case_arg, case_env) = mk_var case_dom env size in
-       let case_mot = E.do_clos2 (size + 1) mot1 (D.BDim (D.Const o)) (D.Term case_arg) in
+       let case_mot = E.do_clos2 (size + 1) mot1 (D.Dim (D.Const o)) (D.Term case_arg) in
        let applied_case1 = E.do_clos (size + 1) case1 (D.Term case_arg) in
        let applied_case2 = E.do_clos (size + 1) case2 (D.Term case_arg) in
        check_nf case_env (size + 1)
@@ -528,7 +528,7 @@ and check_extent_head env size
   let (bridge_arg, bridge_env) = mk_var (D.Bridge (dom1, end_args)) ends_env (size + width) in
   let (varcase_barg, varcase_benv) = mk_bvar bridge_env (size + width + 1) in
   let varcase_inst = E.do_bapp (size + width + 2) bridge_arg varcase_barg in
-  let varcase_mot = E.do_clos2 (size + width + 2) mot1 (D.BDim varcase_barg) (D.Term varcase_inst) in
+  let varcase_mot = E.do_clos2 (size + width + 2) mot1 (D.Dim varcase_barg) (D.Term varcase_inst) in
   let applied_varcase1 = E.do_clos_extent (size + width + 2) varcase1 end_args bridge_arg varcase_barg in
   let applied_varcase2 = E.do_clos_extent (size + width + 2) varcase2 end_args bridge_arg varcase_barg in
   check_nf varcase_benv (size + width + 2)
@@ -560,8 +560,8 @@ and check_tp ~subtype env size d1 d2 =
     let width = List.length ends in
     let (barg, barg_env) = mk_bvar env size in
     check_tp ~subtype barg_env (size + 1)
-      (E.do_clos (size + 1) dest (D.BDim barg))
-      (E.do_clos (size + 1) dest' (D.BDim barg)) &&
+      (E.do_clos (size + 1) dest (D.Dim barg))
+      (E.do_clos (size + 1) dest' (D.Dim barg)) &&
     let nfs = List.map2 (fun tp term -> D.Normal {tp; term}) (E.do_consts size dest width) ends in
     let nfs' = List.map2 (fun tp term -> D.Normal {tp; term}) (E.do_consts size dest width) ends' in
     List.for_all2 (check_nf env size) nfs nfs'

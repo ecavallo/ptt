@@ -1,11 +1,11 @@
 type lvl = int
 
-type bdim =
-  | BVar of lvl
+type dim =
+  | DVar of lvl
   | Const of int
 
 type env_entry =
-  | BDim of bdim
+  | Dim of dim
   | Term of t
 and env = env_entry list
 and clos = Clos of {term : Syntax.t; env : env}
@@ -67,7 +67,7 @@ val equal_nf : nf -> nf -> bool
 
 val pp : Format.formatter -> t -> unit
 val pp_lvl : Format.formatter -> lvl -> unit
-val pp_bdim : Format.formatter -> bdim -> unit
+val pp_dim : Format.formatter -> dim -> unit
 val pp_nf : Format.formatter -> nf -> unit
 val pp_ne : Format.formatter -> ne -> unit
 val pp_env : Format.formatter -> env -> unit

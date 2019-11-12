@@ -4,8 +4,8 @@ type idx = int
 type uni_level = int
 [@@deriving show{ with_path = false }, eq]
 
-type bdim =
-  | BVar of idx
+type dim =
+  | DVar of idx
   | Const of int
 [@@deriving eq]
 
@@ -18,9 +18,9 @@ type t =
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
   | Sg of t * (* BINDS *) t | Pair of t * t | Fst of t | Snd of t
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
-  | Bridge of (* BBINDS *) t * t list | BApp of t * bdim | BLam of (* BBINDS *) t
-  | Extent of bdim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS *) t list * (* BINDS n & BBINDS *) t
-  | Gel of bdim * t list * (* BINDS n *) t | Engel of bdim * t list * t
+  | Bridge of (* BBINDS *) t * t list | BApp of t * dim | BLam of (* BBINDS *) t
+  | Extent of dim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS *) t list * (* BINDS n & BBINDS *) t
+  | Gel of dim * t list * (* BINDS n *) t | Engel of dim * t list * t
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
   | Uni of uni_level
 [@@deriving eq]
@@ -29,10 +29,10 @@ exception Indirect_use
 
 let unsubst_bvar i t =
   let bgo depth = function
-    | BVar j ->
-      if j < depth then BVar j
-      else if j = i + depth then BVar depth
-      else BVar (j + 1)
+    | DVar j ->
+      if j < depth then DVar j
+      else if j = i + depth then DVar depth
+      else DVar (j + 1)
     | Const o -> Const o
   in
   let rec go depth = function
@@ -97,10 +97,10 @@ let rec condense = function
     end
   | _ -> None
 
-let pp_bdim fmt =
+let pp_dim fmt =
   let open Format in
   function
-  | BVar i -> fprintf fmt "#%d" i
+  | DVar i -> fprintf fmt "#%d" i
   | Const o -> fprintf fmt "%d" o
 
 let rec pp fmt =
@@ -158,14 +158,14 @@ let rec pp fmt =
   | BLam t ->
     fprintf fmt "blam(@[<hov>%a@])" pp t;
   | BApp (t, r) ->
-    fprintf fmt "bapp(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp t pp_bdim r;
+    fprintf fmt "bapp(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp t pp_dim r;
   | Extent (r, dom, mot, ctx, endcase, varcase) ->
     fprintf fmt "extent(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
-     pp_bdim r pp dom pp mot pp ctx pp_list endcase pp varcase;
+     pp_dim r pp dom pp mot pp ctx pp_list endcase pp varcase;
   | Gel (r, ts, t) ->
-    fprintf fmt "Gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp_bdim r pp_list ts pp t;
+    fprintf fmt "Gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp_dim r pp_list ts pp t;
   | Engel (r, ts, t) ->
-    fprintf fmt "gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp_bdim r pp_list ts pp t;
+    fprintf fmt "gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp_dim r pp_list ts pp t;
   | Ungel (width, mot, gel, case) ->
     fprintf fmt "ungel(@[<hov>@[<hov>%d@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" width pp mot pp gel pp case
   | Uni i -> fprintf fmt "U<%d>" i

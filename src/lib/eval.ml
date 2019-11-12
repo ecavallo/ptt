@@ -3,12 +3,12 @@ module D = Domain
 
 exception Eval_failed of string
 
-let eval_bdim r (env : D.env) =
+let eval_dim r (env : D.env) =
   match r with
-  | Syn.BVar i ->
+  | Syn.DVar i ->
     begin
       match List.nth env i with
-      | D.BDim s -> s
+      | D.Dim s -> s
       | D.Term _ -> raise (Eval_failed "Not a dimension term")
     end
   | Syn.Const o -> D.Const o
@@ -16,7 +16,7 @@ let eval_bdim r (env : D.env) =
 (* TODO organize these closure functions in a better way *)
 
 let rec do_bclos size (D.Clos {term; env}) r =
-  eval term (D.BDim r :: env) size
+  eval term (D.Dim r :: env) size
 
 and do_clos size (D.Clos {term; env}) a =
   eval term (a :: env) size
@@ -31,10 +31,10 @@ and do_closN size (D.ClosN {term; env}) tN =
   eval term (List.rev_append (List.map (fun t -> D.Term t) tN) env) size
 
 and do_clos_extent size (D.ClosN {term; env}) tN t r =
-  eval term (D.BDim r :: D.Term t :: List.rev_append (List.map (fun t -> D.Term t) tN) env) size
+  eval term (D.Dim r :: D.Term t :: List.rev_append (List.map (fun t -> D.Term t) tN) env) size
 
 and do_consts size (D.Clos {term; env}) width =
-  List.init width (fun o -> eval term (D.BDim (D.Const o) :: env) size)
+  List.init width (fun o -> eval term (D.Dim (D.Const o) :: env) size)
 
 and do_rec size tp zero suc n =
   match n with
@@ -71,15 +71,15 @@ and do_snd size p =
 
 and do_bapp size t r =
   match t with
-  | D.BLam bclo -> do_clos size bclo (D.BDim r)
+  | D.BLam bclo -> do_clos size bclo (D.Dim r)
   | D.Neutral {tp; term} ->
     begin
       match tp with
       | D.Bridge (dst, ts) ->
          begin
            match r with
-           | D.BVar i ->
-              let dst = do_clos size dst (D.BDim r) in
+           | D.DVar i ->
+              let dst = do_clos size dst (D.Dim r) in
               D.Neutral {tp = dst; term = D.(BApp i @: term)}
            | Const o -> List.nth ts o
          end
@@ -123,7 +123,7 @@ and do_ungel size mot gel clo case =
         match tp with
         | D.Gel (_, endtps, rel) ->
           let ends =
-            List.mapi (fun o tp -> D.Normal {tp; term = do_clos size clo (D.BDim (D.Const o))}) endtps
+            List.mapi (fun o tp -> D.Normal {tp; term = do_clos size clo (D.Dim (D.Const o))}) endtps
           in
           let final_tp = do_clos size mot (D.Term (D.BLam clo)) in
           D.Neutral {tp = final_tp; term = D.(Ungel (ends, rel, mot, size, clo, case) @: term)}
@@ -138,7 +138,7 @@ and eval t (env : D.env) size =
     begin
       match List.nth env i with
       | D.Term t -> t
-      | D.BDim _-> raise (Eval_failed "Not a term variable")
+      | D.Dim _-> raise (Eval_failed "Not a term variable")
     end
   | Syn.Let (def, body) -> eval body (D.Term (eval def env size) :: env) size
   | Syn.Check (term, _) -> eval term env size
@@ -173,7 +173,7 @@ and eval t (env : D.env) size =
   | Syn.Snd t -> do_snd size (eval t env size)
   | Syn.Bridge (dest, ts) -> D.Bridge (Clos {term = dest; env}, List.map (fun t -> eval t env size) ts)
   | Syn.BApp (t,r) ->
-    let r' = eval_bdim r env in
+    let r' = eval_dim r env in
     do_bapp size (eval t env size) r'
   | Syn.BLam t -> D.BLam (Clos {term = t; env})
   | Syn.Refl t -> D.Refl (eval t env size)
@@ -181,12 +181,12 @@ and eval t (env : D.env) size =
   | Syn.J (mot, refl, eq) ->
     do_j size (D.Clos3 {term = mot; env}) (D.Clos {term = refl; env}) (eval eq env size)
   | Syn.Extent (r, dom, mot, ctx, endcase, varcase) ->
-    let r' = eval_bdim r env in
+    let r' = eval_dim r env in
     let ctx' = eval ctx env size in
     begin
       match r' with
-      | D.BVar i ->
-        let final_tp = eval mot (D.Term ctx' :: D.BDim r' :: env) size in
+      | D.DVar i ->
+        let final_tp = eval mot (D.Term ctx' :: D.Dim r' :: env) size in
         let ext =
           D.Ext
             {var = i;
@@ -202,22 +202,22 @@ and eval t (env : D.env) size =
     end
   | Syn.Gel (r, endtps, rel) ->
     begin
-      let r' = eval_bdim r env in
+      let r' = eval_dim r env in
       match r' with
-      | D.BVar i -> D.Gel (i, List.map (fun t -> eval t env size) endtps, D.ClosN {term = rel; env})
+      | D.DVar i -> D.Gel (i, List.map (fun t -> eval t env size) endtps, D.ClosN {term = rel; env})
       | D.Const o -> eval (List.nth endtps o) env size
     end
   | Syn.Engel (r, ts, t) ->
     begin
-      let r' = eval_bdim r env in
+      let r' = eval_dim r env in
       match r' with
-      | D.BVar i -> D.Engel (i, List.map (fun t -> eval t env size) ts, eval t env size)
+      | D.DVar i -> D.Engel (i, List.map (fun t -> eval t env size) ts, eval t env size)
       | Const o -> eval (List.nth ts o) env size
     end
   | Syn.Ungel (_, mot, gel, case) ->
     do_ungel
       size
       (D.Clos {term = mot; env})
-      (eval gel (D.BDim (D.BVar size) :: env) (size + 1))
+      (eval gel (D.Dim (D.DVar size) :: env) (size + 1))
       (D.Clos {term = gel; env})
       (D.Clos {term = case; env})

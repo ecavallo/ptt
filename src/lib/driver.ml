@@ -3,7 +3,7 @@ module S = Syntax
 module D = Domain
 
 type env_entry =
-  | BDim of string
+  | Dim of string
   | Term of string
 
 type env = Env of {check_env : Check.env; bindings : env_entry list}
@@ -37,7 +37,7 @@ let output = function
 let find_idx key =
   let rec go i = function
     | [] -> raise (Check.Type_error (Check.Misc ("Unbound variable: " ^ key)))
-    | BDim x :: xs -> if String.equal x key then i else go (i + 1) xs
+    | Dim x :: xs -> if String.equal x key then i else go (i + 1) xs
     | Term x :: xs -> if String.equal x key then i else go (i + 1) xs
   in
   go 0
@@ -51,12 +51,12 @@ let rec unravel_spine f = function
   | x :: xs -> unravel_spine (x f) xs
 
 let rec extent_env env = function
-  | [var_bridge; var_dim] -> BDim var_dim :: Term var_bridge :: env
+  | [var_bridge; var_dim] -> Dim var_dim :: Term var_bridge :: env
   | name :: names -> extent_env (Term name :: env) names
   | _ -> raise (Check.Type_error (Check.Misc ("Bad length in extent")))
 
 let bbind env = function
-  | CS.BVar i -> S.BVar (find_idx i env)
+  | CS.DVar i -> S.DVar (find_idx i env)
   | CS.Const o -> S.Const o
 
 let rec bind env = function
@@ -114,23 +114,23 @@ let rec bind env = function
     S.Id (bind env tp, bind env left, bind env right)
   | CS.Refl t -> S.Refl (bind env t)
   | CS.Bridge (Binder {name; body}, endpoints) ->
-    S.Bridge (bind (BDim name :: env) body, List.map (bind env) endpoints)
+    S.Bridge (bind (Dim name :: env) body, List.map (bind env) endpoints)
   | CS.BLam (BinderN {names = []; body}) ->
     bind env body
   | CS.BLam (BinderN {names = i :: names; body}) ->
     let blam = CS.BLam (BinderN {names; body}) in
-    S.BLam (bind (BDim i :: env) blam)
+    S.BLam (bind (Dim i :: env) blam)
   | CS.Extent
-      {bdim;
+      {dim;
        dom = Binder {name = dom_dim; body = dom_body};
        mot = Binder2 {name1 = mot_dim; name2 = mot_dom; body = mot_body};
        ctx;
        endcase;
        varcase = BinderN {names; body = var_body}} ->
     S.Extent
-      (bbind env bdim,
-       bind (BDim dom_dim :: env) dom_body,
-       bind (Term mot_dom :: BDim mot_dim :: env) mot_body,
+      (bbind env dim,
+       bind (Dim dom_dim :: env) dom_body,
+       bind (Term mot_dom :: Dim mot_dim :: env) mot_body,
        bind env ctx,
        List.map (function (CS.Binder {name; body}) -> bind (Term name :: env) body) endcase,
        bind (extent_env env names) var_body)
@@ -149,13 +149,13 @@ let rec bind env = function
     S.Ungel
       (width,
        bind (Term mot_name :: env) mot_body,
-       bind (BDim gel_name :: env) gel_body,
+       bind (Dim gel_name :: env) gel_body,
        bind (Term case_name :: env) case_body)
   | CS.Uni i -> S.Uni i
 
 and bind_spine env = function
   | CS.Term t -> fun f -> S.Ap (f, bind env t)
-  | CS.BDim b -> fun f -> S.BApp (f, bbind env b)
+  | CS.Dim b -> fun f -> S.BApp (f, bbind env b)
 
 let process_decl (Env {check_env; bindings})  = function
   | CS.Def {name; def; tp} ->
