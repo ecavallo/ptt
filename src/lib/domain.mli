@@ -6,7 +6,7 @@ type dim =
 
 type env_entry =
   | Dim of dim
-  | Term of t
+  | Tm of t
 and env = env_entry list
 and clos = Clos of {term : Syntax.t; env : env}
 and clos2 = Clos2 of {term : Syntax.t; env : env}

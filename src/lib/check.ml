@@ -55,8 +55,8 @@ let tp_error e = raise (Type_error e)
 let rec env_to_sem_env = function
   | [] -> []
   | DVar {level; _} :: env -> D.Dim (D.DVar level) :: env_to_sem_env env
-  | Var {level; tp} :: env -> D.Term (D.Neutral {tp; term = D.root (D.Var level)}) :: env_to_sem_env env
-  | Def {term; _} :: env -> D.Term term :: env_to_sem_env env
+  | Var {level; tp} :: env -> D.Tm (D.Neutral {tp; term = D.root (D.Var level)}) :: env_to_sem_env env
+  | Def {term; _} :: env -> D.Tm term :: env_to_sem_env env
   | Restrict _ :: env -> env_to_sem_env env
 
 let rec env_to_quote_env = function
@@ -202,7 +202,7 @@ and check_inert ~env ~size ~term ~tp =
       match tp with
       | D.Pi (arg_tp, clos) ->
         let (arg, arg_env) = mk_var arg_tp env size in
-        let dest_tp = E.do_clos (size + 1) clos (D.Term arg) in
+        let dest_tp = E.do_clos (size + 1) clos (D.Tm arg) in
         check ~env:arg_env ~size:(size + 1) ~term:body ~tp:dest_tp;
       | t -> tp_error (Misc ("Expecting Pi but found\n" ^ D.show t))
     end
@@ -212,7 +212,7 @@ and check_inert ~env ~size ~term ~tp =
       | D.Sg (left_tp, right_tp) ->
         check ~env ~size ~term:left ~tp:left_tp;
         let left_sem = E.eval left (env_to_sem_env env) size in
-        check ~env ~size ~term:right ~tp:(E.do_clos size right_tp (D.Term left_sem))
+        check ~env ~size ~term:right ~tp:(E.do_clos size right_tp (D.Tm left_sem))
       | t -> tp_error (Misc ("Expecting Sg but found\n" ^ D.show t))
     end
   | Bridge (term, ends) ->
@@ -307,7 +307,7 @@ and synth ~env ~size ~term =
       match synth ~env ~size ~term:p with
       | Sg (_, right_tp) ->
         let proj = E.eval (Fst p) (env_to_sem_env env) size in
-        E.do_clos size right_tp (D.Term proj)
+        E.do_clos size right_tp (D.Tm proj)
       | t -> tp_error (Misc ("Expecting Sg but found\n" ^ D.show t))
     end
   | Ap (f, a) ->
@@ -316,7 +316,7 @@ and synth ~env ~size ~term =
       | Pi (src, dest) ->
         check ~env ~size ~term:a ~tp:src;
         let a_sem = E.eval a (env_to_sem_env env) size in
-        E.do_clos size dest (D.Term a_sem)
+        E.do_clos size dest (D.Tm a_sem)
       | t -> tp_error (Misc ("Expecting Pi but found\n" ^ D.show t))
     end
   | NRec (mot, zero, suc, n) ->
@@ -324,23 +324,23 @@ and synth ~env ~size ~term =
     let sem_env = env_to_sem_env env in
     let (nat_arg, nat_env) = mk_var Nat env size in
     check_tp ~env:nat_env ~size:(size + 1) ~term:mot;
-    let zero_tp = E.eval mot (D.Term D.Zero :: sem_env) size in
+    let zero_tp = E.eval mot (D.Tm D.Zero :: sem_env) size in
     check ~env ~size ~term:zero ~tp:zero_tp;
     let ih_tp = E.eval mot (env_to_sem_env nat_env) (size + 1) in
     let (_, ih_env) = mk_var ih_tp nat_env (size + 1) in
-    let suc_tp = E.eval mot (D.Term (Suc nat_arg) :: sem_env) (size + 2) in
+    let suc_tp = E.eval mot (D.Tm (Suc nat_arg) :: sem_env) (size + 2) in
     check ~env:ih_env ~size:(size + 2) ~term:suc ~tp:suc_tp;
-    E.eval mot (D.Term (E.eval n sem_env size) :: sem_env) size
+    E.eval mot (D.Tm (E.eval n sem_env size) :: sem_env) size
   | If (mot, tt, ff, b) ->
     check ~env ~size ~term:b ~tp:Bool;
     let sem_env = env_to_sem_env env in
     let (_, bool_env) = mk_var Bool env size in
     check_tp ~env:bool_env ~size:(size + 1) ~term:mot;
-    let tt_tp = E.eval mot (D.Term D.True :: sem_env) size in
+    let tt_tp = E.eval mot (D.Tm D.True :: sem_env) size in
     check ~env ~size ~term:tt ~tp:tt_tp;
-    let ff_tp = E.eval mot (D.Term D.False :: sem_env) size in
+    let ff_tp = E.eval mot (D.Tm D.False :: sem_env) size in
     check ~env ~size ~term:ff ~tp:ff_tp;
-    E.eval mot (D.Term (E.eval b sem_env size) :: sem_env) size
+    E.eval mot (D.Tm (E.eval b sem_env size) :: sem_env) size
   | BApp (term, r) ->
     let restricted_env = restrict_env r env in
     begin
@@ -363,10 +363,10 @@ and synth ~env ~size ~term =
         check_tp ~env:mot_env3 ~size:(size + 3) ~term:mot;
         let refl_tp =
           E.eval mot
-            (D.Term (D.Refl mot_arg1) :: D.Term mot_arg1 :: D.Term mot_arg1 :: sem_env)
+            (D.Tm (D.Refl mot_arg1) :: D.Tm mot_arg1 :: D.Tm mot_arg1 :: sem_env)
             (size + 1) in
         check ~env:mot_env1 ~size:(size + 1) ~term:refl ~tp:refl_tp;
-        E.eval mot (D.Term (E.eval eq sem_env size) :: D.Term right :: D.Term left :: sem_env) size
+        E.eval mot (D.Tm (E.eval eq sem_env size) :: D.Tm right :: D.Tm left :: sem_env) size
       | t -> tp_error (Misc ("Expecting Id but found\n" ^ D.show t))
     end
   | Extent (r, dom, mot, ctx, endcase, varcase) ->
@@ -386,7 +386,7 @@ and synth ~env ~size ~term =
       (fun o case ->
          let dom_o = E.eval dom (D.Dim (D.Const o) :: sem_env) size in
          let (case_arg, case_env) = mk_var dom_o res_env size in
-         let mot_o = E.eval mot (D.Term case_arg :: D.Dim (D.Const o) :: sem_env) size in
+         let mot_o = E.eval mot (D.Tm case_arg :: D.Dim (D.Const o) :: sem_env) size in
          check ~env:case_env ~size:(size + 1) ~term:case ~tp:mot_o)
       endcase;
     let end_tps = E.do_consts size (D.Clos {term = dom; env = sem_env}) width in
@@ -396,9 +396,9 @@ and synth ~env ~size ~term =
     let (varcase_barg, varcase_benv) = mk_bvar width bridge_env (size + width + 1) in
     let varcase_inst = E.do_bapp (size + width + 2) bridge_arg varcase_barg in
     let varcase_mot =
-      E.eval mot (D.Term varcase_inst :: D.Dim varcase_barg :: sem_env) (size + width + 2) in
+      E.eval mot (D.Tm varcase_inst :: D.Dim varcase_barg :: sem_env) (size + width + 2) in
     check ~env:varcase_benv ~size:(size + width + 2) ~term:varcase ~tp:varcase_mot;
-    E.eval mot (D.Term (E.eval ctx sem_env size) :: D.Dim r' :: sem_env) size
+    E.eval mot (D.Tm (E.eval ctx sem_env size) :: D.Dim r' :: sem_env) size
   | Ungel (width, mot, term, case) ->
     let (var_arg, var_env) = mk_bvar width env size in
     begin
@@ -423,9 +423,9 @@ and synth ~env ~size ~term =
                {tp = D.Gel (size + 1, end_tps, rel);
                 term = D.Engel (size + 1, end_tms, wit_arg)}) in
         let gel_term = D.BLam (D.Clos {term = syn_engel; env = env_to_sem_env wit_env}) in
-        let gel_tp = E.eval mot (D.Term gel_term :: sem_env) (size + 1) in
+        let gel_tp = E.eval mot (D.Tm gel_term :: sem_env) (size + 1) in
         check ~env:wit_env ~size:(size + 1) ~term:case ~tp:gel_tp;
-        E.eval mot (D.Term (D.BLam (D.Clos {term; env = sem_env})) :: sem_env) size
+        E.eval mot (D.Tm (D.BLam (D.Clos {term; env = sem_env})) :: sem_env) size
       | t -> tp_error (Misc ("Expecting Gel but found\n" ^ D.show t))
     end
   | _ -> tp_error (Cannot_synth_term term)

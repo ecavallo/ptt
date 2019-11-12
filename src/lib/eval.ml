@@ -9,7 +9,7 @@ let eval_dim r (env : D.env) =
     begin
       match List.nth env i with
       | D.Dim s -> s
-      | D.Term _ -> raise (Eval_failed "Not a dimension term")
+      | D.Tm _ -> raise (Eval_failed "Not a dimension term")
     end
   | Syn.Const o -> D.Const o
 
@@ -25,13 +25,13 @@ and do_clos2 size (D.Clos2 {term; env}) a1 a2 =
   eval term (a2 :: a1 :: env) size
 
 and do_clos3 size (D.Clos3 {term; env}) t1 t2 t3 =
-  eval term (D.Term t3 :: D.Term t2 :: D.Term t1 :: env) size
+  eval term (D.Tm t3 :: D.Tm t2 :: D.Tm t1 :: env) size
 
 and do_closN size (D.ClosN {term; env}) tN =
-  eval term (List.rev_append (List.map (fun t -> D.Term t) tN) env) size
+  eval term (List.rev_append (List.map (fun t -> D.Tm t) tN) env) size
 
 and do_clos_extent size (D.ClosN {term; env}) tN t r =
-  eval term (D.Dim r :: D.Term t :: List.rev_append (List.map (fun t -> D.Term t) tN) env) size
+  eval term (D.Dim r :: D.Tm t :: List.rev_append (List.map (fun t -> D.Tm t) tN) env) size
 
 and do_consts size (D.Clos {term; env}) width =
   List.init width (fun o -> eval term (D.Dim (D.Const o) :: env) size)
@@ -39,9 +39,9 @@ and do_consts size (D.Clos {term; env}) width =
 and do_rec size tp zero suc n =
   match n with
   | D.Zero -> zero
-  | D.Suc n -> do_clos2 size suc (D.Term n) (D.Term (do_rec size tp zero suc n))
+  | D.Suc n -> do_clos2 size suc (D.Tm n) (D.Tm (do_rec size tp zero suc n))
   | D.Neutral {term; _} ->
-    let final_tp = do_clos size tp (D.Term n) in
+    let final_tp = do_clos size tp (D.Tm n) in
     D.Neutral {tp = final_tp; term = D.(NRec (tp, zero, suc) @: term)}
   | _ -> raise (Eval_failed "Not a number")
 
@@ -50,7 +50,7 @@ and do_if size mot tt ff b =
   | D.True -> tt
   | D.False -> ff
   | D.Neutral {term; _} ->
-    let final_tp = do_clos size mot (D.Term b) in
+    let final_tp = do_clos size mot (D.Tm b) in
     D.Neutral {tp = final_tp; term = D.(If (mot, tt, ff) @: term)}
   | _ -> raise (Eval_failed "Not a number")
 
@@ -66,7 +66,7 @@ and do_snd size p =
   | D.Pair (_, p2) -> p2
   | D.Neutral {tp = D.Sg (_, clo); term} ->
     let fst = do_fst p in
-    D.Neutral {tp = do_clos size clo (D.Term fst); term = D.(Snd @: term)}
+    D.Neutral {tp = do_clos size clo (D.Tm fst); term = D.(Snd @: term)}
   | _ -> raise (Eval_failed "Couldn't snd argument in do_snd")
 
 and do_bapp size t r =
@@ -89,7 +89,7 @@ and do_bapp size t r =
 
 and do_j size mot refl eq =
   match eq with
-  | D.Refl t -> do_clos size refl (D.Term t)
+  | D.Refl t -> do_clos size refl (D.Tm t)
   | D.Neutral {tp; term = term} ->
     begin
       match tp with
@@ -103,12 +103,12 @@ and do_j size mot refl eq =
 
 and do_ap size f a =
   match f with
-  | D.Lam clos -> do_clos size clos (D.Term a)
+  | D.Lam clos -> do_clos size clos (D.Tm a)
   | D.Neutral {tp; term} ->
     begin
       match tp with
       | D.Pi (src, dst) ->
-        let dst = do_clos size dst (D.Term a) in
+        let dst = do_clos size dst (D.Tm a) in
         D.Neutral {tp = dst; term = D.(Ap (D.Normal {tp = src; term = a}) @: term)}
       | _ -> raise (Eval_failed "Not a Pi in do_ap")
     end
@@ -117,7 +117,7 @@ and do_ap size f a =
 and do_ungel size mot gel clo case =
   begin
     match gel with
-    | D.Engel (_, _, t) -> do_clos size case (D.Term t)
+    | D.Engel (_, _, t) -> do_clos size case (D.Tm t)
     | D.Neutral {tp; term} ->
       begin
         match tp with
@@ -125,7 +125,7 @@ and do_ungel size mot gel clo case =
           let ends =
             List.mapi (fun o tp -> D.Normal {tp; term = do_clos size clo (D.Dim (D.Const o))}) endtps
           in
-          let final_tp = do_clos size mot (D.Term (D.BLam clo)) in
+          let final_tp = do_clos size mot (D.Tm (D.BLam clo)) in
           D.Neutral {tp = final_tp; term = D.(Ungel (ends, rel, mot, size, clo, case) @: term)}
         | _ -> raise (Eval_failed "Not a Gel in do_ungel")
       end
@@ -137,10 +137,10 @@ and eval t (env : D.env) size =
   | Syn.Var i ->
     begin
       match List.nth env i with
-      | D.Term t -> t
+      | D.Tm t -> t
       | D.Dim _-> raise (Eval_failed "Not a term variable")
     end
-  | Syn.Let (def, body) -> eval body (D.Term (eval def env size) :: env) size
+  | Syn.Let (def, body) -> eval body (D.Tm (eval def env size) :: env) size
   | Syn.Check (term, _) -> eval term env size
   | Syn.Unit -> D.Unit
   | Syn.Triv -> D.Triv
@@ -186,7 +186,7 @@ and eval t (env : D.env) size =
     begin
       match r' with
       | D.DVar i ->
-        let final_tp = eval mot (D.Term ctx' :: D.Dim r' :: env) size in
+        let final_tp = eval mot (D.Tm ctx' :: D.Dim r' :: env) size in
         let ext =
           D.Ext
             {var = i;
@@ -198,7 +198,7 @@ and eval t (env : D.env) size =
         in
         D.Neutral {tp = final_tp; term = D.root ext}
       | D.Const o ->
-        eval (List.nth endcase o) (D.Term ctx' :: env) size
+        eval (List.nth endcase o) (D.Tm ctx' :: env) size
     end
   | Syn.Gel (r, endtps, rel) ->
     begin

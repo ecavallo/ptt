@@ -8,7 +8,7 @@ type dim =
 
 type env_entry =
   | Dim of dim
-  | Term of t
+  | Tm of t
 and env = env_entry list
 [@@deriving show, eq]
 and clos = Clos of {term : Syntax.t; env : env}
@@ -77,7 +77,7 @@ let instantiate_dim r i = function
 
 let rec instantiate_entry r i = function
   | Dim s -> Dim (instantiate_dim r i s)
-  | Term t -> Term (instantiate r i t)
+  | Tm t -> Tm (instantiate r i t)
 
 and instantiate_env r i env =
   List.map (instantiate_entry r i) env
