@@ -407,22 +407,14 @@ and synth ~env ~size ~term =
         assert_dim_equal (D.DVar i) var_arg;
         let sem_env = env_to_sem_env env in
         let end_tms = E.do_consts size (D.Clos {term; env = sem_env}) width in
-        let syn_gel =
-          Q.read_back_tp (env_to_quote_env var_env) (size + 1) (D.Gel (i, end_tps, rel)) in
-        let mot_hyp = D.Bridge (D.Clos {term = syn_gel; env = sem_env}, end_tms) in
+        let mot_hyp =
+          D.Bridge (D.Pseudo {var = size; term = D.Gel (size, end_tps, rel); ends = end_tps}, end_tms) in
         let (_, hyp_env) = mk_var mot_hyp env size in
         check_tp ~env:hyp_env ~size:(size + 1) ~term:mot;
         let applied_rel = E.do_closN size rel end_tms in
         let (wit_arg, wit_env) = mk_var applied_rel env size in
-        let (_, gel_env) = mk_bvar width wit_env (size + 1) in
-        let syn_engel =
-          Q.read_back_nf
-            (env_to_quote_env gel_env)
-            (size + 2)
-            (D.Normal
-               {tp = D.Gel (size + 1, end_tps, rel);
-                term = D.Engel (size + 1, end_tms, wit_arg)}) in
-        let gel_term = D.BLam (D.Clos {term = syn_engel; env = env_to_sem_env wit_env}) in
+        let gel_term =
+          D.BLam (D.Pseudo {var = size + 1; term = D.Engel (size + 1, end_tms, wit_arg); ends = end_tms}) in
         let gel_tp = E.eval mot (D.Tm gel_term :: sem_env) (size + 1) in
         check ~env:wit_env ~size:(size + 1) ~term:case ~tp:gel_tp;
         E.eval mot (D.Tm (D.BLam (D.Clos {term; env = sem_env})) :: sem_env) size
