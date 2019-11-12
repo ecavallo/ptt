@@ -202,7 +202,7 @@ and check_inert ~env ~size ~term ~tp =
       match tp with
       | D.Pi (arg_tp, clos) ->
         let (arg, arg_env) = mk_var arg_tp env size in
-        let dest_tp = E.do_clos (size + 1) clos arg in
+        let dest_tp = E.do_clos (size + 1) clos (D.Term arg) in
         check ~env:arg_env ~size:(size + 1) ~term:body ~tp:dest_tp;
       | t -> tp_error (Misc ("Expecting Pi but found\n" ^ D.show t))
     end
@@ -212,7 +212,7 @@ and check_inert ~env ~size ~term ~tp =
       | D.Sg (left_tp, right_tp) ->
         check ~env ~size ~term:left ~tp:left_tp;
         let left_sem = E.eval left (env_to_sem_env env) size in
-        check ~env ~size ~term:right ~tp:(E.do_clos size right_tp left_sem)
+        check ~env ~size ~term:right ~tp:(E.do_clos size right_tp (D.Term left_sem))
       | t -> tp_error (Misc ("Expecting Sg but found\n" ^ D.show t))
     end
   | Bridge (term, ends) ->
@@ -233,14 +233,14 @@ and check_inert ~env ~size ~term ~tp =
       | Bridge (clos, ends) ->
         let width = List.length ends in
         let (arg, arg_env) = mk_bvar width env size in
-        let dest_tp = E.do_bclos (size + 1) clos arg in
+        let dest_tp = E.do_clos (size + 1) clos (D.BDim arg) in
         check ~env:arg_env ~size:(size + 1) ~term:body ~tp:dest_tp;
         let quote_env = env_to_quote_env env in
         let sem_env = Q.env_to_sem_env quote_env in
         List.iteri
           (fun o pt ->
              let body_o = E.eval body (D.BDim (D.Const o) :: sem_env) size in
-             let tp = E.do_bclos size clos (D.Const o) in
+             let tp = E.do_clos size clos (D.BDim (D.Const o)) in
              assert_equal quote_env size body_o pt tp)
           ends
       | t -> tp_error (Misc ("Expecting Bridge but found\n" ^ D.show t))
@@ -307,7 +307,7 @@ and synth ~env ~size ~term =
       match synth ~env ~size ~term:p with
       | Sg (_, right_tp) ->
         let proj = E.eval (Fst p) (env_to_sem_env env) size in
-        E.do_clos size right_tp proj
+        E.do_clos size right_tp (D.Term proj)
       | t -> tp_error (Misc ("Expecting Sg but found\n" ^ D.show t))
     end
   | Ap (f, a) ->
@@ -316,7 +316,7 @@ and synth ~env ~size ~term =
       | Pi (src, dest) ->
         check ~env ~size ~term:a ~tp:src;
         let a_sem = E.eval a (env_to_sem_env env) size in
-        E.do_clos size dest a_sem
+        E.do_clos size dest (D.Term a_sem)
       | t -> tp_error (Misc ("Expecting Pi but found\n" ^ D.show t))
     end
   | NRec (mot, zero, suc, n) ->
@@ -349,7 +349,7 @@ and synth ~env ~size ~term =
         let width = List.length ends in
         check_bdim ~width ~env ~bdim:r;
         let r' = E.eval_bdim r (env_to_sem_env env) in
-        E.do_bclos size clos r'
+        E.do_clos size clos (D.BDim r')
       | t -> tp_error (Misc ("Expecting Bridge but found\n" ^ D.show t ^ "\n" ^ Syn.show term))
     end
   | J (mot, refl, eq) ->

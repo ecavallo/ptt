@@ -8,9 +8,7 @@ type env_entry =
   | BDim of bdim
   | Term of t
 and env = env_entry list
-and clos =
-    Clos of {term : Syntax.t; env : env}
-  | ConstClos of t
+and clos = Clos of {term : Syntax.t; env : env}
 and clos2 = Clos2 of {term : Syntax.t; env : env}
 and clos3 = Clos3 of {term : Syntax.t; env : env}
 and closN = ClosN of {term : Syntax.t; env : env}

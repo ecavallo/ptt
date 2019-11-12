@@ -14,12 +14,9 @@ val do_snd : Domain.lvl -> Domain.t -> Domain.t
 val do_j : Domain.lvl -> Domain.clos3 -> Domain.clos -> Domain.t -> Domain.t
 val do_ungel : Domain.lvl -> Domain.clos -> Domain.t -> Domain.clos -> Domain.clos -> Domain.t
 
-val do_bclos : Domain.lvl -> Domain.clos -> Domain.bdim -> Domain.t
-val do_clos : Domain.lvl -> Domain.clos -> Domain.t -> Domain.t
-val do_clos2 : Domain.lvl -> Domain.clos2 -> Domain.t -> Domain.t -> Domain.t
+val do_clos : Domain.lvl -> Domain.clos -> Domain.env_entry -> Domain.t
+val do_clos2 : Domain.lvl -> Domain.clos2 -> Domain.env_entry -> Domain.env_entry -> Domain.t
 val do_clos3 : Domain.lvl -> Domain.clos3 -> Domain.t -> Domain.t -> Domain.t -> Domain.t
 val do_closN : Domain.lvl -> Domain.closN -> Domain.t list -> Domain.t
-val do_closbclos : Domain.lvl -> Domain.clos2 -> Domain.t -> Domain.bdim -> Domain.t
-val do_bclosclos : Domain.lvl -> Domain.clos2 -> Domain.bdim -> Domain.t -> Domain.t
 val do_clos_extent : Domain.lvl -> Domain.closN -> Domain.t list -> Domain.t -> Domain.bdim -> Domain.t
 val do_consts : Domain.lvl -> Domain.clos -> int -> Domain.t list

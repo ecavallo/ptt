@@ -11,9 +11,7 @@ type env_entry =
   | Term of t
 and env = env_entry list
 [@@deriving show, eq]
-and clos =
-    Clos of {term : Syntax.t; env : env}
-  | ConstClos of t
+and clos = Clos of {term : Syntax.t; env : env}
 [@@deriving show, eq]
 and clos2 = Clos2 of {term : Syntax.t; env : env}
 [@@deriving show, eq]
@@ -84,17 +82,16 @@ let rec instantiate_entry r i = function
 and instantiate_env r i env =
   List.map (instantiate_entry r i) env
 
-and instantiate_clos r i = function
-  | Clos {term; env} -> Clos {term; env = instantiate_env r i env}
-  | ConstClos t -> ConstClos (instantiate r i t)
+and instantiate_clos r i (Clos {term; env}) =
+  Clos {term; env = instantiate_env r i env}
 
-and instantiate_clos2 r i (Clos2 {term; env = env}) =
+and instantiate_clos2 r i (Clos2 {term; env}) =
   Clos2 {term; env = instantiate_env r i env}
 
-and instantiate_clos3 r i (Clos3 {term; env = env}) =
+and instantiate_clos3 r i (Clos3 {term; env}) =
   Clos3 {term; env = instantiate_env r i env}
 
-and instantiate_closN r i (ClosN {term; env = env}) =
+and instantiate_closN r i (ClosN {term; env}) =
   ClosN {term; env = instantiate_env r i env}
 
 and instantiate r i = function

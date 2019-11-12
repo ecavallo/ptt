@@ -15,45 +15,33 @@ let eval_bdim r (env : D.env) =
 
 (* TODO organize these closure functions in a better way *)
 
-let rec do_bclos size clo r =
-  match clo with
-  | D.Clos {term; env} -> eval term (D.BDim r :: env) size
-  | D.ConstClos t -> t
+let rec do_bclos size (D.Clos {term; env}) r =
+  eval term (D.BDim r :: env) size
 
-and do_clos size clo a =
-  match clo with
-  | D.Clos {term; env} -> eval term (D.Term a :: env) size
-  | D.ConstClos t -> t
+and do_clos size (D.Clos {term; env}) a =
+  eval term (a :: env) size
 
 and do_clos2 size (D.Clos2 {term; env}) a1 a2 =
-  eval term (D.Term a2 :: D.Term a1 :: env) size
+  eval term (a2 :: a1 :: env) size
 
-and do_bclosclos size (D.Clos2 {term; env}) r a =
-  eval term (D.Term a :: D.BDim r :: env) size
+and do_clos3 size (D.Clos3 {term; env}) t1 t2 t3 =
+  eval term (D.Term t3 :: D.Term t2 :: D.Term t1 :: env) size
 
-and do_closbclos size (D.Clos2 {term; env}) a r =
-  eval term (D.BDim r :: D.Term a :: env) size
+and do_closN size (D.ClosN {term; env}) tN =
+  eval term (List.rev_append (List.map (fun t -> D.Term t) tN) env) size
 
-and do_clos3 size (D.Clos3 {term; env}) a1 a2 a3 =
-  eval term (D.Term a3 :: D.Term a2 :: D.Term a1 :: env) size
+and do_clos_extent size (D.ClosN {term; env}) tN t r =
+  eval term (D.BDim r :: D.Term t :: List.rev_append (List.map (fun t -> D.Term t) tN) env) size
 
-and do_closN size (D.ClosN {term; env}) aN =
-  eval term (List.rev_append (List.map (fun a -> D.Term a) aN) env) size
-
-and do_clos_extent size (D.ClosN {term; env}) aN a r =
-  eval term (D.BDim r :: D.Term a :: List.rev_append (List.map (fun a -> D.Term a) aN) env) size
-
-and do_consts size clo width =
-  match clo with
-  | D.Clos {term; env} -> List.init width (fun o -> eval term (D.BDim (D.Const o) :: env) size)
-  | D.ConstClos t -> List.init width (fun _ -> t)
+and do_consts size (D.Clos {term; env}) width =
+  List.init width (fun o -> eval term (D.BDim (D.Const o) :: env) size)
 
 and do_rec size tp zero suc n =
   match n with
   | D.Zero -> zero
-  | D.Suc n -> do_clos2 size suc n (do_rec size tp zero suc n)
+  | D.Suc n -> do_clos2 size suc (D.Term n) (D.Term (do_rec size tp zero suc n))
   | D.Neutral {term; _} ->
-    let final_tp = do_clos size tp n in
+    let final_tp = do_clos size tp (D.Term n) in
     D.Neutral {tp = final_tp; term = D.(NRec (tp, zero, suc) @: term)}
   | _ -> raise (Eval_failed "Not a number")
 
@@ -62,7 +50,7 @@ and do_if size mot tt ff b =
   | D.True -> tt
   | D.False -> ff
   | D.Neutral {term; _} ->
-    let final_tp = do_clos size mot b in
+    let final_tp = do_clos size mot (D.Term b) in
     D.Neutral {tp = final_tp; term = D.(If (mot, tt, ff) @: term)}
   | _ -> raise (Eval_failed "Not a number")
 
@@ -78,12 +66,12 @@ and do_snd size p =
   | D.Pair (_, p2) -> p2
   | D.Neutral {tp = D.Sg (_, clo); term} ->
     let fst = do_fst p in
-    D.Neutral {tp = do_clos size clo fst; term = D.(Snd @: term)}
+    D.Neutral {tp = do_clos size clo (D.Term fst); term = D.(Snd @: term)}
   | _ -> raise (Eval_failed "Couldn't snd argument in do_snd")
 
 and do_bapp size t r =
   match t with
-  | D.BLam bclo -> do_bclos size bclo r
+  | D.BLam bclo -> do_clos size bclo (D.BDim r)
   | D.Neutral {tp; term} ->
     begin
       match tp with
@@ -91,7 +79,7 @@ and do_bapp size t r =
          begin
            match r with
            | D.BVar i ->
-              let dst = do_bclos size dst r in
+              let dst = do_clos size dst (D.BDim r) in
               D.Neutral {tp = dst; term = D.(BApp i @: term)}
            | Const o -> List.nth ts o
          end
@@ -101,7 +89,7 @@ and do_bapp size t r =
 
 and do_j size mot refl eq =
   match eq with
-  | D.Refl t -> do_clos size refl t
+  | D.Refl t -> do_clos size refl (D.Term t)
   | D.Neutral {tp; term = term} ->
     begin
       match tp with
@@ -115,12 +103,12 @@ and do_j size mot refl eq =
 
 and do_ap size f a =
   match f with
-  | D.Lam clos -> do_clos size clos a
+  | D.Lam clos -> do_clos size clos (D.Term a)
   | D.Neutral {tp; term} ->
     begin
       match tp with
       | D.Pi (src, dst) ->
-        let dst = do_clos size dst a in
+        let dst = do_clos size dst (D.Term a) in
         D.Neutral {tp = dst; term = D.(Ap (D.Normal {tp = src; term = a}) @: term)}
       | _ -> raise (Eval_failed "Not a Pi in do_ap")
     end
@@ -129,15 +117,15 @@ and do_ap size f a =
 and do_ungel size mot gel clo case =
   begin
     match gel with
-    | D.Engel (_, _, t) -> do_clos size case t
+    | D.Engel (_, _, t) -> do_clos size case (D.Term t)
     | D.Neutral {tp; term} ->
       begin
         match tp with
         | D.Gel (_, endtps, rel) ->
           let ends =
-            List.mapi (fun o tp -> D.Normal {tp; term = do_bclos size clo (D.Const o)}) endtps
+            List.mapi (fun o tp -> D.Normal {tp; term = do_clos size clo (D.BDim (D.Const o))}) endtps
           in
-          let final_tp = do_clos size mot (D.BLam clo) in
+          let final_tp = do_clos size mot (D.Term (D.BLam clo)) in
           D.Neutral {tp = final_tp; term = D.(Ungel (ends, rel, mot, size, clo, case) @: term)}
         | _ -> raise (Eval_failed "Not a Gel in do_ungel")
       end
