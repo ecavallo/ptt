@@ -240,28 +240,24 @@ and read_back_ne env size (h, s) =
             tp = E.do_clos3 (size + 1) mot refl_arg refl_arg (D.Refl refl_arg)}) in
     Syn.J (mot_syn, refl_syn, read_back_ne env size (h, s))
   | D.Ungel (ends, rel, mot, i, _, case) :: s ->
-    let width = List.length ends in
     let sem_env = env_to_sem_env env in
+    let (_, dim_env) = mk_bvar env size in
     let end_tps = List.map (function (D.Normal {tp; _}) -> tp) ends in
     let end_tms = List.map (function (D.Normal {term; _}) -> term) ends in
-    let (end_args, _) = mk_vars end_tps env size in
-    let applied_rel = E.do_closN size rel end_args in
-    let mot_inner_env =
-      D.Term applied_rel ::
-      List.rev_append (List.map (fun t -> D.Term t) end_tps) sem_env in
-    let mot_inner_tp =
-      Syn.Gel (Syn.BVar 0, List.init width (fun o -> Syn.Var (o + 2)), Syn.Var (width + 1)) in
+    let mot_inner_tp = read_back_tp dim_env (size + 1) (D.Gel (size, end_tps, rel)) in
     let (mot_arg, mot_env) =
-      mk_var (D.Bridge (D.Clos {term = mot_inner_tp; env = mot_inner_env}, end_tms)) env size in
+      mk_var (D.Bridge (D.Clos {term = mot_inner_tp; env = sem_env}, end_tms)) env size in
     let mot' = read_back_tp mot_env (size + 1) (E.do_clos (size + 1) mot mot_arg) in
-    let wit_rel = E.do_closN size rel end_tms in
-    let (wit_arg, wit_env) = mk_var wit_rel env size in
-    let engel_inner_env =
-      D.Term wit_arg ::
-      List.rev_append (List.map (fun t -> D.Term t) end_tms) sem_env in
-    let engel_inner_tm =
-      Syn.Engel (Syn.BVar 0, List.init width (fun o -> Syn.Var (o + 2)), Syn.Var 1) in
-    let gel_term = D.BLam (D.Clos {term = engel_inner_tm; env = engel_inner_env}) in
+    let applied_rel = E.do_closN size rel end_tms in
+    let (wit_arg, wit_env) = mk_var applied_rel env size in
+    let (_, gel_env) = mk_bvar wit_env (size + 1) in
+    let syn_engel =
+      read_back_nf gel_env
+        (size + 2)
+        (D.Normal
+           {tp = D.Gel (size + 1, end_tps, rel);
+            term = D.Engel (size + 1, end_tms, wit_arg)}) in
+    let gel_term = D.BLam (D.Clos {term = syn_engel; env = env_to_sem_env wit_env}) in
     let case' = read_back_nf
         wit_env
         (size + 1)
@@ -463,30 +459,26 @@ and check_ne env size (h1, s1) (h2, s2) =
     check_ne env size (h1, s1) (h2, s2)
   | D.Ungel (ends1, rel1, mot1, i1, _, case1) :: s1,
     D.Ungel (_, _, mot2, i2, _, case2) :: s2 ->
-    let width = List.length ends1 in
     let sem_env = env_to_sem_env env in
+    let (_, dim_env) = mk_bvar env size in
     let end_tps = List.map (function (D.Normal {tp; _}) -> tp) ends1 in
     let end_tms = List.map (function (D.Normal {term; _}) -> term) ends1 in
-    let (end_args, _) = mk_vars end_tps env size in
-    let applied_rel = E.do_closN size rel1 end_args in
-    let mot_inner_env =
-      D.Term applied_rel ::
-      List.rev_append (List.map (fun t -> D.Term t) end_tps) sem_env in
-    let mot_inner_tp =
-      Syn.Gel (Syn.BVar 0, List.init width (fun o -> Syn.Var (o + 2)), Syn.Var (width + 1)) in
+    let mot_inner_tp = read_back_tp dim_env (size + 1) (D.Gel (size, end_tps, rel1)) in
     let (mot_arg, mot_env) =
-      mk_var (D.Bridge (D.Clos {term = mot_inner_tp; env = mot_inner_env}, end_tms)) env size in
+      mk_var (D.Bridge (D.Clos {term = mot_inner_tp; env = sem_env}, end_tms)) env size in
     check_tp ~subtype:false mot_env (size + 1)
       (E.do_clos (size + 1) mot1 mot_arg)
       (E.do_clos (size + 1) mot2 mot_arg) &&
     let applied_rel = E.do_closN size rel1 end_tms in
     let (wit_arg, wit_env) = mk_var applied_rel env size in
-    let engel_inner_env =
-      D.Term wit_arg ::
-      List.rev_append (List.map (fun t -> D.Term t) end_tms) sem_env in
-    let engel_inner_tm =
-      Syn.Engel (Syn.BVar 0, List.init width (fun o -> Syn.Var (o + 2)), Syn.Var 1) in
-    let gel_term = D.BLam (D.Clos {term = engel_inner_tm; env = engel_inner_env}) in
+    let (_, gel_env) = mk_bvar wit_env (size + 1) in
+    let syn_engel =
+      read_back_nf gel_env
+        (size + 2)
+        (D.Normal
+           {tp = D.Gel (size + 1, end_tps, rel1);
+            term = D.Engel (size + 1, end_tms, wit_arg)}) in
+    let gel_term = D.BLam (D.Clos {term = syn_engel; env = env_to_sem_env wit_env}) in
     check_nf wit_env (size + 1)
       (D.Normal
          {term = E.do_clos (size + 1) case1 wit_arg;
