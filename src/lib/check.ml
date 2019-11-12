@@ -260,24 +260,18 @@ and check_inert ~env ~size ~term ~tp =
       | t -> tp_error (Expecting_universe t)
     end
   | Engel (r, ts, term) ->
-    let width = List.length ts in
-    check_bdim ~env ~bdim:r ~width;
     begin
-      match r with
-      | BVar i ->
-        begin
-          match tp with
-          | Gel (j, ends, rel) ->
-            let sem_env = env_to_sem_env env in
-            assert_bdim_equal (E.eval_bdim (Syn.BVar i) sem_env) (D.BVar j);
-            let res_env = restrict_env (Syn.BVar i) env in
-            List.iter2 (fun term tp -> check ~env:res_env ~size ~term ~tp) ts ends;
-            let ts' = List.map (fun t -> E.eval t sem_env size) ts in
-            check ~env:res_env ~size ~term ~tp:(E.do_closN size rel ts')
-          | t -> tp_error (Misc ("Expecting Gel but found\n" ^ D.show t))
-        end
-      | Const _ ->
-        tp_error (Misc ("Cannot check Engel at an endpoint"))
+      match tp with
+      | Gel (j, ends, rel) ->
+        let width = List.length ts in
+        check_bdim ~env ~bdim:r ~width;
+        let sem_env = env_to_sem_env env in
+        assert_bdim_equal (E.eval_bdim r sem_env) (D.BVar j);
+        let res_env = restrict_env r env in
+        List.iter2 (fun term tp -> check ~env:res_env ~size ~term ~tp) ts ends;
+        let ts' = List.map (fun t -> E.eval t sem_env size) ts in
+        check ~env:res_env ~size ~term ~tp:(E.do_closN size rel ts')
+      | t -> tp_error (Misc ("Expecting Gel but found\n" ^ D.show t))
     end
   | Uni i ->
     begin
