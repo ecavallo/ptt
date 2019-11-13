@@ -57,7 +57,7 @@ and cell =
   | NRec of clos * t * clos2
   | If of clos * t * t
   | J of clos3 * clos * t * t * t
-  | Ungel of nf list * closN * clos * (* BBINDER *) lvl * clos * clos
+  | Ungel of nf list * closN * clos * (* BBINDER *) lvl * clos
 [@@deriving show, eq]
 and spine = cell list
 [@@deriving show, eq]
@@ -162,7 +162,7 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
          instantiate r i left,
          instantiate r i right)
       @: go r i (h, s)
-    | Ungel (ends, rel, mot, j, clo, case) :: s ->
+    | Ungel (ends, rel, mot, j, case) :: s ->
       let j' = if i = j then j else max (r + 1) j in
       let ne = if i = j then (h, s) else go r i (go j' j (h, s))
       in
@@ -171,7 +171,6 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
          instantiate_closN r i rel,
          instantiate_clos r i mot,
          j',
-         instantiate_clos r i clo,
          instantiate_clos r i case)
       @: ne
   in

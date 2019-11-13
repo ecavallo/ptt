@@ -120,19 +120,18 @@ and do_ap size f a =
     end
   | _ -> raise (Eval_failed "Not a function in do_ap")
 
-and do_ungel size mot gel clo case =
+and do_ungel size ends mot gel case =
   begin
     match gel with
     | D.Engel (_, _, t) -> do_clos size case (D.Tm t)
     | D.Neutral {tp; term} ->
       begin
         match tp with
-        | D.Gel (_, endtps, rel) ->
-          let ends =
-            List.mapi (fun o tp -> D.Normal {tp; term = do_clos size clo (D.Dim (D.Const o))}) endtps
-          in
-          let final_tp = do_clos size mot (D.Tm (D.BLam clo)) in
-          D.Neutral {tp = final_tp; term = D.(Ungel (ends, rel, mot, size, clo, case) @: term)}
+        | D.Gel (_, end_tps, rel) ->
+          let end_nos = List.map2 (fun tp term -> (D.Normal {tp; term})) end_tps ends in
+          let final_tp =
+            do_clos size mot (D.Tm (D.BLam (D.Pseudo {var = size; term = gel; ends}))) in
+          D.Neutral {tp = final_tp; term = D.(Ungel (end_nos, rel, mot, size, case) @: term)}
         | _ -> raise (Eval_failed "Not a Gel in do_ungel")
       end
     | _ -> raise (Eval_failed "Not a gel or neutral in do_ungel")
@@ -220,10 +219,10 @@ and eval t (env : D.env) size =
       | D.DVar i -> D.Engel (i, List.map (fun t -> eval t env size) ts, eval t env size)
       | Const o -> eval (List.nth ts o) env size
     end
-  | Syn.Ungel (_, mot, gel, case) ->
+  | Syn.Ungel (width, mot, gel, case) ->
     do_ungel
       size
+      (do_consts size (D.Clos {term = gel; env}) width)
       (D.Clos {term = mot; env})
       (eval gel (D.Dim (D.DVar size) :: env) (size + 1))
-      (D.Clos {term = gel; env})
       (D.Clos {term = case; env})

@@ -71,16 +71,17 @@ and reduce_extent env size es =
   let rec go env size (e, s) =
     match s with
     | [] -> reduce_extent_head env size e
-    | D.Ap (Normal {term;_}) :: s -> E.do_ap size (go env size (e, s)) term
+    | D.Ap (Normal {term; _}) :: s -> E.do_ap size (go env size (e, s)) term
     | D.NRec (tp, zero, suc) :: s -> E.do_rec size tp zero suc (go env size (e, s))
     | D.If (mot, tt, ff) :: s -> E.do_if size mot tt ff (go env size (e, s))
     | D.Fst :: s -> E.do_fst (go env size (e, s))
     | D.Snd :: s -> E.do_snd size (go env size (e, s))
     | D.BApp i :: s -> E.do_bapp size (go env size (e, s)) (D.DVar i)
     | D.J (mot, refl, _, _, _) :: s -> E.do_j size mot refl (go env size (e, s))
-    | D.Ungel (_, _, mot, i, clo, case) :: s ->
+    | D.Ungel (ends, _, mot, i, case) :: s ->
+      let end_tms = List.map (fun (D.Normal {term; _}) -> term) ends in
       let es' = D.instantiate_spine D.instantiate_extent_head size i (e, s) in
-      E.do_ungel size mot (go (DVar size :: env) (size + 1) es') clo case
+      E.do_ungel size end_tms mot (go (DVar size :: env) (size + 1) es') case
   in
   try
     Some (go env size es)
@@ -244,7 +245,7 @@ and read_back_ne env size (h, s) =
            {term = E.do_clos (size + 1) refl (D.Tm refl_arg);
             tp = E.do_clos3 (size + 1) mot refl_arg refl_arg (D.Refl refl_arg)}) in
     Syn.J (mot_syn, refl_syn, read_back_ne env size (h, s))
-  | D.Ungel (ends, rel, mot, i, _, case) :: s ->
+  | D.Ungel (ends, rel, mot, i, case) :: s ->
     let end_tps = List.map (function (D.Normal {tp; _}) -> tp) ends in
     let end_tms = List.map (function (D.Normal {term; _}) -> term) ends in
     let mot_hyp =
@@ -454,8 +455,8 @@ and check_ne env size (h1, s1) (h2, s2) =
          {term = E.do_clos (size + 1) refl2 (D.Tm refl_arg);
           tp = E.do_clos3 (size + 1) mot2 refl_arg refl_arg (D.Refl refl_arg)}) &&
     check_ne env size (h1, s1) (h2, s2)
-  | D.Ungel (ends1, rel1, mot1, i1, _, case1) :: s1,
-    D.Ungel (_, _, mot2, i2, _, case2) :: s2 ->
+  | D.Ungel (ends1, rel1, mot1, i1, case1) :: s1,
+    D.Ungel (_, _, mot2, i2, case2) :: s2 ->
     let end_tps = List.map (function (D.Normal {tp; _}) -> tp) ends1 in
     let end_tms = List.map (function (D.Normal {term; _}) -> term) ends1 in
     let mot_hyp =
