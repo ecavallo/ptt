@@ -55,7 +55,7 @@ let rec extent_env env = function
   | name :: names -> extent_env (Term name :: env) names
   | _ -> raise (Check.Type_error (Check.Misc ("Bad length in extent")))
 
-let bbind env = function
+let bind_dim env = function
   | CS.DVar i -> S.DVar (find_idx i env)
   | CS.Const o -> S.Const o
 
@@ -128,7 +128,7 @@ let rec bind env = function
        endcase;
        varcase = BinderN {names; body = var_body}} ->
     S.Extent
-      (bbind env dim,
+      (bind_dim env dim,
        bind (Dim dom_dim :: env) dom_body,
        bind (Term mot_dom :: Dim mot_dim :: env) mot_body,
        bind env ctx,
@@ -136,11 +136,11 @@ let rec bind env = function
        bind (extent_env env names) var_body)
   | CS.Gel (r, ends, BinderN {names; body}) ->
     S.Gel
-      (bbind env r,
+      (bind_dim env r,
        List.map (bind env) ends,
        bind (List.rev_append (List.map (fun t -> Term t) names) env) body)
-  | CS.Engel (r, ts, t) ->
-    S.Engel (bbind env r, List.map (bind env) ts, bind env t)
+  | CS.Engel (i, ts, t) ->
+    S.Engel (find_idx i env, List.map (bind env) ts, bind env t)
   | CS.Ungel
       {width;
        mot = Binder {name = mot_name; body = mot_body};
@@ -155,7 +155,7 @@ let rec bind env = function
 
 and bind_spine env = function
   | CS.Term t -> fun f -> S.Ap (f, bind env t)
-  | CS.Dim b -> fun f -> S.BApp (f, bbind env b)
+  | CS.Dim b -> fun f -> S.BApp (f, bind_dim env b)
 
 let process_decl (Env {check_env; bindings})  = function
   | CS.Def {name; def; tp} ->

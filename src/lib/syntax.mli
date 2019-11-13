@@ -16,7 +16,7 @@ type t =
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
   | Bridge of (* BBINDS *) t * t list | BApp of t * dim | BLam of (* BBINDS *) t
   | Extent of dim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS *) t list * (* BINDS & BBINDS *) t
-  | Gel of dim * t list * (* BINDS n *) t | Engel of dim * t list * t
+  | Gel of dim * t list * (* BINDS n *) t | Engel of idx * t list * t
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
   | Uni of uni_level
 

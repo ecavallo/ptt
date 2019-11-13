@@ -39,7 +39,7 @@ and t =
   | BLam of bindern
   | Extent of {dim : dim; dom : binder; mot : binder2; ctx : t; endcase : binder list; varcase : bindern}
   | Gel of dim * t list * bindern
-  | Engel of dim * t list * t
+  | Engel of ident * t list * t
   | Ungel of {width : int; mot : binder; gel : binder; case : binder}
   | Uni of uni_level
 

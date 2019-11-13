@@ -149,10 +149,10 @@ term:
     { Gel (dim, endpoints, BinderN {names; body}) }
   | GEL; dim = dim; body = atomic
     { Gel (dim, [], BinderN {names = []; body}) }
-  | ENGEL; dim = dim; endpoints = endpoints; t = atomic
-    { Engel (dim, endpoints, t) }
-  | ENGEL; dim = dim; t = atomic
-    { Engel (dim, [], t) }
+  | ENGEL; name = name; endpoints = endpoints; t = atomic
+    { Engel (name, endpoints, t) }
+  | ENGEL; name = name; t = atomic
+    { Engel (name, [], t) }
   | UNGEL; gel_name = name; COLON; width = NUMERAL; RIGHT_ARROW; gel_body = term; AT;
     mot_name = name; RIGHT_ARROW; mot_body = term; WITH
     PIPE; ENGEL; case_name = name; RIGHT_ARROW; case_body = term;

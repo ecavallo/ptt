@@ -259,10 +259,11 @@ and check_inert ~env ~size ~term ~tp =
         check ~env:rel_env ~size:(size + width) ~term:rel ~tp;
       | t -> tp_error (Expecting_universe t)
     end
-  | Engel (r, ts, term) ->
+  | Engel (i, ts, term) ->
     begin
       match tp with
       | Gel (j, ends, rel) ->
+        let r = Syn.DVar i in
         let width = List.length ts in
         check_dim ~env ~dim:r ~width;
         let sem_env = env_to_sem_env env in

@@ -129,7 +129,7 @@ and read_back_nf env size nf =
     let i' = read_back_level env i in
     let applied_rel = E.do_closN size rel ts in
     Syn.Engel
-      (Syn.DVar i',
+      (i',
        List.map2 (fun tp term -> read_back_nf env size (D.Normal {tp; term})) endtps ts,
        read_back_nf env size (D.Normal {tp = applied_rel; term = t}))
   (* Types *)

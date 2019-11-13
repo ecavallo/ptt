@@ -20,7 +20,7 @@ type t =
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
   | Bridge of (* BBINDS *) t * t list | BApp of t * dim | BLam of (* BBINDS *) t
   | Extent of dim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS *) t list * (* BINDS n & BBINDS *) t
-  | Gel of dim * t list * (* BINDS n *) t | Engel of dim * t list * t
+  | Gel of dim * t list * (* BINDS n *) t | Engel of idx * t list * t
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
   | Uni of uni_level
 [@@deriving eq]
@@ -28,11 +28,13 @@ type t =
 exception Indirect_use
 
 let unsubst_bvar i t =
-  let bgo depth = function
-    | DVar j ->
-      if j < depth then DVar j
-      else if j = i + depth then DVar depth
-      else DVar (j + 1)
+  let go_dvar depth j =
+      if j < depth then j
+      else if j = i + depth then depth
+      else j + 1
+  in
+  let go_dim depth = function
+    | DVar j -> DVar (go_dvar depth j)
     | Const o -> Const o
   in
   let rec go depth = function
@@ -67,17 +69,17 @@ let unsubst_bvar i t =
       J (go (depth + 3) mot, go (depth + 1) refl, go depth eq)
     | Bridge (t, ts) -> Bridge (go (depth + 1) t, List.map (go depth) ts)
     | BLam t -> BLam (go (depth + 1) t)
-    | BApp (t, r) -> BApp (go depth t, bgo depth r)
+    | BApp (t, r) -> BApp (go depth t, go_dim depth r)
     | Extent (r, dom, mot, ctx, endcase, varcase) ->
       Extent
-        (bgo depth r,
+        (go_dim depth r,
          go (depth + 1) dom,
          go (depth + 2) mot,
          go depth ctx,
          List.map (go (depth + 1)) endcase,
          go (depth + List.length endcase + 2) varcase)
-    | Gel (r, ts, t) -> Gel (bgo depth r, List.map (go depth) ts, go (depth + List.length ts) t)
-    | Engel (r, ts, t) -> Engel (bgo depth r, List.map (go depth) ts, go depth t)
+    | Gel (r, ts, t) -> Gel (go_dim depth r, List.map (go depth) ts, go (depth + List.length ts) t)
+    | Engel (i, ts, t) -> Engel (go_dvar depth i, List.map (go depth) ts, go depth t)
     | Ungel (width, mot, gel, case) ->
       Ungel (width, go (depth + 1) mot, go (depth + 1) gel, go (depth + 1) case)
     | Uni j -> Uni j
@@ -164,8 +166,8 @@ let rec pp fmt =
      pp_dim r pp dom pp mot pp ctx pp_list endcase pp varcase;
   | Gel (r, ts, t) ->
     fprintf fmt "Gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp_dim r pp_list ts pp t;
-  | Engel (r, ts, t) ->
-    fprintf fmt "gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp_dim r pp_list ts pp t;
+  | Engel (i, ts, t) ->
+    fprintf fmt "gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp_dim (DVar i) pp_list ts pp t;
   | Ungel (width, mot, gel, case) ->
     fprintf fmt "ungel(@[<hov>@[<hov>%d@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" width pp mot pp gel pp case
   | Uni i -> fprintf fmt "U<%d>" i

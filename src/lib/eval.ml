@@ -212,11 +212,11 @@ and eval t (env : D.env) size =
       | D.DVar i -> D.Gel (i, List.map (fun t -> eval t env size) endtps, D.ClosN {term = rel; env})
       | D.Const o -> eval (List.nth endtps o) env size
     end
-  | Syn.Engel (r, ts, t) ->
+  | Syn.Engel (i, ts, t) ->
     begin
-      let r' = eval_dim r env in
+      let r' = eval_dim (Syn.DVar i) env in
       match r' with
-      | D.DVar i -> D.Engel (i, List.map (fun t -> eval t env size) ts, eval t env size)
+      | D.DVar i' -> D.Engel (i', List.map (fun t -> eval t env size) ts, eval t env size)
       | Const o -> eval (List.nth ts o) env size
     end
   | Syn.Ungel (width, mot, gel, case) ->
