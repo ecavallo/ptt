@@ -63,6 +63,9 @@ and cell =
 and quasi_cell = 
   | PiDom
   | PiCod of t
+  | IdTp
+  | IdLeft
+  | IdRight
 [@@deriving show, eq]
 and spine = cell list
 [@@deriving show, eq]
@@ -186,6 +189,9 @@ and instantiate_quasi_cell r i =
   function 
   | PiDom -> PiDom 
   | PiCod v -> PiCod (instantiate r i v)
+  | IdLeft -> IdLeft
+  | IdRight -> IdRight
+  | IdTp -> IdTp
 
 and instantiate_ne r i ne =
   let headf r i = function

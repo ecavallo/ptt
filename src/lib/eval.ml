@@ -97,31 +97,22 @@ and do_j size mot refl eq =
   match eq with
   | D.Refl t -> do_clos size refl (D.Tm t)
   | D.Neutral {tp; term = term} ->
-    begin
-      match tp with
-      | D.Id (tp, left, right) ->
-        D.Neutral
-          {tp = do_clos3 size mot left right eq;
-           term = D.(J (mot, refl, tp, left, right) @: term)}
-      | _ -> raise (Eval_failed "Not an Id in do_j")
-    end
+    let tp = do_id_tp tp in
+    let left = do_id_left tp in
+    let right = do_id_right tp in
+    D.Neutral
+      {tp = do_clos3 size mot left right eq;
+       term = D.(J (mot, refl, tp, left, right) @: term)}
   | _ -> raise (Eval_failed "Not a refl or neutral in do_j")
 
 and do_ap size f a =
   match f with
   | D.Lam clos -> do_clos size clos (D.Tm a)
   | D.Neutral {tp; term} ->
-    let src, dst = do_inst_pi_type size tp a in 
+    let src = do_pi_dom tp in
+    let dst = do_pi_cod size tp a in
     D.Neutral {tp = dst; term = D.(Ap (D.Normal {tp = src; term = a}) @: term)}
   | _ -> raise (Eval_failed "Not a function in do_ap")
-
-and do_inst_pi_type size f a = 
-  match f with 
-  | D.Pi (dom,dst) -> dom, do_clos size dst (D.Tm a)
-  | D.Neutral {tp; term} ->
-    D.Neutral {tp; term = D.(Quasi PiDom @: term)}, D.Neutral {tp; term = D.(Quasi (PiCod a) @: term)}
-  | _ -> raise (Eval_failed "Not something that can become a pi type")
-
 
 and do_pi_dom f = 
   match f with 
@@ -129,6 +120,30 @@ and do_pi_dom f =
   | D.Neutral {tp; term} ->
     D.Neutral {tp; term = D.(Quasi PiDom @: term)}
   | _ -> raise (Eval_failed "Not something that can become a pi type")
+
+and do_id_tp f = 
+  match f with 
+  | D.Id (tp, _, _) -> tp
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi IdTp @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a identity type")
+
+
+and do_id_left f = 
+  match f with 
+  | D.Id (_, l, _) -> l
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp = D.(Neutral {tp; term = Quasi IdTp @: term}); term = D.(Quasi IdLeft @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a identity type")
+
+
+and do_id_right f = 
+  match f with 
+  | D.Id (_, _, r) -> r
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp = D.(Neutral {tp; term = Quasi IdTp @: term}); term = D.(Quasi IdRight @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a identity type")
+
 
 and do_pi_cod size f a = 
   match f with 

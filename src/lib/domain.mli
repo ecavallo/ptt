@@ -52,6 +52,9 @@ and cell =
 and quasi_cell = 
   | PiDom
   | PiCod of t
+  | IdTp
+  | IdLeft
+  | IdRight
 and spine = cell list
 and ne = head * spine
 and nf =
