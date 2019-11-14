@@ -1,0 +1,9 @@
+let working : (A : U<0>) (B : U<0>) ->
+ [x] (extent x of triv in _ -> unit at _ _ -> U<0> with | _ _ -> A -> B) -> A -> B {}
+ =
+ fun A B -> bri x -> fun f -> f
+
+let broken : (A : U<0>) (B : U<0>) ->
+ [x] (extent x of triv in _ -> unit at _ _ -> U<0> with | _ _ -> A -> B) -> A -> B {}
+ =
+ fun A B -> bri x -> fun f a -> f a
