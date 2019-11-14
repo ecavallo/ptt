@@ -92,6 +92,8 @@ and reduce_extent env size es =
         | D.IdLeft -> E.do_id_left (go env size (e,s))
         | D.IdRight -> E.do_id_right (go env size (e,s))
         | D.IdTp -> E.do_id_tp (go env size (e,s))
+        | D.BridgeCod r -> E.do_bridge_cod size (go env size (e,s)) r
+        | D.BridgeEndpoint (r,o) -> E.do_bridge_endpoint (go env size (e,s)) r o
       end
   in
   try

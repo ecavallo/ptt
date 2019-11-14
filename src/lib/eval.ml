@@ -79,17 +79,13 @@ and do_bapp size t r =
   match t with
   | D.BLam bclo -> do_clos size bclo (D.Dim r)
   | D.Neutral {tp; term} ->
-    begin
-      match tp with
-      | D.Bridge (dst, ts) ->
-        begin
-          match r with
-          | D.DVar i ->
-            let dst = do_clos size dst (D.Dim r) in
-            D.Neutral {tp = dst; term = D.(BApp i @: term)}
-          | Const o -> List.nth ts o
-        end
-      | _ -> raise (Eval_failed "Not a bridge in do_bapp")
+    begin 
+      match r with 
+      | D.DVar i -> 
+        let dst = do_bridge_cod size tp r in 
+        D.Neutral {tp = dst; term = D.(BApp i @: term)}
+      | Const o -> 
+        do_bridge_endpoint tp r o
     end
   | _ -> raise (Eval_failed "Not a bridge or neutral in bapp")
 
@@ -115,28 +111,45 @@ and do_ap size f a =
   | _ -> raise (Eval_failed "Not a function in do_ap")
 
 
-and do_id_tp f = 
-  match f with 
+and do_id_tp tp = 
+  match tp with 
   | D.Id (tp, _, _) -> tp
   | D.Neutral {tp; term} ->
     D.Neutral {tp; term = D.(Quasi IdTp @: term)}
   | _ -> raise (Eval_failed "Not something that can become a identity type")
 
 
-and do_id_left f = 
-  match f with 
+and do_id_left tp = 
+  match tp with 
   | D.Id (_, l, _) -> l
   | D.Neutral {tp; term} ->
     D.Neutral {tp = D.(Neutral {tp; term = Quasi IdTp @: term}); term = D.(Quasi IdLeft @: term)}
   | _ -> raise (Eval_failed "Not something that can become a identity type")
 
 
-and do_id_right f = 
-  match f with 
+and do_id_right tp = 
+  match tp with 
   | D.Id (_, _, r) -> r
   | D.Neutral {tp; term} ->
     D.Neutral {tp = D.(Neutral {tp; term = Quasi IdTp @: term}); term = D.(Quasi IdRight @: term)}
   | _ -> raise (Eval_failed "Not something that can become a identity type")
+
+
+and do_bridge_cod size tp s =
+  match tp with
+  | D.Bridge (clos, _) ->
+    do_clos size clos (D.Dim s)
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi (BridgeCod s) @: term)}
+  | _ -> raise (Eval_failed "Not something that can be come a bridge type")
+
+and do_bridge_endpoint tp s o =
+  match tp with
+  | D.Bridge (_, ts) ->
+    List.nth ts o
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp = D.Neutral {tp; term = D.(Quasi (BridgeCod s) @: term)}; term = D.(Quasi (BridgeEndpoint (s,o)) @: term)}
+  | _ -> raise (Eval_failed "Not something that can be come a bridge type")
 
 and do_pi_dom f = 
   match f with 
