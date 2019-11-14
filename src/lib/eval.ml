@@ -93,12 +93,12 @@ and do_j size mot refl eq =
   match eq with
   | D.Refl t -> do_clos size refl (D.Tm t)
   | D.Neutral {tp; term = term} ->
-    let tp = do_id_tp tp in
+    let dom = do_id_tp tp in
     let left = do_id_left tp in
     let right = do_id_right tp in
     D.Neutral
       {tp = do_clos3 size mot left right eq;
-       term = D.(J (mot, refl, tp, left, right) @: term)}
+       term = D.(J (mot, refl, dom, left, right) @: term)}
   | _ -> raise (Eval_failed "Not a refl or neutral in do_j")
 
 and do_ap size f a =
