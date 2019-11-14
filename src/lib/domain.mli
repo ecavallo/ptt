@@ -48,6 +48,8 @@ and cell =
   | If of clos * t * t
   | J of clos3 * clos * t * t * t
   | Ungel of nf list * closN * clos * (* BBINDER *) lvl * clos
+  | Quasi of quasi_cell
+and quasi_cell = 
   | PiDom
   | PiCod of t
 and spine = cell list

@@ -119,7 +119,7 @@ and do_inst_pi_type size f a =
   match f with 
   | D.Pi (dom,dst) -> dom, do_clos size dst (D.Tm a)
   | D.Neutral {tp; term} ->
-    D.Neutral {tp; term = D.(PiDom @: term)}, D.Neutral {tp; term = D.(PiCod a @: term)}
+    D.Neutral {tp; term = D.(Quasi PiDom @: term)}, D.Neutral {tp; term = D.(Quasi (PiCod a) @: term)}
   | _ -> raise (Eval_failed "Not something that can become a pi type")
 
 
@@ -127,14 +127,14 @@ and do_pi_dom f =
   match f with 
   | D.Pi (tp, _) -> tp
   | D.Neutral {tp; term} ->
-    D.Neutral {tp; term = D.(PiDom @: term)}
+    D.Neutral {tp; term = D.(Quasi PiDom @: term)}
   | _ -> raise (Eval_failed "Not something that can become a pi type")
 
 and do_pi_cod size f a = 
   match f with 
   | D.Pi (_,dst) -> do_clos size dst (D.Tm a)
   | D.Neutral {tp; term} ->
-    D.Neutral {tp; term = D.(PiCod a @: term)}
+    D.Neutral {tp; term = D.(Quasi (PiCod a) @: term)}
   | _ -> raise (Eval_failed "Not something that can become a pi type")
 
 

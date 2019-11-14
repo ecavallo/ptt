@@ -58,6 +58,9 @@ and cell =
   | If of clos * t * t
   | J of clos3 * clos * t * t * t
   | Ungel of nf list * closN * clos * (* BBINDER *) lvl * clos
+  | Quasi of quasi_cell
+[@@deriving show, eq]
+and quasi_cell = 
   | PiDom
   | PiCod of t
 [@@deriving show, eq]
@@ -175,10 +178,14 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
          j',
          instantiate_clos r i case)
       @: ne
-    | PiDom :: s -> PiDom @: go r i (h, s)
-    | PiCod v :: s -> PiCod (instantiate r i v) @: go r i (h, s)
+    | Quasi q :: s -> Quasi (instantiate_quasi_cell r i q) @: go r i (h, s)
   in
   go
+
+and instantiate_quasi_cell r i =
+  function 
+  | PiDom -> PiDom 
+  | PiCod v -> PiCod (instantiate r i v)
 
 and instantiate_ne r i ne =
   let headf r i = function

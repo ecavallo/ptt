@@ -82,8 +82,12 @@ and reduce_extent env size es =
       let end_tms = List.map (fun (D.Normal {term; _}) -> term) ends in
       let es' = D.instantiate_spine D.instantiate_extent_head size i (e, s) in
       E.do_ungel size end_tms mot (go (DVar size :: env) (size + 1) es') case
-    | D.PiDom :: s -> E.do_pi_dom (go env size (e,s))
-    | D.PiCod a :: s -> E.do_pi_cod size (go env size (e,s)) a
+    | D.Quasi q :: s ->
+      begin
+        match q with 
+        | D.PiDom -> E.do_pi_dom (go env size (e,s))
+        | D.PiCod a -> E.do_pi_cod size (go env size (e,s)) a
+      end
   in
   try
     Some (go env size es)
@@ -267,11 +271,8 @@ and read_back_ne env size (h, s) =
             tp = E.do_clos (size + 1) mot (D.Tm gel_term)}) in
     let ne' = D.instantiate_ne size i (h, s) in
     Syn.Ungel (List.length ends, mot', read_back_ne (DVar size :: env) (size + 1) ne', case')
-  | D.PiDom :: _ ->
+  | D.Quasi _ :: _ ->
     failwith "Invariant: this can never happen"
-  | D.PiCod _ :: _ ->
-    failwith "Invariant: this can never happen"
-
 
 
 and read_back_extent_head env size ({var = i; dom; mot; ctx; endcase; varcase} : D.extent_head) =
