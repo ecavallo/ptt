@@ -63,16 +63,16 @@ and do_if size mot tt ff b =
 and do_fst p =
   match p with
   | D.Pair (p1, _) -> p1
-  | D.Neutral {tp = D.Sg (t, _); term} ->
-    D.Neutral {tp = t; term = D.(Fst @: term)}
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp = do_sg_dom tp; term = D.(Fst @: term)}
   | _ -> raise (Eval_failed "Couldn't fst argument in do_fst")
 
 and do_snd size p =
   match p with
   | D.Pair (_, p2) -> p2
-  | D.Neutral {tp = D.Sg (_, clo); term} ->
+  | D.Neutral {tp; term} ->
     let fst = do_fst p in
-    D.Neutral {tp = do_clos size clo (D.Tm fst); term = D.(Snd @: term)}
+    D.Neutral {tp = do_pi_cod size tp fst; term = D.(Snd @: term)}
   | _ -> raise (Eval_failed "Couldn't snd argument in do_snd")
 
 and do_bapp size t r =
@@ -114,12 +114,6 @@ and do_ap size f a =
     D.Neutral {tp = dst; term = D.(Ap (D.Normal {tp = src; term = a}) @: term)}
   | _ -> raise (Eval_failed "Not a function in do_ap")
 
-and do_pi_dom f = 
-  match f with 
-  | D.Pi (tp, _) -> tp
-  | D.Neutral {tp; term} ->
-    D.Neutral {tp; term = D.(Quasi PiDom @: term)}
-  | _ -> raise (Eval_failed "Not something that can become a pi type")
 
 and do_id_tp f = 
   match f with 
@@ -144,6 +138,12 @@ and do_id_right f =
     D.Neutral {tp = D.(Neutral {tp; term = Quasi IdTp @: term}); term = D.(Quasi IdRight @: term)}
   | _ -> raise (Eval_failed "Not something that can become a identity type")
 
+and do_pi_dom f = 
+  match f with 
+  | D.Pi (tp, _) -> tp
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi PiDom @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a pi type")
 
 and do_pi_cod size f a = 
   match f with 
@@ -152,6 +152,20 @@ and do_pi_cod size f a =
     D.Neutral {tp; term = D.(Quasi (PiCod a) @: term)}
   | _ -> raise (Eval_failed "Not something that can become a pi type")
 
+
+and do_sg_dom f = 
+  match f with 
+  | D.Sg (tp, _) -> tp
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi SgDom @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a sigma type")
+
+and do_sg_cod size f a = 
+  match f with 
+  | D.Sg (_,dst) -> do_clos size dst (D.Tm a)
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi (SgCod a) @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a sigma type")
 
 
 and do_ungel size ends mot gel case =

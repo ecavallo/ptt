@@ -87,6 +87,8 @@ and reduce_extent env size es =
         match q with 
         | D.PiDom -> E.do_pi_dom (go env size (e,s))
         | D.PiCod a -> E.do_pi_cod size (go env size (e,s)) a
+        | D.SgDom -> E.do_sg_dom (go env size (e,s))
+        | D.SgCod a -> E.do_sg_cod size (go env size (e,s)) a
         | D.IdLeft -> E.do_id_left (go env size (e,s))
         | D.IdRight -> E.do_id_right (go env size (e,s))
         | D.IdTp -> E.do_id_tp (go env size (e,s))

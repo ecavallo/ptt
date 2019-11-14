@@ -16,6 +16,8 @@ val do_ungel : Domain.lvl -> Domain.t list -> Domain.clos -> Domain.t -> Domain.
 
 val do_pi_dom : Domain.t -> Domain.t
 val do_pi_cod : Domain.lvl -> Domain.t -> Domain.t -> Domain.t
+val do_sg_dom : Domain.t -> Domain.t
+val do_sg_cod : Domain.lvl -> Domain.t -> Domain.t -> Domain.t
 val do_id_left : Domain.t -> Domain.t
 val do_id_right : Domain.t -> Domain.t
 val do_id_tp : Domain.t -> Domain.t

@@ -52,6 +52,8 @@ and cell =
 and quasi_cell = 
   | PiDom
   | PiCod of t
+  | SgDom
+  | SgCod of t
   | IdTp
   | IdLeft
   | IdRight

@@ -63,6 +63,8 @@ and cell =
 and quasi_cell = 
   | PiDom
   | PiCod of t
+  | SgDom
+  | SgCod of t
   | IdTp
   | IdLeft
   | IdRight
@@ -189,6 +191,8 @@ and instantiate_quasi_cell r i =
   function 
   | PiDom -> PiDom 
   | PiCod v -> PiCod (instantiate r i v)
+  | SgDom -> SgDom 
+  | SgCod v -> SgCod (instantiate r i v)
   | IdLeft -> IdLeft
   | IdRight -> IdRight
   | IdTp -> IdTp
