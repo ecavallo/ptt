@@ -14,6 +14,9 @@ val do_snd : Domain.lvl -> Domain.t -> Domain.t
 val do_j : Domain.lvl -> Domain.clos3 -> Domain.clos -> Domain.t -> Domain.t
 val do_ungel : Domain.lvl -> Domain.t list -> Domain.clos -> Domain.t -> Domain.clos -> Domain.t
 
+val do_pi_dom : Domain.t -> Domain.t
+val do_pi_cod : Domain.lvl -> Domain.t -> Domain.t -> Domain.t
+
 val do_clos : Domain.lvl -> Domain.clos -> Domain.env_entry -> Domain.t
 val do_clos2 : Domain.lvl -> Domain.clos2 -> Domain.env_entry -> Domain.env_entry -> Domain.t
 val do_clos3 : Domain.lvl -> Domain.clos3 -> Domain.t -> Domain.t -> Domain.t -> Domain.t

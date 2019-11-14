@@ -58,6 +58,8 @@ and cell =
   | If of clos * t * t
   | J of clos3 * clos * t * t * t
   | Ungel of nf list * closN * clos * (* BBINDER *) lvl * clos
+  | PiDom
+  | PiCod of t
 [@@deriving show, eq]
 and spine = cell list
 [@@deriving show, eq]
@@ -173,6 +175,8 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
          j',
          instantiate_clos r i case)
       @: ne
+    | PiDom :: s -> PiDom @: go r i (h, s)
+    | PiCod v :: s -> PiCod (instantiate r i v) @: go r i (h, s)
   in
   go
 

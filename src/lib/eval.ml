@@ -82,13 +82,13 @@ and do_bapp size t r =
     begin
       match tp with
       | D.Bridge (dst, ts) ->
-         begin
-           match r with
-           | D.DVar i ->
-              let dst = do_clos size dst (D.Dim r) in
-              D.Neutral {tp = dst; term = D.(BApp i @: term)}
-           | Const o -> List.nth ts o
-         end
+        begin
+          match r with
+          | D.DVar i ->
+            let dst = do_clos size dst (D.Dim r) in
+            D.Neutral {tp = dst; term = D.(BApp i @: term)}
+          | Const o -> List.nth ts o
+        end
       | _ -> raise (Eval_failed "Not a bridge in do_bapp")
     end
   | _ -> raise (Eval_failed "Not a bridge or neutral in bapp")
@@ -111,14 +111,33 @@ and do_ap size f a =
   match f with
   | D.Lam clos -> do_clos size clos (D.Tm a)
   | D.Neutral {tp; term} ->
-    begin
-      match tp with
-      | D.Pi (src, dst) ->
-        let dst = do_clos size dst (D.Tm a) in
-        D.Neutral {tp = dst; term = D.(Ap (D.Normal {tp = src; term = a}) @: term)}
-      | _ -> raise (Eval_failed "Not a Pi in do_ap")
-    end
+    let src, dst = do_inst_pi_type size tp a in 
+    D.Neutral {tp = dst; term = D.(Ap (D.Normal {tp = src; term = a}) @: term)}
   | _ -> raise (Eval_failed "Not a function in do_ap")
+
+and do_inst_pi_type size f a = 
+  match f with 
+  | D.Pi (dom,dst) -> dom, do_clos size dst (D.Tm a)
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(PiDom @: term)}, D.Neutral {tp; term = D.(PiCod a @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a pi type")
+
+
+and do_pi_dom f = 
+  match f with 
+  | D.Pi (tp, _) -> tp
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(PiDom @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a pi type")
+
+and do_pi_cod size f a = 
+  match f with 
+  | D.Pi (_,dst) -> do_clos size dst (D.Tm a)
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(PiCod a @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a pi type")
+
+
 
 and do_ungel size ends mot gel case =
   begin

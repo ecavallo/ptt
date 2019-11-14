@@ -82,6 +82,8 @@ and reduce_extent env size es =
       let end_tms = List.map (fun (D.Normal {term; _}) -> term) ends in
       let es' = D.instantiate_spine D.instantiate_extent_head size i (e, s) in
       E.do_ungel size end_tms mot (go (DVar size :: env) (size + 1) es') case
+    | D.PiDom :: s -> E.do_pi_dom (go env size (e,s))
+    | D.PiCod a :: s -> E.do_pi_cod size (go env size (e,s)) a
   in
   try
     Some (go env size es)
@@ -99,28 +101,28 @@ and read_back_nf env size nf =
     Syn.Lam (read_back_nf arg_env (size + 1) nf)
   (* Pairs *)
   | D.Normal {tp = D.Sg (fst, snd); term = p} ->
-     let fst' = E.do_fst p in
-     let snd = E.do_clos size snd (D.Tm fst') in
-     let snd' = E.do_snd size p in
-     Syn.Pair
-       (read_back_nf env size (D.Normal {tp = fst; term = fst'}),
-        read_back_nf env size (D.Normal {tp = snd; term = snd'}))
+    let fst' = E.do_fst p in
+    let snd = E.do_clos size snd (D.Tm fst') in
+    let snd' = E.do_snd size p in
+    Syn.Pair
+      (read_back_nf env size (D.Normal {tp = fst; term = fst'}),
+       read_back_nf env size (D.Normal {tp = snd; term = snd'}))
   (* Unit *)
   | D.Normal {tp = D.Unit; term = _} -> Syn.Triv
   (* Numbers *)
   | D.Normal {tp = D.Nat; term = D.Zero} -> Syn.Zero
   | D.Normal {tp = D.Nat; term = D.Suc nf} ->
-     Syn.Suc (read_back_nf env size (D.Normal {tp = D.Nat; term = nf}))
+    Syn.Suc (read_back_nf env size (D.Normal {tp = D.Nat; term = nf}))
   (* Booleans *)
   | D.Normal {tp = D.Bool; term = D.True} -> Syn.True
   | D.Normal {tp = D.Bool; term = D.False} -> Syn.False
   (* Bridge *)
   | D.Normal {tp = D.Bridge (dest, _); term} ->
-     let (arg, arg_env) = mk_bvar env size in
-     let nf = D.Normal
-         {tp = E.do_clos (size + 1) dest (D.Dim arg);
-          term = E.do_bapp (size + 1) term arg} in
-     Syn.BLam (read_back_nf arg_env (size + 1) nf)
+    let (arg, arg_env) = mk_bvar env size in
+    let nf = D.Normal
+        {tp = E.do_clos (size + 1) dest (D.Dim arg);
+         term = E.do_bapp (size + 1) term arg} in
+    Syn.BLam (read_back_nf arg_env (size + 1) nf)
   (* Id *)
   | D.Normal {tp = D.Id (tp, _, _); term = D.Refl term} ->
     Syn.Refl (read_back_nf env size (D.Normal {tp; term}))
@@ -205,6 +207,7 @@ and read_back_ne env size (h, s) =
     end
   | D.Ap arg :: s ->
     Syn.Ap (read_back_ne env size (h, s), read_back_nf env size arg)
+
   | D.NRec (tp, zero, suc) :: s ->
     let (nat_arg, nat_env) = mk_var D.Nat env size in
     let applied_tp = E.do_clos (size + 1) tp (D.Tm nat_arg) in
@@ -264,6 +267,12 @@ and read_back_ne env size (h, s) =
             tp = E.do_clos (size + 1) mot (D.Tm gel_term)}) in
     let ne' = D.instantiate_ne size i (h, s) in
     Syn.Ungel (List.length ends, mot', read_back_ne (DVar size :: env) (size + 1) ne', case')
+  | D.PiDom :: _ ->
+    failwith "Invariant: this can never happen"
+  | D.PiCod _ :: _ ->
+    failwith "Invariant: this can never happen"
+
+
 
 and read_back_extent_head env size ({var = i; dom; mot; ctx; endcase; varcase} : D.extent_head) =
   let i' = read_back_level env i in
