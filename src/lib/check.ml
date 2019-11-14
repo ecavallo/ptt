@@ -286,6 +286,19 @@ and check_inert ~env ~size ~term ~tp =
   | term -> assert_subtype (env_to_quote_env env) size (synth ~env ~size ~term) tp
 
 and synth ~env ~size ~term =
+  let rec go tp =
+    match tp with
+    | D.Neutral {term = (D.Ext e, tp_spine); _} ->
+      begin
+        match Q.reduce_extent (env_to_quote_env env) size (e, tp_spine) with
+        | Some tp -> go tp
+        | None -> tp
+      end
+    | _ -> tp
+  in
+  go (synth_quasi ~env ~size ~term)
+
+and synth_quasi ~env ~size ~term =
   match term with
   | Syn.Var i -> synth_var env i
   | Check (term, tp') ->
