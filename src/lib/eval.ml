@@ -72,7 +72,7 @@ and do_snd size p =
   | D.Pair (_, p2) -> p2
   | D.Neutral {tp; term} ->
     let fst = do_fst p in
-    D.Neutral {tp = do_pi_cod size tp fst; term = D.(Snd @: term)}
+    D.Neutral {tp = do_sg_cod size tp fst; term = D.(Snd @: term)}
   | _ -> raise (Eval_failed "Couldn't snd argument in do_snd")
 
 and do_bapp size t r =
