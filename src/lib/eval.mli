@@ -22,7 +22,7 @@ val do_id_left : Domain.t -> Domain.t
 val do_id_right : Domain.t -> Domain.t
 val do_id_tp : Domain.t -> Domain.t
 val do_bridge_cod : Domain.lvl -> Domain.t -> Domain.dim -> Domain.t
-val do_bridge_endpoint : Domain.t -> Domain.dim -> int -> Domain.t
+val do_bridge_endpoint : Domain.t -> int -> Domain.t
 
 val do_clos : Domain.lvl -> Domain.clos -> Domain.env_entry -> Domain.t
 val do_clos2 : Domain.lvl -> Domain.clos2 -> Domain.env_entry -> Domain.env_entry -> Domain.t

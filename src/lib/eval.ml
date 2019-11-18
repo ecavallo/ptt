@@ -85,7 +85,7 @@ and do_bapp size t r =
         let dst = do_bridge_cod size tp r in 
         D.Neutral {tp = dst; term = D.(BApp i @: term)}
       | Const o -> 
-        do_bridge_endpoint tp r o
+        do_bridge_endpoint tp o
     end
   | _ -> raise (Eval_failed "Not a bridge or neutral in bapp")
 
@@ -143,12 +143,14 @@ and do_bridge_cod size tp s =
     D.Neutral {tp; term = D.(Quasi (BridgeCod s) @: term)}
   | _ -> raise (Eval_failed "Not something that can be come a bridge type")
 
-and do_bridge_endpoint tp s o =
+and do_bridge_endpoint tp o =
   match tp with
   | D.Bridge (_, ts) ->
     List.nth ts o
   | D.Neutral {tp; term} ->
-    D.Neutral {tp = D.Neutral {tp; term = D.(Quasi (BridgeCod s) @: term)}; term = D.(Quasi (BridgeEndpoint (s,o)) @: term)}
+    D.Neutral
+      {tp = D.Neutral {tp; term = D.(Quasi (BridgeCod (D.Const o)) @: term)};
+       term = D.(Quasi (BridgeEndpoint o) @: term)}
   | _ -> raise (Eval_failed "Not something that can be come a bridge type")
 
 and do_pi_dom f = 

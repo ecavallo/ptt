@@ -69,7 +69,7 @@ and quasi_cell =
   | IdLeft
   | IdRight
   | BridgeCod of dim
-  | BridgeEndpoint of dim * int
+  | BridgeEndpoint of int
 [@@deriving show, eq]
 and spine = cell list
 [@@deriving show, eq]
@@ -199,7 +199,7 @@ and instantiate_quasi_cell r i =
   | IdRight -> IdRight
   | IdTp -> IdTp
   | BridgeCod s -> BridgeCod (instantiate_dim r i s)
-  | BridgeEndpoint (s,o) -> BridgeEndpoint (instantiate_dim r i s, o)
+  | BridgeEndpoint o -> BridgeEndpoint o
 
 and instantiate_ne r i ne =
   let headf r i = function

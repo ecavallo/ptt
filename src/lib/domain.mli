@@ -58,7 +58,7 @@ and quasi_cell =
   | IdLeft
   | IdRight
   | BridgeCod of dim
-  | BridgeEndpoint of dim * int
+  | BridgeEndpoint of int
 and spine = cell list
 and ne = head * spine
 and nf =
