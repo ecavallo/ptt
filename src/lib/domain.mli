@@ -47,7 +47,7 @@ and cell =
   | NRec of clos * t * clos2
   | If of clos * t * t
   | J of clos3 * clos * t * t * t
-  | Ungel of nf list * closN * clos * (* BBINDER *) lvl * clos
+  | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
   | Quasi of quasi_cell
 and quasi_cell = 
   | PiDom
@@ -59,6 +59,8 @@ and quasi_cell =
   | IdRight
   | BridgeCod of dim
   | BridgeEndpoint of int
+  | GelRel of t list
+  | GelBridge of t list
 and spine = cell list
 and ne = head * spine
 and nf =

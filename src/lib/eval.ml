@@ -111,6 +111,19 @@ and do_ap size f a =
   | _ -> raise (Eval_failed "Not a function in do_ap")
 
 
+and do_ungel size ends mot gel case =
+  begin
+    match gel with
+    | D.Engel (_, _, t) -> do_clos size case (D.Tm t)
+    | D.Neutral {tp; term} ->
+      let rel = do_gel_rel size tp ends in
+      let bri = do_gel_bridge size tp ends in
+      let final_tp =
+        do_clos size mot (D.Tm (D.BLam (D.Pseudo {var = size; term = gel; ends}))) in
+      D.Neutral {tp = final_tp; term = D.(Ungel (ends, rel, bri, mot, size, case) @: term)}
+    | _ -> raise (Eval_failed "Not a gel or neutral in do_ungel")
+  end
+
 and do_id_tp tp = 
   match tp with 
   | D.Id (tp, _, _) -> tp
@@ -182,23 +195,20 @@ and do_sg_cod size f a =
     D.Neutral {tp; term = D.(Quasi (SgCod a) @: term)}
   | _ -> raise (Eval_failed "Not something that can become a sigma type")
 
+and do_gel_rel size f end_tms =
+  match f with
+  | D.Gel (_, _, rel) ->  do_closN size rel end_tms
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi (GelRel end_tms) @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a gel type")
 
-and do_ungel size ends mot gel case =
-  begin
-    match gel with
-    | D.Engel (_, _, t) -> do_clos size case (D.Tm t)
-    | D.Neutral {tp; term} ->
-      begin
-        match tp with
-        | D.Gel (_, end_tps, rel) ->
-          let end_nos = List.map2 (fun tp term -> (D.Normal {tp; term})) end_tps ends in
-          let final_tp =
-            do_clos size mot (D.Tm (D.BLam (D.Pseudo {var = size; term = gel; ends}))) in
-          D.Neutral {tp = final_tp; term = D.(Ungel (end_nos, rel, mot, size, case) @: term)}
-        | _ -> raise (Eval_failed "Not a Gel in do_ungel")
-      end
-    | _ -> raise (Eval_failed "Not a gel or neutral in do_ungel")
-  end
+and do_gel_bridge size f end_tms =
+  match f with
+  | D.Gel (_, end_tps, rel) ->
+    D.Bridge (D.Pseudo {var = size; term = D.Gel (size, end_tps, rel); ends = end_tps}, end_tms)
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi (GelBridge end_tms) @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a gel type")
 
 and eval t (env : D.env) size =
   match t with
