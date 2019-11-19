@@ -571,7 +571,9 @@ and check_tp ~subtype env size d1 d2 =
     let go nf nf' =
       match nf, nf' with
       | Some nf, Some nf' -> check_nf env size nf nf'
-      | _, _ -> true
+      | Some _, None -> false
+      | None, Some _ -> false
+      | None, None -> true
     in
     List.for_all2 go nfs nfs'
   | D.Gel (i, endtps, rel), D.Gel (i', endtps', rel') ->
