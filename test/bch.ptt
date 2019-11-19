@@ -1,0 +1,117 @@
+--------------------------------------------------------------------------------
+-- Some BCH
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- Preliminary
+--------------------------------------------------------------------------------
+
+let empty : U<0> = Id bool tt ff
+
+let subst : (A : U<0>) (B : A -> U<0>)
+  (a0 : A) (a1 : A) (eq : Id A a0 a1)
+   -> (B a0) -> B a1 =
+  fun A B a0 a1 eq ->
+  match eq at x y _ -> (B x) -> B y with
+  | refl _ -> fun b -> b
+
+let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
+  -> (Id A a0 a1) -> Id B (f a0) (f a1)
+  =
+  fun A B f a0 a1 eq ->
+  match eq at x0 x1 _ -> Id B (f x0) (f x1) with
+  | refl z -> refl (f z)
+
+--------------------------------------------------------------------------------
+-- Postulates (some)
+--------------------------------------------------------------------------------
+
+postulate cof : U<0>
+postulate decode : cof -> U<0>
+
+postulate false : cof
+postulate decode_false : Id U<0> (decode false) empty
+
+postulate bdy : cof -> [x] cof {*; *}
+postulate decode_bdy :
+  (c : cof) -> [x] Id U<0> (decode (bdy c @ x)) (Gel x {unit; unit} (_ _ -> decode c)) {*; *}
+
+--------------------------------------------------------------------------------
+-- Definition of fibration
+--------------------------------------------------------------------------------
+
+let box : (t : bool) (c : cof) -> [x] U<0> {*; *} =
+  fun t c -> bri x ->
+  Gel x
+    { if t at _ -> U<0> with | tt -> decode c | ff -> unit
+    ; if t at _ -> U<0> with | tt -> unit | ff -> decode c
+    }
+    (_ _ -> decode c)
+
+let isFib : (G : U<0>) (A : G -> U<0>) -> U<0> =
+  fun G A ->
+  (p : [_] G {*; *})
+  (t : bool) (c : cof)
+  (f : [x] (box t c @ x) -> A (p @ x) {*; *})
+  ->
+  [x] (a : A (p @ x)) * (u : box t c @ x) -> Id (A (p @ x)) (f @ x u) a {*; *}
+
+--------------------------------------------------------------------------------
+-- Fibrations are closed under sigma-types
+--------------------------------------------------------------------------------
+
+let Sigma : (G : U<0>) (A : G -> U<0>) (B : ((g : G) * A g) -> U<0>) -> G -> U<0> =
+  fun G A B g -> (a : A g) * B <g, a>
+
+let sigmaEq : (A : U<0>) (B : A -> U<0>)
+  (s0 : (a : A) * B a) (s1 : (a : A) * B a)
+  (eqA : Id A (fst s0) (fst s1))
+  -> (Id (B (fst s1)) (subst A B (fst s0) (fst s1) eqA (snd s0)) (snd s1))
+  -> Id ((a : A) * B a) s0 s1
+  =
+  fun A B s0 s1 eqA eqB ->
+  (match eqA at
+     a0 a1 eqA ->
+     (b0 : B a0) (b1 : B a1)
+     -> (Id (B a1) (subst A B a0 a1 eqA b0) b1)
+     -> Id ((a : A) * B a) <a0, b0> <a1, b1>
+   with
+   | refl a -> cong (B a) ((a : A) * B a) (fun b -> <a, b>))
+  (snd s0) (snd s1) eqB
+
+let fibSigma : (G : U<0>) (A : G -> U<0>) (B : ((g : G) * A g) -> U<0>)
+  -> (isFib G A) -> (isFib ((g : G) * A g) B) -> isFib G (Sigma G A B)
+  =
+  fun G A B fibA fibB ->
+  fun p t c f ->
+  let fA : [x] (box t c @ x) -> A (p @ x) {*; *} =
+    bri x -> fun u -> fst (f @ x u)
+  in
+  let cA : [x] (a : A (p @ x)) * (u : box t c @ x) -> Id (A (p @ x)) (fA @ x u) a {*; *}
+    =
+    fibA p t c fA
+  in
+  let q : [x] (g : G) * A g {*; *} =
+    bri x -> <p @ x, fst (cA @ x)>
+  in
+  let fB : [x] (box t c @ x) -> B (q @ x) {*; *} =
+    bri x -> fun u ->
+    subst (A (p @ x)) (fun a -> B <p @ x, a>)
+      (fst (f @ x u)) (fst (cA @ x)) (snd (cA @ x) u)
+      (snd (f @ x u))
+  in
+  let cB : [x] (cb : B (q @ x)) * (u : box t c @ x) -> Id (B (q @ x)) (fB @ x u) cb {*; *}
+    =
+    fibB q t c fB
+  in
+  bri x ->
+  < <fst (cA @ x), fst (cB @ x)>
+  , fun u ->
+    sigmaEq
+      (A (p @ x))
+      (fun a -> B <p @ x, a>)
+      (f @ x u)
+      (<fst (cA @ x), fst (cB @ x)>)
+      (snd (cA @ x) u)
+      (snd (cB @ x) u)
+  >
