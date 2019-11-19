@@ -1,0 +1,109 @@
+--------------------------------------------------------------------------------
+-- Any operator that transports properties from a0,a1 : A for A bridge-discrete
+-- must be substitution along a path from a0 to a1. This would be one part of
+-- a proof that Id A a0 a1 is equivalent to Leibniz equality:
+--   (B : A -> U<0>) -> B a0 -> B a1
+-- but we would need function extensionality to prove the complete result.
+--------------------------------------------------------------------------------
+
+let subst : (A : U<0>) (a0 : A) (a1 : A) (eq : Id A a0 a1)
+  (B : A -> U<0>) -> (B a0) -> B a1 =
+  fun A a0 a1 eq B ->
+  match eq at x y _ -> (B x) -> B y with
+  | refl _ -> fun b -> b
+
+let symm : (A : U<0>) (a : A) (b : A) -> (Id A a b) -> Id A b a =
+  fun A a b eq ->
+  match eq at x y _ -> Id A y x with
+  | refl z -> refl z
+
+let trans : (A : U<0>) (a : A) (b : A) (c : A) -> (Id A a b) -> (Id A b c) -> Id A a c =
+  fun A a b c eq0 ->
+  match eq0 at x y _ -> (Id A y c) -> Id A x c with
+  | refl z -> fun eq1 -> eq1
+
+let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
+  -> (Id A a0 a1) -> Id B (f a0) (f a1)
+  =
+  fun A B f a0 a1 eq ->
+  match eq at x0 x1 _ -> Id B (f x0) (f x1) with
+  | refl z -> refl (f z)
+
+let gelproj : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
+  (a : A) (b : B) -> [x] Gel x {A; B} (a b -> R a b) {a; b} -> R a b
+  =
+  fun A B R a b p ->
+  ungel x : 2 -> p @ x at _ -> R a b with | gel r -> r
+
+let is_equiv : (A : U<0>) (B : U<0>) (f : A -> B) -> U<0> =
+  fun A B f ->
+  ((l : B -> A) * (a : A) -> Id A (l (f a)) a)
+  * ((r : B -> A) * (b : B) -> Id B (f (r b)) b)
+
+let id_to_bridge : (A : U<0>) (a0 : A) (a1 : A) -> (Id A a0 a1) -> [_] A {a0; a1} =
+  fun A a0 a1 eq ->
+  subst A a0 a1 eq (fun a -> [_] A {a0;a}) (bri _ -> a0)
+
+let is_bdisc : U<0> -> U<0> =
+  fun A ->
+  (a0 : A) (a1 : A) ->
+  is_equiv (Id A a0 a1) ([_] A {a0; a1}) (id_to_bridge A a0 a1)
+
+let subst_unique : (A : U<0>) (_ : is_bdisc A) (a0 : A) (a1 : A)
+  (F : (B : A -> U<0>) -> (B a0) -> B a1)
+  (B : A -> U<0>) (b0 : B a0)
+  -> Id (B a1) (F B b0) (subst A a0 a1 (F (fun a -> Id A a0 a) (refl a0)) B b0)
+  =
+  fun A bd a0 a1 F B b0 ->
+  let R : (c0 : A) (c1 : A) (eq : Id A c0 c1) -> (B c0) -> (Id A a0 c1) -> U<0> =
+    fun c0 c1 ceq b eq ->
+    Id (B c1)
+      (subst A c0 c1 ceq B b)
+      (subst A a0 c1 eq B b0)
+  in    
+  let G : [x] A -> U<0> {B; fun a -> Id A a0 a} =
+    bri x -> fun a ->
+    extent x of a in _ -> A at _ _ -> U<0> with
+    | c0 -> B c0
+    | c1 -> Id A a0 c1
+    | c0 c1 q y ->
+      Gel y {B c0; Id A a0 c1} (b eq -> R c0 c1 (fst (fst (bd c0 c1)) q) b eq)
+  in
+  let g : [x] G @ x a0 {b0; refl a0} =
+    bri x ->
+    gel x {b0; refl a0}
+      (cong (Id A a0 a0) (B a0)
+        (fun eq -> subst A a0 a0 eq B b0)
+        (fst (fst (bd a0 a0)) (bri _ -> a0))
+        (refl a0)
+        (snd (fst (bd a0 a0)) (refl a0)))
+  in
+  let FGg : [x] G @ x a1 {F B b0; F (fun a -> Id A a0 a) (refl a0)} =
+    bri x -> F (G @ x) (g @ x)
+  in
+  let adjust : Id (B a1) (F B b0) (subst A a1 a1 (fst (fst (bd a1 a1)) (bri _ -> a1)) B (F B b0)) =
+    symm (B a1)
+      (subst A a1 a1 (fst (fst (bd a1 a1)) (bri _ -> a1)) B (F B b0))
+      (F B b0)
+      (cong (Id A a1 a1) (B a1)
+        (fun eq -> subst A a1 a1 eq B (F B b0))
+        (fst (fst (bd a1 a1)) (bri _ -> a1))
+        (refl a1)
+        (snd (fst (bd a1 a1)) (refl a1)))
+  in
+  let main : Id (B a1)
+    (subst A a1 a1 (fst (fst (bd a1 a1)) (bri _ -> a1)) B (F B b0))
+    (subst A a0 a1 (F (fun a -> Id A a0 a) (refl a0)) B b0)
+    =
+    gelproj (B a1) (Id A a0 a1)
+      (R a1 a1 (fst (fst (bd a1 a1)) (bri _ -> a1)))
+      (F B b0)
+      (F (fun a -> Id A a0 a) (refl a0))
+      FGg
+  in
+  trans (B a1)
+    (F B b0)
+    (subst A a1 a1 (fst (fst (bd a1 a1)) (bri _ -> a1)) B (F B b0))
+    (subst A a0 a1 (F (fun a -> Id A a0 a) (refl a0)) B b0)
+    adjust
+    main

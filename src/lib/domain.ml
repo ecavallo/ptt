@@ -57,7 +57,21 @@ and cell =
   | NRec of clos * t * clos2
   | If of clos * t * t
   | J of clos3 * clos * t * t * t
-  | Ungel of nf list * closN * clos * (* BBINDER *) lvl * clos
+  | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
+  | Quasi of quasi_cell
+[@@deriving show, eq]
+and quasi_cell = 
+  | PiDom
+  | PiCod of t
+  | SgDom
+  | SgCod of t
+  | IdTp
+  | IdLeft
+  | IdRight
+  | BridgeCod of dim
+  | BridgeEndpoint of int
+  | GelRel of t list
+  | GelBridge of t list
 [@@deriving show, eq]
 and spine = cell list
 [@@deriving show, eq]
@@ -162,19 +176,35 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
          instantiate r i left,
          instantiate r i right)
       @: go r i (h, s)
-    | Ungel (ends, rel, mot, j, case) :: s ->
+    | Ungel (ends, ty, bri, mot, j, case) :: s ->
       let j' = if i = j then j else max (r + 1) j in
       let ne = if i = j then (h, s) else go r i (go j' j (h, s))
       in
       Ungel
-        (List.map (instantiate_nf r i) ends,
-         instantiate_closN r i rel,
+        (List.map (instantiate r i) ends,
+         instantiate r i ty,
+         instantiate r i bri,
          instantiate_clos r i mot,
          j',
          instantiate_clos r i case)
       @: ne
+    | Quasi q :: s -> Quasi (instantiate_quasi_cell r i q) @: go r i (h, s)
   in
   go
+
+and instantiate_quasi_cell r i =
+  function 
+  | PiDom -> PiDom 
+  | PiCod v -> PiCod (instantiate r i v)
+  | SgDom -> SgDom 
+  | SgCod v -> SgCod (instantiate r i v)
+  | IdLeft -> IdLeft
+  | IdRight -> IdRight
+  | IdTp -> IdTp
+  | BridgeCod s -> BridgeCod (instantiate_dim r i s)
+  | BridgeEndpoint o -> BridgeEndpoint o
+  | GelRel ts -> GelRel (List.map (instantiate r i) ts)
+  | GelBridge ts -> GelBridge (List.map (instantiate r i) ts)
 
 and instantiate_ne r i ne =
   let headf r i = function

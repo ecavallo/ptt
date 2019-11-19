@@ -78,10 +78,24 @@ and reduce_extent env size es =
     | D.Snd :: s -> E.do_snd size (go env size (e, s))
     | D.BApp i :: s -> E.do_bapp size (go env size (e, s)) (D.DVar i)
     | D.J (mot, refl, _, _, _) :: s -> E.do_j size mot refl (go env size (e, s))
-    | D.Ungel (ends, _, mot, i, case) :: s ->
-      let end_tms = List.map (fun (D.Normal {term; _}) -> term) ends in
+    | D.Ungel (end_tms, _, _, mot, i, case) :: s ->
       let es' = D.instantiate_spine D.instantiate_extent_head size i (e, s) in
       E.do_ungel size end_tms mot (go (DVar size :: env) (size + 1) es') case
+    | D.Quasi q :: s ->
+      begin
+        match q with 
+        | D.PiDom -> E.do_pi_dom (go env size (e,s))
+        | D.PiCod a -> E.do_pi_cod size (go env size (e,s)) a
+        | D.SgDom -> E.do_sg_dom (go env size (e,s))
+        | D.SgCod a -> E.do_sg_cod size (go env size (e,s)) a
+        | D.IdLeft -> E.do_id_left (go env size (e,s))
+        | D.IdRight -> E.do_id_right (go env size (e,s))
+        | D.IdTp -> E.do_id_tp (go env size (e,s))
+        | D.BridgeCod r -> E.do_bridge_cod size (go env size (e,s)) r
+        | D.BridgeEndpoint o -> E.do_bridge_endpoint (go env size (e,s)) o
+        | D.GelRel ts -> E.do_gel_rel size (go env size (e,s)) ts
+        | D.GelBridge ts -> E.do_gel_bridge size (go env size (e,s)) ts
+      end
   in
   try
     Some (go env size es)
@@ -99,28 +113,28 @@ and read_back_nf env size nf =
     Syn.Lam (read_back_nf arg_env (size + 1) nf)
   (* Pairs *)
   | D.Normal {tp = D.Sg (fst, snd); term = p} ->
-     let fst' = E.do_fst p in
-     let snd = E.do_clos size snd (D.Tm fst') in
-     let snd' = E.do_snd size p in
-     Syn.Pair
-       (read_back_nf env size (D.Normal {tp = fst; term = fst'}),
-        read_back_nf env size (D.Normal {tp = snd; term = snd'}))
+    let fst' = E.do_fst p in
+    let snd = E.do_clos size snd (D.Tm fst') in
+    let snd' = E.do_snd size p in
+    Syn.Pair
+      (read_back_nf env size (D.Normal {tp = fst; term = fst'}),
+       read_back_nf env size (D.Normal {tp = snd; term = snd'}))
   (* Unit *)
   | D.Normal {tp = D.Unit; term = _} -> Syn.Triv
   (* Numbers *)
   | D.Normal {tp = D.Nat; term = D.Zero} -> Syn.Zero
   | D.Normal {tp = D.Nat; term = D.Suc nf} ->
-     Syn.Suc (read_back_nf env size (D.Normal {tp = D.Nat; term = nf}))
+    Syn.Suc (read_back_nf env size (D.Normal {tp = D.Nat; term = nf}))
   (* Booleans *)
   | D.Normal {tp = D.Bool; term = D.True} -> Syn.True
   | D.Normal {tp = D.Bool; term = D.False} -> Syn.False
   (* Bridge *)
   | D.Normal {tp = D.Bridge (dest, _); term} ->
-     let (arg, arg_env) = mk_bvar env size in
-     let nf = D.Normal
-         {tp = E.do_clos (size + 1) dest (D.Dim arg);
-          term = E.do_bapp (size + 1) term arg} in
-     Syn.BLam (read_back_nf arg_env (size + 1) nf)
+    let (arg, arg_env) = mk_bvar env size in
+    let nf = D.Normal
+        {tp = E.do_clos (size + 1) dest (D.Dim arg);
+         term = E.do_bapp (size + 1) term arg} in
+    Syn.BLam (read_back_nf arg_env (size + 1) nf)
   (* Id *)
   | D.Normal {tp = D.Id (tp, _, _); term = D.Refl term} ->
     Syn.Refl (read_back_nf env size (D.Normal {tp; term}))
@@ -205,6 +219,7 @@ and read_back_ne env size (h, s) =
     end
   | D.Ap arg :: s ->
     Syn.Ap (read_back_ne env size (h, s), read_back_nf env size arg)
+
   | D.NRec (tp, zero, suc) :: s ->
     let (nat_arg, nat_env) = mk_var D.Nat env size in
     let applied_tp = E.do_clos (size + 1) tp (D.Tm nat_arg) in
@@ -245,15 +260,10 @@ and read_back_ne env size (h, s) =
            {term = E.do_clos (size + 1) refl (D.Tm refl_arg);
             tp = E.do_clos3 (size + 1) mot refl_arg refl_arg (D.Refl refl_arg)}) in
     Syn.J (mot_syn, refl_syn, read_back_ne env size (h, s))
-  | D.Ungel (ends, rel, mot, i, case) :: s ->
-    let end_tps = List.map (function (D.Normal {tp; _}) -> tp) ends in
-    let end_tms = List.map (function (D.Normal {term; _}) -> term) ends in
-    let mot_hyp =
-      D.Bridge (D.Pseudo {var = size; term = D.Gel (size, end_tps, rel); ends = end_tps}, end_tms) in
-    let (mot_arg, mot_env) = mk_var mot_hyp env size in
+  | D.Ungel (end_tms, rel, bri, mot, i, case) :: s ->
+    let (mot_arg, mot_env) = mk_var bri env size in
     let mot' = read_back_tp mot_env (size + 1) (E.do_clos (size + 1) mot (D.Tm mot_arg)) in
-    let applied_rel = E.do_closN size rel end_tms in
-    let (wit_arg, wit_env) = mk_var applied_rel env size in
+    let (wit_arg, wit_env) = mk_var rel env size in
     let gel_term =
       D.BLam (D.Pseudo {var = size + 1; term = D.Engel (size + 1, end_tms, wit_arg); ends = end_tms}) in
     let case' = read_back_nf
@@ -263,7 +273,10 @@ and read_back_ne env size (h, s) =
            {term = E.do_clos (size + 1) case (D.Tm wit_arg);
             tp = E.do_clos (size + 1) mot (D.Tm gel_term)}) in
     let ne' = D.instantiate_ne size i (h, s) in
-    Syn.Ungel (List.length ends, mot', read_back_ne (DVar size :: env) (size + 1) ne', case')
+    Syn.Ungel (List.length end_tms, mot', read_back_ne (DVar size :: env) (size + 1) ne', case')
+  | D.Quasi _ :: _ ->
+    failwith "Invariant: this can never happen"
+
 
 and read_back_extent_head env size ({var = i; dom; mot; ctx; endcase; varcase} : D.extent_head) =
   let i' = read_back_level env i in
@@ -455,20 +468,15 @@ and check_ne env size (h1, s1) (h2, s2) =
          {term = E.do_clos (size + 1) refl2 (D.Tm refl_arg);
           tp = E.do_clos3 (size + 1) mot2 refl_arg refl_arg (D.Refl refl_arg)}) &&
     check_ne env size (h1, s1) (h2, s2)
-  | D.Ungel (ends1, rel1, mot1, i1, case1) :: s1,
-    D.Ungel (_, _, mot2, i2, case2) :: s2 ->
-    let end_tps = List.map (function (D.Normal {tp; _}) -> tp) ends1 in
-    let end_tms = List.map (function (D.Normal {term; _}) -> term) ends1 in
-    let mot_hyp =
-      D.Bridge (D.Pseudo {var = size; term = D.Gel (size, end_tps, rel1); ends = end_tps}, end_tms) in
-    let (mot_arg, mot_env) = mk_var mot_hyp env size in
+  | D.Ungel (end_tms1, rel1, bri1, mot1, i1, case1) :: s1,
+    D.Ungel (_, _, _, mot2, i2, case2) :: s2 ->
+    let (mot_arg, mot_env) = mk_var bri1 env size in
     check_tp ~subtype:false mot_env (size + 1)
       (E.do_clos (size + 1) mot1 (D.Tm mot_arg))
       (E.do_clos (size + 1) mot2 (D.Tm mot_arg)) &&
-    let applied_rel = E.do_closN size rel1 end_tms in
-    let (wit_arg, wit_env) = mk_var applied_rel env size in
+    let (wit_arg, wit_env) = mk_var rel1 env size in
     let gel_term =
-      D.BLam (D.Pseudo {var = size + 1; term = D.Engel (size + 1, end_tms, wit_arg); ends = end_tms}) in
+      D.BLam (D.Pseudo {var = size + 1; term = D.Engel (size + 1, end_tms1, wit_arg); ends = end_tms1}) in
     check_nf wit_env (size + 1)
       (D.Normal
          {term = E.do_clos (size + 1) case1 (D.Tm wit_arg);

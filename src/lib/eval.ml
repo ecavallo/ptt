@@ -63,33 +63,29 @@ and do_if size mot tt ff b =
 and do_fst p =
   match p with
   | D.Pair (p1, _) -> p1
-  | D.Neutral {tp = D.Sg (t, _); term} ->
-    D.Neutral {tp = t; term = D.(Fst @: term)}
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp = do_sg_dom tp; term = D.(Fst @: term)}
   | _ -> raise (Eval_failed "Couldn't fst argument in do_fst")
 
 and do_snd size p =
   match p with
   | D.Pair (_, p2) -> p2
-  | D.Neutral {tp = D.Sg (_, clo); term} ->
+  | D.Neutral {tp; term} ->
     let fst = do_fst p in
-    D.Neutral {tp = do_clos size clo (D.Tm fst); term = D.(Snd @: term)}
+    D.Neutral {tp = do_sg_cod size tp fst; term = D.(Snd @: term)}
   | _ -> raise (Eval_failed "Couldn't snd argument in do_snd")
 
 and do_bapp size t r =
   match t with
   | D.BLam bclo -> do_clos size bclo (D.Dim r)
   | D.Neutral {tp; term} ->
-    begin
-      match tp with
-      | D.Bridge (dst, ts) ->
-         begin
-           match r with
-           | D.DVar i ->
-              let dst = do_clos size dst (D.Dim r) in
-              D.Neutral {tp = dst; term = D.(BApp i @: term)}
-           | Const o -> List.nth ts o
-         end
-      | _ -> raise (Eval_failed "Not a bridge in do_bapp")
+    begin 
+      match r with 
+      | D.DVar i -> 
+        let dst = do_bridge_cod size tp r in 
+        D.Neutral {tp = dst; term = D.(BApp i @: term)}
+      | Const o -> 
+        do_bridge_endpoint tp o
     end
   | _ -> raise (Eval_failed "Not a bridge or neutral in bapp")
 
@@ -97,45 +93,122 @@ and do_j size mot refl eq =
   match eq with
   | D.Refl t -> do_clos size refl (D.Tm t)
   | D.Neutral {tp; term = term} ->
-    begin
-      match tp with
-      | D.Id (tp, left, right) ->
-        D.Neutral
-          {tp = do_clos3 size mot left right eq;
-           term = D.(J (mot, refl, tp, left, right) @: term)}
-      | _ -> raise (Eval_failed "Not an Id in do_j")
-    end
+    let dom = do_id_tp tp in
+    let left = do_id_left tp in
+    let right = do_id_right tp in
+    D.Neutral
+      {tp = do_clos3 size mot left right eq;
+       term = D.(J (mot, refl, dom, left, right) @: term)}
   | _ -> raise (Eval_failed "Not a refl or neutral in do_j")
 
 and do_ap size f a =
   match f with
   | D.Lam clos -> do_clos size clos (D.Tm a)
   | D.Neutral {tp; term} ->
-    begin
-      match tp with
-      | D.Pi (src, dst) ->
-        let dst = do_clos size dst (D.Tm a) in
-        D.Neutral {tp = dst; term = D.(Ap (D.Normal {tp = src; term = a}) @: term)}
-      | _ -> raise (Eval_failed "Not a Pi in do_ap")
-    end
+    let src = do_pi_dom tp in
+    let dst = do_pi_cod size tp a in
+    D.Neutral {tp = dst; term = D.(Ap (D.Normal {tp = src; term = a}) @: term)}
   | _ -> raise (Eval_failed "Not a function in do_ap")
+
 
 and do_ungel size ends mot gel case =
   begin
     match gel with
     | D.Engel (_, _, t) -> do_clos size case (D.Tm t)
     | D.Neutral {tp; term} ->
-      begin
-        match tp with
-        | D.Gel (_, end_tps, rel) ->
-          let end_nos = List.map2 (fun tp term -> (D.Normal {tp; term})) end_tps ends in
-          let final_tp =
-            do_clos size mot (D.Tm (D.BLam (D.Pseudo {var = size; term = gel; ends}))) in
-          D.Neutral {tp = final_tp; term = D.(Ungel (end_nos, rel, mot, size, case) @: term)}
-        | _ -> raise (Eval_failed "Not a Gel in do_ungel")
-      end
+      let rel = do_gel_rel size tp ends in
+      let bri = do_gel_bridge size tp ends in
+      let final_tp =
+        do_clos size mot (D.Tm (D.BLam (D.Pseudo {var = size; term = gel; ends}))) in
+      D.Neutral {tp = final_tp; term = D.(Ungel (ends, rel, bri, mot, size, case) @: term)}
     | _ -> raise (Eval_failed "Not a gel or neutral in do_ungel")
   end
+
+and do_id_tp tp = 
+  match tp with 
+  | D.Id (tp, _, _) -> tp
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi IdTp @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a identity type")
+
+
+and do_id_left tp = 
+  match tp with 
+  | D.Id (_, l, _) -> l
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp = D.(Neutral {tp; term = Quasi IdTp @: term}); term = D.(Quasi IdLeft @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a identity type")
+
+
+and do_id_right tp = 
+  match tp with 
+  | D.Id (_, _, r) -> r
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp = D.(Neutral {tp; term = Quasi IdTp @: term}); term = D.(Quasi IdRight @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a identity type")
+
+
+and do_bridge_cod size tp s =
+  match tp with
+  | D.Bridge (clos, _) ->
+    do_clos size clos (D.Dim s)
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi (BridgeCod s) @: term)}
+  | _ -> raise (Eval_failed "Not something that can be come a bridge type")
+
+and do_bridge_endpoint tp o =
+  match tp with
+  | D.Bridge (_, ts) ->
+    List.nth ts o
+  | D.Neutral {tp; term} ->
+    D.Neutral
+      {tp = D.Neutral {tp; term = D.(Quasi (BridgeCod (D.Const o)) @: term)};
+       term = D.(Quasi (BridgeEndpoint o) @: term)}
+  | _ -> raise (Eval_failed "Not something that can be come a bridge type")
+
+and do_pi_dom f = 
+  match f with 
+  | D.Pi (tp, _) -> tp
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi PiDom @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a pi type")
+
+and do_pi_cod size f a = 
+  match f with 
+  | D.Pi (_,dst) -> do_clos size dst (D.Tm a)
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi (PiCod a) @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a pi type")
+
+
+and do_sg_dom f = 
+  match f with 
+  | D.Sg (tp, _) -> tp
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi SgDom @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a sigma type")
+
+and do_sg_cod size f a = 
+  match f with 
+  | D.Sg (_,dst) -> do_clos size dst (D.Tm a)
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi (SgCod a) @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a sigma type")
+
+and do_gel_rel size f end_tms =
+  match f with
+  | D.Gel (_, _, rel) ->  do_closN size rel end_tms
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi (GelRel end_tms) @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a gel type")
+
+and do_gel_bridge size f end_tms =
+  match f with
+  | D.Gel (_, end_tps, rel) ->
+    D.Bridge (D.Pseudo {var = size; term = D.Gel (size, end_tps, rel); ends = end_tps}, end_tms)
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi (GelBridge end_tms) @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a gel type")
 
 and eval t (env : D.env) size =
   match t with
