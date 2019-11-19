@@ -45,6 +45,7 @@ and t =
 
 type decl =
     Def of {name : ident; def : t; tp : t}
+  | Postulate of {name : ident; tp : t}
   | NormalizeDef of ident
   | NormalizeTerm of {term : t; tp : t}
   | Quit

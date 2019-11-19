@@ -44,9 +44,10 @@ let keywords =
     ("Gel", GEL);
     ("gel", ENGEL);
     ("ungel", UNGEL);
-    ("def", DEF);
     ("at", AT);
     ("of", OF);
+    ("def", DEF);
+    ("postulate", POSTULATE);
     ("normalize", NORMALIZE);
     ("quit", QUIT);
   ]

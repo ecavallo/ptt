@@ -8,7 +8,7 @@
 %token LPR RPR LANGLE RANGLE LBR RBR LCU RCU
 %token EQUALS
 %token TIMES FST SND
-%token LAM LET IN END WITH OF DEF
+%token LAM LET IN END WITH OF DEF POSTULATE
 %token BRI ATSIGN EXTENT
 %token GEL ENGEL UNGEL
 %token UNIT TRIV
@@ -31,6 +31,8 @@ name:
 decl:
   | LET; nm = name; COLON; tp = term; EQUALS; body = term
     { Def {name = nm; def = body; tp} }
+  | POSTULATE; nm = name; COLON; tp = term
+    { Postulate {name = nm; tp} }
   | QUIT { Quit }
   | NORMALIZE; DEF; a = name
     { NormalizeDef a  }
