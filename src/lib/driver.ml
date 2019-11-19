@@ -114,7 +114,7 @@ let rec bind env = function
     S.Id (bind env tp, bind env left, bind env right)
   | CS.Refl t -> S.Refl (bind env t)
   | CS.Bridge (Binder {name; body}, endpoints) ->
-    S.Bridge (bind (Dim name :: env) body, List.map (bind env) endpoints)
+    S.Bridge (bind (Dim name :: env) body, List.map (Option.map (bind env)) endpoints)
   | CS.BLam (BinderN {names = []; body}) ->
     bind env body
   | CS.BLam (BinderN {names = i :: names; body}) ->

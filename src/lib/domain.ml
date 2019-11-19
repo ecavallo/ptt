@@ -35,7 +35,7 @@ and t =
   | Pi of t * clos
   | Sg of t * clos
   | Pair of t * t
-  | Bridge of clos * t list
+  | Bridge of clos * t option list
   | BLam of clos
   | Refl of t
   | Id of t * t * t
@@ -53,7 +53,7 @@ and cell =
   | Ap of nf
   | Fst
   | Snd
-  | BApp of lvl
+  | BApp of dim
   | NRec of clos * t * clos2
   | If of clos * t * t
   | J of clos3 * clos * t * t * t
@@ -69,7 +69,7 @@ and quasi_cell =
   | IdLeft
   | IdRight
   | BridgeCod of dim
-  | BridgeEndpoint of int
+  | BridgeEndpoint of ne * int
   | GelRel of t list
   | GelBridge of t list
 [@@deriving show, eq]
@@ -131,7 +131,7 @@ and instantiate r i = function
   | Pi (src, dst) -> Pi (instantiate r i src, instantiate_clos r i dst)
   | Sg (src, dst) -> Sg (instantiate r i src, instantiate_clos r i dst)
   | Pair (t, u) -> Pair (instantiate r i t, instantiate r i u)
-  | Bridge (dst, ts) -> Bridge (instantiate_clos r i dst, List.map (instantiate r i) ts)
+  | Bridge (dst, ts) -> Bridge (instantiate_clos r i dst, List.map (Option.map (instantiate r i)) ts)
   | BLam clo -> BLam (instantiate_clos r i clo)
   | Refl t -> Refl (instantiate r i t)
   | Id (ty, t, u) -> Id (instantiate r i ty, instantiate r i t, instantiate r i u)
@@ -155,7 +155,7 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
     | Ap t :: s -> Ap (instantiate_nf r i t) @: go r i (h, s)
     | Fst :: s -> Fst @: go r i (h, s)
     | Snd :: s -> Snd @: go r i (h, s)
-    | BApp j :: s -> BApp (instantiate_bvar r i j) @: go r i (h, s)
+    | BApp t :: s -> BApp (instantiate_dim r i t) @: go r i (h, s)
     | NRec (tp, zero, suc) :: s ->
       NRec
         (instantiate_clos r i tp,
@@ -202,7 +202,7 @@ and instantiate_quasi_cell r i =
   | IdRight -> IdRight
   | IdTp -> IdTp
   | BridgeCod s -> BridgeCod (instantiate_dim r i s)
-  | BridgeEndpoint o -> BridgeEndpoint o
+  | BridgeEndpoint (t, o) -> BridgeEndpoint (instantiate_ne r i t, o)
   | GelRel ts -> GelRel (List.map (instantiate r i) ts)
   | GelBridge ts -> GelBridge (List.map (instantiate r i) ts)
 

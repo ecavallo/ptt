@@ -81,11 +81,11 @@ and do_bapp size t r =
   | D.Neutral {tp; term} ->
     begin 
       match r with 
-      | D.DVar i -> 
+      | D.DVar _ ->
         let dst = do_bridge_cod size tp r in 
-        D.Neutral {tp = dst; term = D.(BApp i @: term)}
+        D.Neutral {tp = dst; term = D.(BApp r @: term)}
       | Const o -> 
-        do_bridge_endpoint tp o
+        do_bridge_endpoint size tp term o
     end
   | _ -> raise (Eval_failed "Not a bridge or neutral in bapp")
 
@@ -156,14 +156,20 @@ and do_bridge_cod size tp s =
     D.Neutral {tp; term = D.(Quasi (BridgeCod s) @: term)}
   | _ -> raise (Eval_failed "Not something that can be come a bridge type")
 
-and do_bridge_endpoint tp o =
+and do_bridge_endpoint size tp ne o =
   match tp with
   | D.Bridge (_, ts) ->
-    List.nth ts o
+    begin
+      match List.nth ts o with
+      | Some t -> t
+      | None ->
+        let dst = do_bridge_cod size tp (D.Const o) in
+        D.Neutral {tp = dst; term = D.(BApp (Const o) @: ne)}
+    end
   | D.Neutral {tp; term} ->
     D.Neutral
       {tp = D.Neutral {tp; term = D.(Quasi (BridgeCod (D.Const o)) @: term)};
-       term = D.(Quasi (BridgeEndpoint o) @: term)}
+       term = D.(Quasi (BridgeEndpoint (term, o)) @: term)}
   | _ -> raise (Eval_failed "Not something that can be come a bridge type")
 
 and do_pi_dom f = 
@@ -205,7 +211,9 @@ and do_gel_rel size f end_tms =
 and do_gel_bridge size f end_tms =
   match f with
   | D.Gel (_, end_tps, rel) ->
-    D.Bridge (D.Pseudo {var = size; term = D.Gel (size, end_tps, rel); ends = end_tps}, end_tms)
+    D.Bridge
+      (D.Pseudo {var = size; term = D.Gel (size, end_tps, rel); ends = end_tps},
+       List.map Option.some end_tms)
   | D.Neutral {tp; term} ->
     D.Neutral {tp; term = D.(Quasi (GelBridge end_tms) @: term)}
   | _ -> raise (Eval_failed "Not something that can become a gel type")
@@ -249,7 +257,8 @@ and eval t (env : D.env) size =
   | Syn.Pair (t1, t2) -> D.Pair (eval t1 env size, eval t2 env size)
   | Syn.Fst t -> do_fst (eval t env size)
   | Syn.Snd t -> do_snd size (eval t env size)
-  | Syn.Bridge (dest, ts) -> D.Bridge (Clos {term = dest; env}, List.map (fun t -> eval t env size) ts)
+  | Syn.Bridge (dest, ts) ->
+    D.Bridge (Clos {term = dest; env}, List.map (Option.map (fun t -> eval t env size)) ts)
   | Syn.BApp (t,r) ->
     let r' = eval_dim r env in
     do_bapp size (eval t env size) r'

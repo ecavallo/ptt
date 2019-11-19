@@ -28,7 +28,7 @@ and t =
   | Pi of t * clos
   | Sg of t * clos
   | Pair of t * t
-  | Bridge of clos * t list
+  | Bridge of clos * t option list
   | BLam of clos
   | Refl of t
   | Id of t * t * t
@@ -43,7 +43,7 @@ and cell =
   | Ap of nf
   | Fst
   | Snd
-  | BApp of lvl
+  | BApp of dim
   | NRec of clos * t * clos2
   | If of clos * t * t
   | J of clos3 * clos * t * t * t
@@ -58,7 +58,7 @@ and quasi_cell =
   | IdLeft
   | IdRight
   | BridgeCod of dim
-  | BridgeEndpoint of int
+  | BridgeEndpoint of ne * int
   | GelRel of t list
   | GelBridge of t list
 and spine = cell list

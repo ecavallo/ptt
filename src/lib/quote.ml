@@ -48,6 +48,10 @@ let read_back_level env x =
   in
   go 0 env
 
+let read_back_dim env = function
+  | D.DVar i -> Syn.DVar (read_back_level env i)
+  | D.Const o -> Syn.Const o
+
 exception Cannot_reduce_extent
 
 let rec reduce_extent_head env size ({var = i; dom; ctx; endcase; varcase; _} : D.extent_head) =
@@ -76,7 +80,7 @@ and reduce_extent env size es =
     | D.If (mot, tt, ff) :: s -> E.do_if size mot tt ff (go env size (e, s))
     | D.Fst :: s -> E.do_fst (go env size (e, s))
     | D.Snd :: s -> E.do_snd size (go env size (e, s))
-    | D.BApp i :: s -> E.do_bapp size (go env size (e, s)) (D.DVar i)
+    | D.BApp r :: s -> E.do_bapp size (go env size (e, s)) r
     | D.J (mot, refl, _, _, _) :: s -> E.do_j size mot refl (go env size (e, s))
     | D.Ungel (end_tms, _, _, mot, i, case) :: s ->
       let es' = D.instantiate_spine D.instantiate_extent_head size i (e, s) in
@@ -92,7 +96,7 @@ and reduce_extent env size es =
         | D.IdRight -> E.do_id_right (go env size (e,s))
         | D.IdTp -> E.do_id_tp (go env size (e,s))
         | D.BridgeCod r -> E.do_bridge_cod size (go env size (e,s)) r
-        | D.BridgeEndpoint o -> E.do_bridge_endpoint (go env size (e,s)) o
+        | D.BridgeEndpoint (ne, o) -> E.do_bridge_endpoint size (go env size (e,s)) ne o
         | D.GelRel ts -> E.do_gel_rel size (go env size (e,s)) ts
         | D.GelBridge ts -> E.do_gel_bridge size (go env size (e,s)) ts
       end
@@ -177,8 +181,10 @@ and read_back_tp env size d =
     let (arg, arg_env) = mk_bvar env size in
     Syn.Bridge
       (read_back_tp arg_env (size + 1) (E.do_clos (size + 1) dest (D.Dim arg)),
-       List.map2 (fun tp term -> read_back_nf env size (D.Normal {tp; term}))
-         (E.do_consts size dest width) ends)
+       List.map2
+         (fun tp -> Option.map (fun term -> read_back_nf env size (D.Normal {tp; term})))
+         (E.do_consts size dest width)
+         ends)
   | D.Id (tp, left, right) ->
     Syn.Id
       (read_back_tp env size tp,
@@ -242,9 +248,8 @@ and read_back_ne env size (h, s) =
     Syn.If (mot', tt', ff', read_back_ne env size (h, s))
   | D.Fst :: s -> Syn.Fst (read_back_ne env size (h, s))
   | D.Snd :: s -> Syn.Snd (read_back_ne env size (h, s))
-  | D.BApp i :: s ->
-    let i' = read_back_level env i in
-    Syn.BApp (read_back_ne env size (h, s), Syn.DVar i')
+  | D.BApp r :: s ->
+    Syn.BApp (read_back_ne env size (h, s), read_back_dim env r)
   | D.J (mot, refl, tp, left, right) :: s ->
     let (mot_arg1, mot_env1) = mk_var tp env size in
     let (mot_arg2, mot_env2) = mk_var tp mot_env1 (size + 1) in
@@ -300,7 +305,8 @@ and read_back_extent_head env size ({var = i; dom; mot; ctx; endcase; varcase} :
   let width = List.length endcase in
   let endtps = E.do_consts size dom width in
   let (end_args, ends_env) = mk_vars endtps env size in
-  let (bridge_arg, bridge_env) = mk_var (D.Bridge (dom, end_args)) ends_env (size + width) in
+  let (bridge_arg, bridge_env) =
+    mk_var (D.Bridge (dom, List.map Option.some end_args)) ends_env (size + width) in
   let (varcase_barg, varcase_benv) = mk_bvar bridge_env (size + width + 1) in
   let varcase_inst = E.do_bapp (size + width + 2) bridge_arg varcase_barg in
   let varcase_mot = E.do_clos2 (size + width + 2) mot (D.Dim varcase_barg) (D.Tm varcase_inst) in
@@ -518,7 +524,8 @@ and check_extent_head env size
   let width = List.length endcase1 in
   let endtps = E.do_consts size dom1 width in
   let (end_args, ends_env) = mk_vars endtps env size in
-  let (bridge_arg, bridge_env) = mk_var (D.Bridge (dom1, end_args)) ends_env (size + width) in
+  let (bridge_arg, bridge_env) =
+    mk_var (D.Bridge (dom1, List.map Option.some end_args)) ends_env (size + width) in
   let (varcase_barg, varcase_benv) = mk_bvar bridge_env (size + width + 1) in
   let varcase_inst = E.do_bapp (size + width + 2) bridge_arg varcase_barg in
   let varcase_mot = E.do_clos2 (size + width + 2) mot1 (D.Dim varcase_barg) (D.Tm varcase_inst) in
@@ -555,9 +562,20 @@ and check_tp ~subtype env size d1 d2 =
     check_tp ~subtype barg_env (size + 1)
       (E.do_clos (size + 1) dest (D.Dim barg))
       (E.do_clos (size + 1) dest' (D.Dim barg)) &&
-    let nfs = List.map2 (fun tp term -> D.Normal {tp; term}) (E.do_consts size dest width) ends in
-    let nfs' = List.map2 (fun tp term -> D.Normal {tp; term}) (E.do_consts size dest width) ends' in
-    List.for_all2 (check_nf env size) nfs nfs'
+    let nfs = List.map2
+        (fun tp -> Option.map (fun term -> D.Normal {tp; term}))
+        (E.do_consts size dest width) ends in
+    let nfs' = List.map2
+        (fun tp -> Option.map (fun term -> D.Normal {tp; term}))
+        (E.do_consts size dest width) ends' in
+    let go nf nf' =
+      match nf, nf' with
+      | Some nf, Some nf' -> check_nf env size nf nf'
+      | Some _, None -> false
+      | None, Some _ -> false
+      | None, None -> true
+    in
+    List.for_all2 go nfs nfs'
   | D.Gel (i, endtps, rel), D.Gel (i', endtps', rel') ->
     i = i' &&
     List.for_all2 (check_tp ~subtype env size) endtps endtps' &&
