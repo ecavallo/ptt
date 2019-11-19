@@ -18,7 +18,7 @@ type t =
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
   | Sg of t * (* BINDS *) t | Pair of t * t | Fst of t | Snd of t
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
-  | Bridge of (* BBINDS *) t * t list | BApp of t * dim | BLam of (* BBINDS *) t
+  | Bridge of (* BBINDS *) t * t option list | BApp of t * dim | BLam of (* BBINDS *) t
   | Extent of dim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS *) t list * (* BINDS n & BBINDS *) t
   | Gel of dim * t list * (* BINDS n *) t | Engel of idx * t list * t
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
@@ -67,7 +67,7 @@ let unsubst_bvar i t =
     | Refl t -> Refl (go depth t)
     | J (mot, refl, eq) ->
       J (go (depth + 3) mot, go (depth + 1) refl, go depth eq)
-    | Bridge (t, ts) -> Bridge (go (depth + 1) t, List.map (go depth) ts)
+    | Bridge (t, ts) -> Bridge (go (depth + 1) t, List.map (Option.map (go depth)) ts)
     | BLam t -> BLam (go (depth + 1) t)
     | BApp (t, r) -> BApp (go depth t, go_dim depth r)
     | Extent (r, dom, mot, ctx, endcase, varcase) ->
@@ -104,6 +104,14 @@ let pp_dim fmt =
   function
   | DVar i -> fprintf fmt "#%d" i
   | Const o -> fprintf fmt "%d" o
+
+let pp_option pp fmt =
+  function
+  | None -> Format.fprintf fmt "*"
+  | Some a -> pp fmt a
+
+let pp_list pp fmt =
+  Format.fprintf fmt "[%a]" (Format.pp_print_list ~pp_sep:(fun fmt _ -> Format.fprintf fmt "; ") pp)
 
 let rec pp fmt =
   let open Format in
@@ -156,24 +164,21 @@ let rec pp fmt =
     fprintf fmt "J(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp mot pp refl pp eq;
   | Bridge (t, ts) ->
     fprintf fmt "Bridge(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])"
-      pp t pp_list ts;
+      pp t (pp_list (pp_option pp)) ts;
   | BLam t ->
     fprintf fmt "blam(@[<hov>%a@])" pp t;
   | BApp (t, r) ->
     fprintf fmt "bapp(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp t pp_dim r;
   | Extent (r, dom, mot, ctx, endcase, varcase) ->
     fprintf fmt "extent(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
-     pp_dim r pp dom pp mot pp ctx pp_list endcase pp varcase;
+     pp_dim r pp dom pp mot pp ctx (pp_list pp) endcase pp varcase;
   | Gel (r, ts, t) ->
-    fprintf fmt "Gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp_dim r pp_list ts pp t;
+    fprintf fmt "Gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp_dim r (pp_list pp) ts pp t;
   | Engel (i, ts, t) ->
-    fprintf fmt "gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp_dim (DVar i) pp_list ts pp t;
+    fprintf fmt "gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp_dim (DVar i) (pp_list pp) ts pp t;
   | Ungel (width, mot, gel, case) ->
     fprintf fmt "ungel(@[<hov>@[<hov>%d@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" width pp mot pp gel pp case
   | Uni i -> fprintf fmt "U<%d>" i
-
-and pp_list fmt =
-  Format.fprintf fmt "[%a]" (Format.pp_print_list ~pp_sep:(fun fmt _ -> Format.fprintf fmt "; ") pp)
 
 let show t =
   let b = Buffer.create 100 in

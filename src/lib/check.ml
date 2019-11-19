@@ -224,7 +224,7 @@ and check_inert ~env ~size ~term ~tp =
         check ~env:arg_env ~size:(size + 1) ~term ~tp;
         let width = List.length ends in
         let tps = E.do_consts size (D.Clos {term; env = env_to_sem_env env}) width in
-        List.iter2 (fun term tp -> check ~env ~size ~term ~tp) ends tps
+        List.iter2 (fun tp -> Option.fold () (fun term -> check ~env ~size ~term ~tp)) tps ends
       | t -> tp_error (Expecting_universe t)
     end
   | BLam body ->
@@ -238,10 +238,12 @@ and check_inert ~env ~size ~term ~tp =
         let quote_env = env_to_quote_env env in
         let sem_env = Q.env_to_sem_env quote_env in
         List.iteri
-          (fun o pt ->
-             let body_o = E.eval body (D.Dim (D.Const o) :: sem_env) size in
-             let tp = E.do_clos size clos (D.Dim (D.Const o)) in
-             assert_equal quote_env size body_o pt tp)
+          (fun o ->
+             Option.fold ()
+               (fun pt ->
+                  let body_o = E.eval body (D.Dim (D.Const o) :: sem_env) size in
+                  let tp = E.do_clos size clos (D.Dim (D.Const o)) in
+                  assert_equal quote_env size body_o pt tp))
           ends
       | t -> tp_error (Misc ("Expecting Bridge but found\n" ^ D.show t))
     end
@@ -405,7 +407,7 @@ and synth_quasi ~env ~size ~term =
       endcase;
     let end_tps = E.do_consts size (D.Clos {term = dom; env = sem_env}) width in
     let (end_vars, ends_env) = mk_vars end_tps res_env size in
-    let dom_bridge = D.Bridge (D.Clos {term = dom; env = sem_env}, end_vars) in
+    let dom_bridge = D.Bridge (D.Clos {term = dom; env = sem_env}, List.map Option.some end_vars) in
     let (bridge_arg, bridge_env) = mk_var dom_bridge ends_env (size + width) in
     let (varcase_barg, varcase_benv) = mk_bvar width bridge_env (size + width + 1) in
     let varcase_inst = E.do_bapp (size + width + 2) bridge_arg varcase_barg in
@@ -422,7 +424,9 @@ and synth_quasi ~env ~size ~term =
         let sem_env = env_to_sem_env env in
         let end_tms = E.do_consts size (D.Clos {term; env = sem_env}) width in
         let mot_hyp =
-          D.Bridge (D.Pseudo {var = size; term = D.Gel (size, end_tps, rel); ends = end_tps}, end_tms) in
+          D.Bridge
+            (D.Pseudo {var = size; term = D.Gel (size, end_tps, rel); ends = end_tps},
+             List.map Option.some end_tms) in
         let (_, hyp_env) = mk_var mot_hyp env size in
         check_tp ~env:hyp_env ~size:(size + 1) ~term:mot;
         let applied_rel = E.do_closN size rel end_tms in
@@ -448,8 +452,10 @@ and check_tp ~env ~size ~term =
     check_tp ~env:var_env ~size:(size + 1) ~term;
     let sem_env = env_to_sem_env env in
     List.iteri
-      (fun o pt ->
-         check ~env ~size ~term:pt ~tp:(E.eval term (D.Dim (D.Const o) :: sem_env) size))
+      (fun o ->
+         Option.fold ()
+           (fun pt ->
+              check ~env ~size ~term:pt ~tp:(E.eval term (D.Dim (D.Const o) :: sem_env) size)))
       ends
   | Pi (l, r) | Sg (l, r) ->
     check_tp ~env ~size ~term:l;

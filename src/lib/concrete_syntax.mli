@@ -35,7 +35,7 @@ and t =
   | Id of t * t * t
   | Refl of t
   | J of {mot : binder3; refl : binder; eq : t}
-  | Bridge of binder * t list
+  | Bridge of binder * t option list
   | BLam of bindern
   | Extent of {dim : dim; dom : binder; mot : binder2; ctx : t; endcase : binder list; varcase : bindern}
   | Gel of dim * t list * bindern

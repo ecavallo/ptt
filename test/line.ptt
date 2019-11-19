@@ -1,0 +1,19 @@
+let line_map : (A : U<0>) (B : U<0>) -> (A -> B) -> ([_] A {*; *}) -> [_] B {*; *} =
+  fun A B f p -> bri x -> f (p @ x)
+
+normalize def line_map
+
+let learn_ends : (A : U<0>) -> (p : [_] A {*;*}) -> [_] A {p @ 0; p @ 1} =
+  fun A p -> bri x -> p @ x
+
+normalize def learn_ends
+
+let forget : (A : U<0>) (a0 : A) (a1 : A) -> ([_] A {a0; a1}) -> [_] A {*; *} =
+  fun A a0 a1 p -> bri x -> p @ x
+
+normalize def forget
+
+let switch : (A : U<0>) (a0 : A) -> (p : [_] A {a0; *}) -> [_] A {*; p @ 1} =
+  fun A a0 p -> bri x -> p @ x
+
+normalize def switch

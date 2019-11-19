@@ -47,7 +47,14 @@ dim:
   | n = NUMERAL { Const n };
 
 endpoints:
-  | LCU; endpoints = separated_list(SEMI, term); RCU { endpoints }
+  | LCU; endpoints = separated_list(SEMI, term); RCU { endpoints };
+
+term_option:
+  | t = term { Some t }
+  | TIMES { None };
+
+endpoint_options:
+  | LCU; endpoints = separated_list(SEMI, term_option); RCU { endpoints };
 
 atomic:
   | LPR; t = term; RPR
@@ -72,7 +79,7 @@ atomic:
   | BOOL { Bool }
   | LANGLE left = term; COMMA; right = term; RANGLE
     { Pair (left, right) }
-  | LBR; name = name; RBR; body = term; endpoints = endpoints
+  | LBR; name = name; RBR; body = term; endpoints = endpoint_options
     { Bridge(Binder {name; body}, endpoints) }
   | FST; t = atomic { Fst t }
   | SND; t = atomic { Snd t }
