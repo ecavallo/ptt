@@ -244,6 +244,45 @@ let squeeze0 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
     (symm (A (p @ 0)) (coe10 G A fibA p (a @ 1)) (fst (comp @ 1)) (snd (comp @ 1) triv))
     (bri x -> fst (comp @ x))
 
+let squeeze1 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
+  (a : [x] A (p @ x) {*; *}) -> [x] A (p @ 1) {coe01 G A fibA p (a @ 0); a @ 1}
+  =
+  fun G A fibA p a ->
+  let c : [x] cof {*; *} = cof_bdy cof_empty
+  in
+  let tube : [x] (decode (c @ x)) -> [y] A (p @ y) {a @ 0; *} {*; *} =
+    bri x ->
+    adjoin_bdy
+      (bri _ -> [y] A (p @ y) {a @ 0; *})
+      cof_empty
+      (bri y -> coe0 G A fibA p (a @ 0) @ y)
+      (bri y -> a @ y)
+      (fun no -> abort_empty no
+        ([_] [y] A (p @ y) {a @ 0; *} {bri y -> coe0 G A fibA p (a @ 0) @ y; bri y -> a @ y}))
+      @ x
+  in
+  let open_box : [x] [y] (box ff (c @ x) @ y) -> A (p @ y) {fun _ -> a @ 0; *} {*; *} =
+    bri x ->
+    adjoin_cap0
+      (bri y -> A (p @ y))
+      (c @ x)
+      (a @ 0)
+      (tube @ x)
+  in
+  let comp : [x] (a : A (p @ 1)) * (u : decode (c @ x)) -> Id (A (p @ 1)) (tube @ x u @ 1) a {*; *}
+    =
+    bri x -> fibA p ff (c @ x) (bri y -> open_box @ x @ y) @ 1
+  in
+  subst2 (A (p @ 1)) (A (p @ 1))
+    (fun t0 t1 -> [x] A (p @ 1) {t0; t1})
+    (fst (comp @ 0))
+    (coe01 G A fibA p (a @ 0))
+    (symm (A (p @ 1)) (coe01 G A fibA p (a @ 0)) (fst (comp @ 0)) (snd (comp @ 0) triv))
+    (fst (comp @ 1))
+    (a @ 1)
+    (symm (A (p @ 1)) (a @ 1) (fst (comp @ 1)) (snd (comp @ 1) triv))
+    (bri x -> fst (comp @ x))
+
 let squeeze : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
   (a : [x] A (p @ x) {*; *})
   -> [x] [y] A (p @ y) {*; *} {bri y -> coe0 G A fibA p (a @ 0) @ y; bri y -> coe1 G A fibA p (a @ 1) @ y}
