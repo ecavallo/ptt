@@ -3,38 +3,72 @@
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
+-- Postulates (some)
+--------------------------------------------------------------------------------
+
+postulate is_cof : U<0> -> U<0>
+
+let cof : U<1> = (c : U<0>) * is_cof c
+let decode : cof -> U<0> = fun c -> fst c
+
+postulate empty : U<0>
+postulate abort_empty : empty -> (A : U<0>) -> A
+
+postulate empty_is_cof : is_cof empty
+postulate bdy_is_cof : (c : U<0>) (r : is_cof c) -> [x] is_cof (Gel x {unit; unit} (_ _ -> c)) {* ; *}
+
+let cof_empty : cof = <empty, empty_is_cof>
+
+let cof_bdy : cof -> [x] cof {*; *} =
+  fun c -> bri x ->
+  <Gel x {unit; unit} (_ _ -> fst c), bdy_is_cof (fst c) (snd c) @ x>
+
+postulate funext : (A : U<0>) (B : A -> U<0>) (f0 : (a : A) -> B a) (f1 : (a : A) -> B a)
+  -> ((a : A) -> Id (B a) (f0 a) (f1 a)) -> Id ((a : A) -> B a) f0 f1
+
+--------------------------------------------------------------------------------
 -- Preliminary
 --------------------------------------------------------------------------------
 
-let empty : U<0> = Id bool tt ff
+let symm : (A : U<0>) (a : A) (b : A) -> (Id A a b) -> Id A b a =
+  fun A a b eq ->
+  match eq at a0 a1 _ -> Id A a1 a0 with
+  | refl a -> refl a
 
 let subst : (A : U<0>) (B : A -> U<0>)
   (a0 : A) (a1 : A) (eq : Id A a0 a1)
-   -> (B a0) -> B a1 =
+  -> (B a0) -> B a1
+  =
   fun A B a0 a1 eq ->
-  match eq at x y _ -> (B x) -> B y with
+  match eq at a0 a1 _ -> (B a0) -> B a1 with
   | refl _ -> fun b -> b
+
+let subst2 : (A : U<0>) (B : U<0>) (C : A -> B -> U<0>)
+  (a0 : A) (a1 : A) (eqA : Id A a0 a1)
+  (b0 : B) (b1 : B) (eqB : Id B b0 b1)
+  -> (C a0 b0) -> C a1 b1
+  =
+  fun A B C a0 a1 eq ->
+  match eq at a0 a1 _ -> (b0 : B) (b1 : B) -> (Id B b0 b1) -> (C a0 b0) -> C a1 b1 with
+  | refl a -> subst B (C a)
 
 let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
   -> (Id A a0 a1) -> Id B (f a0) (f a1)
   =
   fun A B f a0 a1 eq ->
-  match eq at x0 x1 _ -> Id B (f x0) (f x1) with
+  match eq at a0 a1 _ -> Id B (f a0) (f a1) with
   | refl z -> refl (f z)
 
---------------------------------------------------------------------------------
--- Postulates (some)
---------------------------------------------------------------------------------
-
-postulate cof : U<0>
-postulate decode : cof -> U<0>
-
-postulate false : cof
-postulate decode_false : Id U<0> (decode false) empty
-
-postulate bdy : cof -> [x] cof {*; *}
-postulate decode_bdy :
-  (c : cof) -> [x] Id U<0> (decode (bdy c @ x)) (Gel x {unit; unit} (_ _ -> decode c)) {*; *}
+let cong2 : (A : U<0>) (B : U<0>) (C : U<0>) (f : A -> B -> C)
+  (a0 : A) (a1 : A) (eqA : Id A a0 a1)
+  (b0 : B) (b1 : B) (eqB : Id B b0 b1)
+  -> Id C (f a0 b0) (f a1 b1)
+  =
+  fun A B C f a0 a1 eqA ->
+  match eqA at
+    a0 a1 _ -> (b0 : B) (b1 : B) (eqB : Id B b0 b1)-> Id C (f a0 b0) (f a1 b1)
+  with
+  | refl a -> cong B C (f a)
 
 --------------------------------------------------------------------------------
 -- Definition of fibration
@@ -46,15 +80,199 @@ let box : (t : bool) (c : cof) -> [x] U<0> {*; *} =
     { if t at _ -> U<0> with | tt -> decode c | ff -> unit
     ; if t at _ -> U<0> with | tt -> unit | ff -> decode c
     }
-    (_ _ -> decode c)
+    (_ _ -> unit)
 
-let isFib : (G : U<0>) (A : G -> U<0>) -> U<0> =
+let isFib : (G : U<0>) (A : G -> U<0>) -> U<1> =
   fun G A ->
   (p : [_] G {*; *})
   (t : bool) (c : cof)
   (f : [x] (box t c @ x) -> A (p @ x) {*; *})
   ->
   [x] (a : A (p @ x)) * (u : box t c @ x) -> Id (A (p @ x)) (f @ x u) a {*; *}
+
+--------------------------------------------------------------------------------
+-- Forming open boxes
+--------------------------------------------------------------------------------
+
+let end_ty : ([x] U<0> {*; *}) -> bool -> U<0> =
+  fun A -> fun t ->
+  if t at _ -> U<0> with | tt -> A @ 1 | ff -> A @ 0
+
+let adjoin_bdy : (A : [x] U<0> {*; *}) (c : cof)
+  (f0 : A @ 0) (f1 : A @ 1)
+  (f : (decode c) -> [x] A @ x {f0; f1})
+  -> [x] (decode (cof_bdy c @ x)) -> A @ x {fun _ -> f0; fun _ -> f1}
+  =
+  fun A c f0 f1 f -> bri x -> fun u01 ->
+  extent x of u01 in x -> Gel x {unit; unit} (_ _ -> decode c) at x _ -> A @ x with
+  | _ -> f0
+  | _ -> f1
+  | a0 a1 q x ->
+    (ungel x : 2 -> q @ x at _ -> [x] A @ x {f0; f1} with
+     | gel u -> bri x -> f u @ x)
+    @ x
+
+let adjoin_cap0 : (A : [x] U<0> {*; *}) (c : cof) (a0 : A @ 0)
+  (f : (decode c) -> [x] A @ x {a0; *})
+  -> [x] (box ff c @ x) -> A @ x {fun _ -> a0; *}
+  =
+  fun A c a0 f -> bri x -> fun u0 ->
+  extent x of u0 in x -> Gel x {unit; decode c} (_ _ -> unit) at x _ -> A @ x with
+  | _ -> a0
+  | u -> f u @ 1
+  | _ u _ x -> f u @ x
+
+let adjoin_cap1 : (A : [x] U<0> {*; *}) (c : cof) (a1 : A @ 1)
+  (f : (decode c) -> [x] A @ x {*; a1})
+  -> [x] (box tt c @ x) -> A @ x {*; fun _ -> a1}
+  =
+  fun A c a1 f -> bri x -> fun u1 ->
+  extent x of u1 in x -> Gel x {decode c; unit} (_ _ -> unit) at x _ -> A @ x with
+  | u -> f u @ 0
+  | _ -> a1
+  | u _ _ x -> f u @ x
+
+--------------------------------------------------------------------------------
+-- Coercion and squeezing
+--------------------------------------------------------------------------------
+
+let empty_box : (A : [x] U<0> {*; *}) (t : bool)
+  -> (end_ty A t) -> [x] (box t cof_empty @ x) -> A @ x {*; *}
+  =
+  fun A t ->
+  if t at t -> (end_ty A t) -> [x] (box t cof_empty @ x) -> A @ x {*; *} with
+  | tt -> fun a1 -> bri x -> fun f ->
+    extent x of f in x -> box tt cof_empty @ x at x _ -> A @ x with
+    | no -> abort_empty no (A @ 0)
+    | _ -> a1
+    | no _ _ x -> abort_empty no ([x] A @ x {abort_empty no (A @ 0); a1}) @ x
+  | ff -> fun a0 -> bri x -> fun f ->
+    extent x of f in x -> box ff cof_empty @ x at x _ -> A @ x with
+    | _ -> a0
+    | no -> abort_empty no (A @ 1)
+    | _ no _ x -> abort_empty no ([x] A @ x {a0; abort_empty no (A @ 1)}) @ x
+
+let coe01 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
+  -> (A (p @ 0)) -> A (p @ 1)
+  =
+  fun G A fibA p a0 ->
+  fst (fibA p ff cof_empty (empty_box (bri x -> A (p @ x)) ff a0) @ 1)
+
+let coe0 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
+  -> (a0 : A (p @ 0)) -> [y] A (p @ y) {a0; coe01 G A fibA p a0}
+  =
+  fun G A fibA p a0 ->
+  subst
+   (A (p @ 0))
+   (fun a -> [y] A (p @ y) {a; coe01 G A fibA p a0})
+   (fst (fibA p ff cof_empty (empty_box (bri x -> A (p @ x)) ff a0) @ 0))
+   a0
+   (symm
+     (A (p @ 0))
+     a0
+     (fst (fibA p ff cof_empty (empty_box (bri x -> A (p @ x)) ff a0) @ 0))
+     (snd (fibA p ff cof_empty (empty_box (bri x -> A (p @ x)) ff a0) @ 0) triv))
+   (bri y -> fst (fibA p ff cof_empty (empty_box (bri x -> A (p @ x)) ff a0) @ y))
+
+let coe10 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
+  -> (A (p @ 1)) -> A (p @ 0)
+  =
+  fun G A fibA p a1 ->
+  fst (fibA p tt cof_empty (empty_box (bri x -> A (p @ x)) tt a1) @ 0)
+
+let coe1 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
+  (a1 : A (p @ 1)) -> [y] A (p @ y) {coe10 G A fibA p a1; a1}
+  =
+  fun G A fibA p a1 ->
+  subst
+   (A (p @ 1))
+   (fun a -> [y] A (p @ y) {coe10 G A fibA p a1; a})
+   (fst (fibA p tt cof_empty (empty_box (bri x -> A (p @ x)) tt a1) @ 1))
+   a1
+   (symm
+     (A (p @ 1))
+     a1
+     (fst (fibA p tt cof_empty (empty_box (bri x -> A (p @ x)) tt a1) @ 1))
+     (snd (fibA p tt cof_empty (empty_box (bri x -> A (p @ x)) tt a1) @ 1) triv))
+   (bri y -> fst (fibA p tt cof_empty (empty_box (bri x -> A (p @ x)) tt a1) @ y))
+
+let squeeze0 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
+  (a : [x] A (p @ x) {*; *}) -> [x] A (p @ 0) {a @ 0; coe10 G A fibA p (a @ 1)}
+  =
+  fun G A fibA p a ->
+  let c : [x] cof {*; *} = cof_bdy cof_empty
+  in
+  let tube : [x] (decode (c @ x)) -> [y] A (p @ y) {*; a @ 1} {*; *} =
+    bri x ->
+    adjoin_bdy
+      (bri _ -> [y] A (p @ y) {*; a @ 1})
+      cof_empty
+      (bri y -> a @ y)
+      (bri y -> coe1 G A fibA p (a @ 1) @ y)
+      (fun no -> abort_empty no
+        ([_] [y] A (p @ y) {*; a @ 1} {bri y -> a @ y; bri y -> coe1 G A fibA p (a @ 1) @ y}))
+      @ x
+  in
+  let open_box : [x] [y] (box tt (c @ x) @ y) -> A (p @ y) {*; fun _ -> a @ 1} {*; *} =
+    bri x ->
+    adjoin_cap1
+      (bri y -> A (p @ y))
+      (c @ x)
+      (a @ 1)
+      (tube @ x)
+  in
+  let comp : [x] (a : A (p @ 0)) * (u : decode (c @ x)) -> Id (A (p @ 0)) (tube @ x u @ 0) a {*; *}
+    =
+    bri x -> fibA p tt (c @ x) (bri y -> open_box @ x @ y) @ 0
+  in
+  subst2 (A (p @ 0)) (A (p @ 0))
+    (fun t0 t1 -> [x] A (p @ 0) {t0; t1})
+    (fst (comp @ 0))
+    (a @ 0)
+    (symm (A (p @ 0)) (a @ 0) (fst (comp @ 0)) (snd (comp @ 0) triv))
+    (fst (comp @ 1))
+    (coe10 G A fibA p (a @ 1))
+    (symm (A (p @ 0)) (coe10 G A fibA p (a @ 1)) (fst (comp @ 1)) (snd (comp @ 1) triv))
+    (bri x -> fst (comp @ x))
+
+let squeeze1 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
+  (a : [x] A (p @ x) {*; *}) -> [x] A (p @ 1) {coe01 G A fibA p (a @ 0); a @ 1}
+  =
+  fun G A fibA p a ->
+  let c : [x] cof {*; *} = cof_bdy cof_empty
+  in
+  let tube : [x] (decode (c @ x)) -> [y] A (p @ y) {a @ 0; *} {*; *} =
+    bri x ->
+    adjoin_bdy
+      (bri _ -> [y] A (p @ y) {a @ 0; *})
+      cof_empty
+      (bri y -> coe0 G A fibA p (a @ 0) @ y)
+      (bri y -> a @ y)
+      (fun no -> abort_empty no
+        ([_] [y] A (p @ y) {a @ 0; *} {bri y -> coe0 G A fibA p (a @ 0) @ y; bri y -> a @ y}))
+      @ x
+  in
+  let open_box : [x] [y] (box ff (c @ x) @ y) -> A (p @ y) {fun _ -> a @ 0; *} {*; *} =
+    bri x ->
+    adjoin_cap0
+      (bri y -> A (p @ y))
+      (c @ x)
+      (a @ 0)
+      (tube @ x)
+  in
+  let comp : [x] (a : A (p @ 1)) * (u : decode (c @ x)) -> Id (A (p @ 1)) (tube @ x u @ 1) a {*; *}
+    =
+    bri x -> fibA p ff (c @ x) (bri y -> open_box @ x @ y) @ 1
+  in
+  subst2 (A (p @ 1)) (A (p @ 1))
+    (fun t0 t1 -> [x] A (p @ 1) {t0; t1})
+    (fst (comp @ 0))
+    (coe01 G A fibA p (a @ 0))
+    (symm (A (p @ 1)) (coe01 G A fibA p (a @ 0)) (fst (comp @ 0)) (snd (comp @ 0) triv))
+    (fst (comp @ 1))
+    (a @ 1)
+    (symm (A (p @ 1)) (a @ 1) (fst (comp @ 1)) (snd (comp @ 1) triv))
+    (bri x -> fst (comp @ x))
 
 --------------------------------------------------------------------------------
 -- Fibrations are closed under sigma-types
@@ -115,3 +333,4 @@ let fibSigma : (G : U<0>) (A : G -> U<0>) (B : ((g : G) * A g) -> U<0>)
       (snd (cA @ x) u)
       (snd (cB @ x) u)
   >
+
