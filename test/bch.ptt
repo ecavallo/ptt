@@ -82,13 +82,22 @@ let box : (t : bool) (c : cof) -> [x] U<0> {*; *} =
     }
     (_ _ -> unit)
 
+let Filler : (G : U<0>) (A : G -> U<0>)
+  (p : [_] G {*; *})
+  (t : bool) (c : cof)
+  (f : [x] (box t c @ x) -> A (p @ x) {*; *})
+  -> U<0>
+  =
+  fun G A p t c f ->
+  [x] (a : A (p @ x)) * (u : box t c @ x) -> Id (A (p @ x)) (f @ x u) a {*; *}
+
 let isFib : (G : U<0>) (A : G -> U<0>) -> U<1> =
   fun G A ->
   (p : [_] G {*; *})
   (t : bool) (c : cof)
   (f : [x] (box t c @ x) -> A (p @ x) {*; *})
   ->
-  [x] (a : A (p @ x)) * (u : box t c @ x) -> Id (A (p @ x)) (f @ x u) a {*; *}
+  Filler G A p t c f
 
 --------------------------------------------------------------------------------
 -- Forming open boxes
@@ -235,44 +244,62 @@ let squeeze0 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
     (symm (A (p @ 0)) (coe10 G A fibA p (a @ 1)) (fst (comp @ 1)) (snd (comp @ 1) triv))
     (bri x -> fst (comp @ x))
 
-let squeeze1 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
-  (a : [x] A (p @ x) {*; *}) -> [x] A (p @ 1) {coe01 G A fibA p (a @ 0); a @ 1}
+let squeeze : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
+  (a : [x] A (p @ x) {*; *})
+  -> [x] [y] A (p @ y) {*; *} {bri y -> coe0 G A fibA p (a @ 0) @ y; bri y -> coe1 G A fibA p (a @ 1) @ y}
   =
   fun G A fibA p a ->
   let c : [x] cof {*; *} = cof_bdy cof_empty
   in
-  let tube : [x] (decode (c @ x)) -> [y] A (p @ y) {a @ 0; *} {*; *} =
+  let tube : [x] (decode (c @ x)) -> [y] A (p @ y) {squeeze0 G A fibA p a @ x; *} {*; *} =
     bri x ->
     adjoin_bdy
-      (bri _ -> [y] A (p @ y) {a @ 0; *})
+      (bri x -> [y] A (p @ y) {squeeze0 G A fibA p a @ x; *})
       cof_empty
       (bri y -> coe0 G A fibA p (a @ 0) @ y)
-      (bri y -> a @ y)
+      (bri y -> coe1 G A fibA p (a @ 1) @ y)
       (fun no -> abort_empty no
-        ([_] [y] A (p @ y) {a @ 0; *} {bri y -> coe0 G A fibA p (a @ 0) @ y; bri y -> a @ y}))
+        ([x]
+           [y] A (p @ y) {squeeze0 G A fibA p a @ x; *}
+         {bri y -> coe0 G A fibA p (a @ 0) @ y; bri y -> coe1 G A fibA p (a @ 1) @ y}))
       @ x
   in
-  let open_box : [x] [y] (box ff (c @ x) @ y) -> A (p @ y) {fun _ -> a @ 0; *} {*; *} =
+  let open_box : [x] [y] (box ff (c @ x) @ y) -> A (p @ y) {fun _ -> squeeze0 G A fibA p a @ x; *} {*; *} =
     bri x ->
     adjoin_cap0
       (bri y -> A (p @ y))
       (c @ x)
-      (a @ 0)
+      (squeeze0 G A fibA p a @ x)
       (tube @ x)
   in
-  let comp : [x] (a : A (p @ 1)) * (u : decode (c @ x)) -> Id (A (p @ 1)) (tube @ x u @ 1) a {*; *}
-    =
-    bri x -> fibA p ff (c @ x) (bri y -> open_box @ x @ y) @ 1
+  let comp : [x] Filler G A p ff (c @ x) (bri y -> open_box @ x @ y) {*; *} =
+    bri x -> fibA p ff (c @ x) (bri y -> open_box @ x @ y)
   in
-  subst2 (A (p @ 1)) (A (p @ 1))
-    (fun t0 t1 -> [x] A (p @ 1) {t0; t1})
-    (fst (comp @ 0))
-    (coe01 G A fibA p (a @ 0))
-    (symm (A (p @ 1)) (coe01 G A fibA p (a @ 0)) (fst (comp @ 0)) (snd (comp @ 0) triv))
-    (fst (comp @ 1))
-    (a @ 1)
-    (symm (A (p @ 1)) (a @ 1) (fst (comp @ 1)) (snd (comp @ 1) triv))
-    (bri x -> fst (comp @ x))
+  let flipped : [y] [x] A (p @ y) {coe0 G A fibA p (a @ 0) @ y; coe1 G A fibA p (a @ 1) @ y} {*; *} =
+     bri y ->
+     subst2 (A (p @ y)) (A (p @ y))
+      (fun t0 t1 -> [x] A (p @ y) {t0; t1})
+      (fst (comp @ 0 @ y))
+      (coe0 G A fibA p (a @ 0) @ y)
+      (symm (A (p @ y)) (coe0 G A fibA p (a @ 0) @ y) (fst (comp @ 0 @ y))
+        (snd (comp @ 0 @ y) (gel y {triv; triv} triv)))
+      (fst (comp @ 1 @ y))
+      (coe1 G A fibA p (a @ 1) @ y)
+      (symm (A (p @ y)) (coe1 G A fibA p (a @ 1) @ y) (fst (comp @ 1 @ y))
+        (snd (comp @ 1 @ y) (gel y {triv; triv} triv)))
+      (bri x -> fst (comp @ x @ y))
+  in
+  bri x y -> flipped @ y @ x
+
+let coe : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
+  -> [x] (A (p @ x)) -> [y] A (p @ y) {*; *}
+     {fun a -> bri y -> coe0 G A fibA p a @ y; fun a -> bri y -> coe1 G A fibA p a @ y}
+  =
+  fun G A fibA p -> bri x -> fun a ->
+  extent x of a in x -> A (p @ x) at _ _ -> [y] A (p @ y) {*; *} with
+  | a0 -> bri y -> coe0 G A fibA p a0 @ y
+  | a1 -> bri y -> coe1 G A fibA p a1 @ y
+  | a0 a1 q x -> squeeze G A fibA p (bri x -> q @ x) @ x
 
 --------------------------------------------------------------------------------
 -- Fibrations are closed under sigma-types
