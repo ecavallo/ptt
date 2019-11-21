@@ -571,7 +571,7 @@ and check_tp ~subtype env size d1 d2 =
     let go nf nf' =
       match nf, nf' with
       | Some nf, Some nf' -> check_nf env size nf nf'
-      | Some _, None -> false
+      | Some _, None -> subtype
       | None, Some _ -> false
       | None, None -> true
     in
