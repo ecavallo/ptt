@@ -5,6 +5,7 @@ type dim =
   | Const of int
 
 type env_entry =
+  | TopLevel of t
   | Dim of dim
   | Tm of t
 and env = env_entry list
