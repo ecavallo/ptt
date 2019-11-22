@@ -173,7 +173,7 @@ let process_decl (Env {check_env; bindings; size})  = function
     Check.check_tp ~env:check_env ~size ~term:tp;
     let sem_env = Check.env_to_sem_env check_env in
     let sem_tp = Eval.eval tp sem_env size in
-    let new_env = Check.Var {level = size; tp = sem_tp} :: check_env in
+    let new_env = Check.Postulate {level = size; tp = sem_tp} :: check_env in
     NoOutput (Env {check_env = new_env; bindings = Term name :: bindings; size = size + 1})
   | CS.NormalizeDef name ->
     let err = Check.Type_error (Check.Misc ("Unbound variable: " ^ name)) in

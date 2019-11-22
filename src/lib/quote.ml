@@ -16,8 +16,9 @@ let for_all2i f l1 l2 =
 type env_entry =
   | DVar of D.lvl
   | Var of {level : D.lvl; tp : D.t}
-  | TopLevel of D.t
   | Def of D.t
+  | TopLevel of D.t
+  | Postulate of {level : D.lvl; tp : D.t}
 type env = env_entry list
 
 let mk_bvar env size =
@@ -36,8 +37,9 @@ let env_to_sem_env env =
   let go = function
     | DVar i -> D.Dim (D.DVar i)
     | Var {level; tp} -> D.Tm (D.Neutral {tp; term = D.root (D.Var level)})
-    | TopLevel term -> D.TopLevel term
     | Def term -> D.Tm term
+    | TopLevel term -> D.TopLevel term
+    | Postulate {level; tp} -> D.TopLevel (D.Neutral {tp; term = D.root (D.Var level)})
   in
   List.map go env
 
@@ -45,8 +47,9 @@ let read_back_level env x =
   let rec go acc = function
     | DVar i :: env -> if i = x then acc else go (acc + 1) env
     | Var {level; _} :: env -> if level = x then acc else go (acc + 1) env
-    | TopLevel _ :: env -> go (acc + 1) env
     | Def _ :: env -> go (acc + 1) env
+    | TopLevel _ :: env -> go (acc + 1) env
+    | Postulate {level; _} :: env -> if level = x then acc else go (acc + 1) env
     | [] -> raise (Quote_failed "read back non-existent variable")
   in
   go 0 env

@@ -7,9 +7,10 @@ module Q = Quote
 type env_entry =
   | DVar of {level : D.lvl; width : int}
   | Var of {level : D.lvl; tp : D.t}
-  | TopLevel of {term : D.t; tp : D.t}
   | Def of {term : D.t; tp : D.t}
   | Restrict of Syn.idx
+  | TopLevel of {term : D.t; tp : D.t}
+  | Postulate of {level : D.lvl; tp : D.t}
 [@@deriving show, eq]
 type env = env_entry list
 [@@deriving show, eq]
@@ -57,17 +58,19 @@ let rec env_to_sem_env = function
   | [] -> []
   | DVar {level; _} :: env -> D.Dim (D.DVar level) :: env_to_sem_env env
   | Var {level; tp} :: env -> D.Tm (D.Neutral {tp; term = D.root (D.Var level)}) :: env_to_sem_env env
-  | TopLevel {term; _} :: env -> D.TopLevel term :: env_to_sem_env env
   | Def {term; _} :: env -> D.Tm term :: env_to_sem_env env
   | Restrict _ :: env -> env_to_sem_env env
+  | Postulate {level; tp} :: env -> D.TopLevel (D.Neutral {tp; term = D.root (D.Var level)}) :: env_to_sem_env env
+  | TopLevel {term; _} :: env -> D.TopLevel term :: env_to_sem_env env
 
 let rec env_to_quote_env = function
   | [] -> []
   | DVar {level; _} :: env -> Q.DVar level :: env_to_quote_env env
   | Var {level; tp} :: env -> Q.Var {level; tp} :: env_to_quote_env env
-  | TopLevel {term; _} :: env -> Q.TopLevel term :: env_to_quote_env env
   | Def {term; _} :: env -> Q.Def term :: env_to_quote_env env
   | Restrict _ :: env -> env_to_quote_env env
+  | TopLevel {term; _} :: env -> Q.TopLevel term :: env_to_quote_env env
+  | Postulate {level; tp} :: env -> Q.Postulate {level; tp} :: env_to_quote_env env
 
 let rec synth_var env x =
   match x, env with
@@ -77,9 +80,10 @@ let rec synth_var env x =
     then tp_error (Misc "Tried to use restricted term variable\n")
     else synth_var env x
   | 0, Var {tp; _} :: _ -> tp
-  | 0, TopLevel {tp; _} :: _ -> tp
   | 0, Def {tp; _} :: _ -> tp
   | 0, DVar {level; _} :: _ -> tp_error (Expecting_term level)
+  | 0, TopLevel {tp; _} :: _ -> tp
+  | 0, Postulate {tp; _} :: _ -> tp
   | x, _ :: env -> synth_var env (x - 1)
 
 let mk_bvar width env size =
