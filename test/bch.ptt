@@ -15,7 +15,14 @@ postulate empty : U<0>
 postulate abort_empty : empty -> (A : U<0>) -> A
 
 postulate empty_is_cof : is_cof empty
-postulate bdy_is_cof : (c : U<0>) (r : is_cof c) -> [x] is_cof (Gel x {unit; unit} (_ _ -> c)) {* ; *}
+
+postulate bdy_is_cof : (c : U<0>) (r : is_cof c)
+  -> [x] is_cof (Gel x {unit; unit} (_ _ -> c)) {* ; *}
+
+let is_prop : (A : U<0>) -> U<0> =
+  fun A -> (a : A) (b : A) -> Id A a b
+
+postulate cof_is_prop : (c : cof) -> is_prop (decode c)
 
 let cof_empty : cof = <empty, empty_is_cof>
 
@@ -26,14 +33,50 @@ let cof_bdy : cof -> [x] cof {*; *} =
 postulate funext : (A : U<0>) (B : A -> U<0>) (f0 : (a : A) -> B a) (f1 : (a : A) -> B a)
   -> ((a : A) -> Id (B a) (f0 a) (f1 a)) -> Id ((a : A) -> B a) f0 f1
 
+postulate uip : (A : U<0>) (a0 : A) (a1 : A) -> is_prop (Id A a0 a1)
+
+-- Note that because we do not require the input identity to be refl at x = 0
+-- and x = 1, this postulate implicitly invokes UIP
+postulate briext : (A : [x] U<0> {*; *})
+  (p0 : [x] A @ x {*; *}) (p1 : [x] A @ x {p0 @ 0; p0 @ 1})
+  -> ([x] Id (A @ x) (p0 @ x) (p1 @ x) {*; *})
+  -> Id ([x] A @ x {p0 @ 0; p0 @ 1}) (bri x -> p0 @ x) p1
+
 --------------------------------------------------------------------------------
 -- Preliminary
 --------------------------------------------------------------------------------
+
+let based0_J : (A : U<0>) (a0 : A)
+  (B : (a1 : A) (eq : Id A a0 a1) -> U<0>) (b : B a0 (refl a0))
+  (a1 : A) (eq : Id A a0 a1) -> B a1 eq
+  =
+  fun A a0 B b a1 eq ->
+  (match eq at a0 a1 eq ->
+     (B : (a1 : A) (eq : Id A a0 a1) -> U<0>) (b : B a0 (refl a0)) -> B a1 eq
+   with
+   | refl _ -> fun B b -> b)
+  B b
+
+let based1_J : (A : U<0>) (a1 : A)
+  (B : (a0 : A) (eq : Id A a0 a1) -> U<0>) (b : B a1 (refl a1))
+  (a0 : A) (eq : Id A a0 a1) -> B a0 eq
+  =
+  fun A a1 B b a0 eq ->
+  (match eq at a0 a1 eq ->
+     (B : (a0 : A) (eq : Id A a0 a1) -> U<0>) (b : B a1 (refl a1)) -> B a0 eq
+   with
+   | refl _ -> fun B b -> b)
+  B b
 
 let symm : (A : U<0>) (a : A) (b : A) -> (Id A a b) -> Id A b a =
   fun A a b eq ->
   match eq at a0 a1 _ -> Id A a1 a0 with
   | refl a -> refl a
+
+let trans : (A : U<0>) (a : A) (b : A) (c : A) -> (Id A a b) -> (Id A b c) -> Id A a c =
+  fun A a b c eq0 ->
+  match eq0 at x y _ -> (Id A y c) -> Id A x c with
+  | refl z -> fun eq1 -> eq1
 
 let subst : (A : U<0>) (B : A -> U<0>)
   (a0 : A) (a1 : A) (eq : Id A a0 a1)
@@ -42,6 +85,13 @@ let subst : (A : U<0>) (B : A -> U<0>)
   fun A B a0 a1 eq ->
   match eq at a0 a1 _ -> (B a0) -> B a1 with
   | refl _ -> fun b -> b
+
+let substinv : (A : U<0>) (B : A -> U<0>)
+  (a0 : A) (a1 : A) (eq : Id A a0 a1)
+  -> (B a1) -> B a0
+  =
+  fun A B a0 a1 eq ->
+  subst A B a1 a0 (symm A a0 a1 eq)
 
 let subst2 : (A : U<0>) (B : U<0>) (C : A -> B -> U<0>)
   (a0 : A) (a1 : A) (eqA : Id A a0 a1)
@@ -52,6 +102,69 @@ let subst2 : (A : U<0>) (B : U<0>) (C : A -> B -> U<0>)
   match eq at a0 a1 _ -> (b0 : B) (b1 : B) -> (Id B b0 b1) -> (C a0 b0) -> C a1 b1 with
   | refl a -> subst B (C a)
 
+let subst_ends : (A : [x] U<0> {*; *}) (p : [x] A @ x {*; *})
+  (a0 : A @ 0) (eq0 : Id (A @ 0) (p @ 0) a0)
+  (a1 : A @ 1) (eq1 : Id (A @ 1) (p @ 1) a1)
+  -> [x] A @ x {a0; a1}
+  =
+  fun A p a0 eq0 a1 eq1 ->
+  subst2 (A @ 0) (A @ 1) (fun t0 t1 -> [x] A @ x {t0; t1})
+    (p @ 0) a0 eq0
+    (p @ 1) a1 eq1
+    (bri x -> p @ x)
+
+let subst2inv : (A : U<0>) (B : U<0>) (C : A -> B -> U<0>)
+  (a0 : A) (a1 : A) (eqA : Id A a0 a1)
+  (b0 : B) (b1 : B) (eqB : Id B b0 b1)
+  -> (C a1 b1) -> C a0 b0
+  =
+  fun A B C a0 a1 eqA b0 b1 eqB ->
+  subst2 A B C a1 a0 (symm A a0 a1 eqA) b1 b0 (symm B b0 b1 eqB)
+
+let substinv_ends : (A : [x] U<0> {*; *}) (p : [x] A @ x {*; *})
+  (a0 : A @ 0) (eq0 : Id (A @ 0) a0 (p @ 0))
+  (a1 : A @ 1) (eq1 : Id (A @ 1) a1 (p @ 1))
+  -> [x] A @ x {a0; a1}
+  =
+  fun A p a0 eq0 a1 eq1 ->
+  subst2inv (A @ 0) (A @ 1) (fun t0 t1 -> [x] A @ x {t0; t1})
+    a0 (p @ 0) eq0
+    a1 (p @ 1) eq1
+    (bri x -> p @ x)
+
+let substinv_ends_eq : (A : [x] U<0> {*; *})
+  (q : [x] A @ x {*; *})
+  (p : [x] A @ x {*; *})
+  (a0 : A @ 0) (eq0 : Id (A @ 0) a0 (p @ 0))
+  (a1 : A @ 1) (eq1 : Id (A @ 1) a1 (p @ 1))
+  -> ([x] Id (A @ x) (q @ x) (p @ x) {*; *})
+  -> ([x] Id (A @ x) (q @ x) (substinv_ends A p a0 eq0 a1 eq1 @ x) {*; *})
+  =
+  fun A q p ->
+  based1_J (A @ 0) (p @ 0)
+    (fun a0 eq0 ->
+      (a1 : A @ 1) (eq1 : Id (A @ 1) a1 (p @ 1))
+      -> ([x] Id (A @ x) (q @ x) (p @ x) {*; *})
+      -> ([x] Id (A @ x) (q @ x) (substinv_ends A p a0 eq0 a1 eq1 @ x) {*; *}))
+    (based1_J (A @ 1) (p @ 1)
+      (fun a1 eq1 ->
+        ([x] Id (A @ x) (q @ x) (p @ x) {*; *})
+        -> ([x] Id (A @ x) (q @ x) (substinv_ends A p (p @ 0) (refl (p @ 0)) a1 eq1 @ x) {*; *}))
+      (fun t -> t))
+
+let set_id_bridge_ends : (A : [x] U<0> {*; *})
+  (p : [x] A @ x {*; *}) (q : [x] A @ x {*; *})
+  (eq0 : Id (A @ 0) (p @ 0) (q @ 0)) (eq1 : Id (A @ 1) (p @ 1) (q @ 1))
+  -> ([x] Id (A @ x) (p @ x) (q @ x) {*; *})
+  -> ([x] Id (A @ x) (p @ x) (q @ x) {eq0; eq1})
+  =
+  fun A p q eq0 eq1 t ->
+  subst_ends
+    (bri x -> Id (A @ x) (p @ x) (q @ x))
+    t
+    eq0 (uip (A @ 0) (p @ 0) (q @ 0) (t @ 0) eq0)
+    eq1 (uip (A @ 1) (p @ 1) (q @ 1) (t @ 1) eq1)
+      
 let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
   -> (Id A a0 a1) -> Id B (f a0) (f a1)
   =
@@ -59,16 +172,63 @@ let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
   match eq at a0 a1 _ -> Id B (f a0) (f a1) with
   | refl z -> refl (f z)
 
-let cong2 : (A : U<0>) (B : U<0>) (C : U<0>) (f : A -> B -> C)
-  (a0 : A) (a1 : A) (eqA : Id A a0 a1)
-  (b0 : B) (b1 : B) (eqB : Id B b0 b1)
-  -> Id C (f a0 b0) (f a1 b1)
+let cong_bapp : (A0 : U<0>) (A1 : U<0>) (A : [_] U<0> {A0; A1}) (a0 : A0) (a1 : A1)
+  (b0 : [x] A @ x {a0; a1}) (b1 : [x] A @ x {a0; a1})
+  -> (Id ([x] A @ x {a0; a1}) b0 b1)
+  -> [x] Id (A @ x) (b0 @ x) (b1 @ x) {refl a0; refl a1}
   =
-  fun A B C f a0 a1 eqA ->
-  match eqA at
-    a0 a1 _ -> (b0 : B) (b1 : B) (eqB : Id B b0 b1)-> Id C (f a0 b0) (f a1 b1)
+  fun A0 A1 A a0 a1 b0 b1 eq ->
+  match eq at c0 c1 _ -> [x] Id (A @ x) (c0 @ x) (c1 @ x) {refl a0; refl a1} with
+  | refl c -> bri x -> refl (c @ x)
+
+let lineext : (A : [x] U<0> {*; *})
+  (p0 : [x] A @ x {*; *}) (p1 : [x] A @ x {*; *})
+  -> ([x] Id (A @ x) (p0 @ x) (p1 @ x) {*; *})
+  -> Id ([x] A @ x {*; *}) p0 p1
+  =
+  fun A p0 p1 q ->
+  subst2 (A @ 0) (A @ 1)
+    (fun a0 a1 ->
+      (p1 : [x] A @ x {a0; a1})
+      -> ([x] Id (A @ x) (p0 @ x) (p1 @ x) {*; *})
+      -> Id ([x] A @ x {*; *}) p0 p1)
+    (p0 @ 0) (p1 @ 0) (q @ 0)
+    (p0 @ 1) (p1 @ 1) (q @ 1)
+    (fun p1' q' -> briext (bri x -> A @ x) p0 p1' q')
+    (bri x -> p1 @ x)
+    q
+
+let based0ext : (A : [x] U<0> {*; *})
+  (p0 : [x] A @ x {*; *}) (p1 : [x] A @ x {p0 @ 0; *})
+  -> ([x] Id (A @ x) (p0 @ x) (p1 @ x) {*; *})
+  -> Id ([x] A @ x {p0 @ 0; *}) (bri x -> p0 @ x) p1
+  =
+  fun A p0 p1 q ->
+  subst (A @ 1)
+    (fun a1 ->
+      (p1 : [x] A @ x {p0 @ 0; a1})
+      -> ([x] Id (A @ x) (p0 @ x) (p1 @ x) {*; *})
+      -> Id ([x] A @ x {p0 @ 0; *}) (bri x -> p0 @ x) p1)
+    (p0 @ 1) (p1 @ 1) (q @ 1)
+    (fun p1' q' -> briext (bri x -> A @ x) p0 p1' q')
+    (bri x -> p1 @ x)
+    q
+
+let gelproj : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
+  (a : A) (b : B) -> [x] Gel x {A; B} (a b -> R a b) {a; b} -> R a b
+  =
+  fun A B R a b p ->
+  ungel x : 2 -> p @ x at _ -> R a b with | gel r -> r
+
+let gel_eta : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>) (a : A) (b : B)
+  (p : [x] Gel x {A; B} (a b -> R a b) {a; b})
+  -> [x] Id (Gel x {A; B} (a b -> R a b)) (p @ x) (gel x {a; b} (gelproj A B R a b p)) {*; *}
+  =
+  fun A B R a b p ->
+  ungel x : 2 -> p @ x at
+  q -> [x] Id (Gel x {A; B} (a b -> R a b)) (q @ x) (gel x {a; b} (gelproj A B R a b q)) {*; *}
   with
-  | refl a -> cong B C (f a)
+  | gel r -> bri x -> refl (gel x {a;b} r)
 
 --------------------------------------------------------------------------------
 -- Definition of fibration
@@ -99,6 +259,26 @@ let isFib : (G : U<0>) (A : G -> U<0>) -> U<1> =
   ->
   Filler G A p t c f
 
+let comp0_path : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A)
+  (p : [_] G {*; *}) (c : cof)
+  (f : [x] (box ff c @ x) -> A (p @ x) {*; *})
+  ->
+  (q : [x] A (p @ x) {f @ 0 triv; *})
+  * (u : decode c) -> [x] Id (A (p @ x)) (f @ x (gel x {triv; u} triv)) (q @ x) {*; *}
+  =
+  fun G A fibA p c f ->
+  substinv
+    (A (p @ 0))
+    (fun a -> 
+      (q : [x] A (p @ x) {a; *})
+      * (u : decode c) -> [x] Id (A (p @ x)) (f @ x (gel x {triv; u} triv)) (q @ x) {*; *})
+    (f @ 0 triv)
+    (fst (fibA p ff c f @ 0))
+    (snd (fibA p ff c f @ 0) triv)
+    < bri x -> fst (fibA p ff c f @ x)
+    , fun u -> bri x -> snd (fibA p ff c f @ x) (gel x {triv; u} triv)
+    >
+
 --------------------------------------------------------------------------------
 -- Forming open boxes
 --------------------------------------------------------------------------------
@@ -118,7 +298,7 @@ let adjoin_bdy : (A : [x] U<0> {*; *}) (c : cof)
   | _ -> f1
   | a0 a1 q x ->
     (ungel x : 2 -> q @ x at _ -> [x] A @ x {f0; f1} with
-     | gel u -> bri x -> f u @ x)
+     | gel u -> f u)
     @ x
 
 let adjoin_cap0 : (A : [x] U<0> {*; *}) (c : cof) (a0 : A @ 0)
@@ -171,16 +351,12 @@ let coe0 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
   -> (a0 : A (p @ 0)) -> [y] A (p @ y) {a0; coe01 G A fibA p a0}
   =
   fun G A fibA p a0 ->
-  subst
+  substinv
    (A (p @ 0))
    (fun a -> [y] A (p @ y) {a; coe01 G A fibA p a0})
-   (fst (fibA p ff cof_empty (empty_box (bri x -> A (p @ x)) ff a0) @ 0))
    a0
-   (symm
-     (A (p @ 0))
-     a0
-     (fst (fibA p ff cof_empty (empty_box (bri x -> A (p @ x)) ff a0) @ 0))
-     (snd (fibA p ff cof_empty (empty_box (bri x -> A (p @ x)) ff a0) @ 0) triv))
+   (fst (fibA p ff cof_empty (empty_box (bri x -> A (p @ x)) ff a0) @ 0))
+   (snd (fibA p ff cof_empty (empty_box (bri x -> A (p @ x)) ff a0) @ 0) triv)
    (bri y -> fst (fibA p ff cof_empty (empty_box (bri x -> A (p @ x)) ff a0) @ y))
 
 let coe10 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
@@ -193,99 +369,64 @@ let coe1 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
   (a1 : A (p @ 1)) -> [y] A (p @ y) {coe10 G A fibA p a1; a1}
   =
   fun G A fibA p a1 ->
-  subst
+  substinv
    (A (p @ 1))
    (fun a -> [y] A (p @ y) {coe10 G A fibA p a1; a})
-   (fst (fibA p tt cof_empty (empty_box (bri x -> A (p @ x)) tt a1) @ 1))
    a1
-   (symm
-     (A (p @ 1))
-     a1
-     (fst (fibA p tt cof_empty (empty_box (bri x -> A (p @ x)) tt a1) @ 1))
-     (snd (fibA p tt cof_empty (empty_box (bri x -> A (p @ x)) tt a1) @ 1) triv))
+   (fst (fibA p tt cof_empty (empty_box (bri x -> A (p @ x)) tt a1) @ 1))
+   (snd (fibA p tt cof_empty (empty_box (bri x -> A (p @ x)) tt a1) @ 1) triv)
    (bri y -> fst (fibA p tt cof_empty (empty_box (bri x -> A (p @ x)) tt a1) @ y))
 
-let squeeze0 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
-  (a : [x] A (p @ x) {*; *}) -> [x] A (p @ 0) {a @ 0; coe10 G A fibA p (a @ 1)}
+let squeeze0Fill : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
+  (a : [x] A (p @ x) {*; *})
+  -> [y] [x] A (p @ y) {a @ y; coe1 G A fibA p (a @ 1) @ y} {*; bri _ -> a @ 1}
   =
   fun G A fibA p a ->
   let c : [x] cof {*; *} = cof_bdy cof_empty
   in
   let tube : [x] (decode (c @ x)) -> [y] A (p @ y) {*; a @ 1} {*; *} =
-    bri x ->
     adjoin_bdy
       (bri _ -> [y] A (p @ y) {*; a @ 1})
       cof_empty
       (bri y -> a @ y)
-      (bri y -> coe1 G A fibA p (a @ 1) @ y)
+      (coe1 G A fibA p (a @ 1))
       (fun no -> abort_empty no
-        ([_] [y] A (p @ y) {*; a @ 1} {bri y -> a @ y; bri y -> coe1 G A fibA p (a @ 1) @ y}))
-      @ x
+        ([_] [y] A (p @ y) {*; a @ 1} {bri y -> a @ y; coe1 G A fibA p (a @ 1)}))
   in
   let open_box : [x] [y] (box tt (c @ x) @ y) -> A (p @ y) {*; fun _ -> a @ 1} {*; *} =
     bri x ->
-    adjoin_cap1
-      (bri y -> A (p @ y))
-      (c @ x)
-      (a @ 1)
-      (tube @ x)
+    adjoin_cap1 (bri y -> A (p @ y)) (c @ x) (a @ 1) (tube @ x)
   in
-  let comp : [x] (a : A (p @ 0)) * (u : decode (c @ x)) -> Id (A (p @ 0)) (tube @ x u @ 0) a {*; *}
-    =
-    bri x -> fibA p tt (c @ x) (bri y -> open_box @ x @ y) @ 0
+  let comp : [x] Filler G A p tt (c @ x) (bri y -> open_box @ x @ y) {*; *} =
+    bri x -> fibA p tt (c @ x) (open_box @ x)
   in
-  subst2 (A (p @ 0)) (A (p @ 0))
-    (fun t0 t1 -> [x] A (p @ 0) {t0; t1})
-    (fst (comp @ 0))
-    (a @ 0)
-    (symm (A (p @ 0)) (a @ 0) (fst (comp @ 0)) (snd (comp @ 0) triv))
-    (fst (comp @ 1))
-    (coe10 G A fibA p (a @ 1))
-    (symm (A (p @ 0)) (coe10 G A fibA p (a @ 1)) (fst (comp @ 1)) (snd (comp @ 1) triv))
-    (bri x -> fst (comp @ x))
-
-let squeeze1 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
-  (a : [x] A (p @ x) {*; *}) -> [x] A (p @ 1) {coe01 G A fibA p (a @ 0); a @ 1}
+  substinv
+    ([x] [y] (box tt (c @ x) @ y) -> A (p @ y) {*; *} {*; *})
+    (fun b ->
+      [y] [x] A (p @ y) {b @ 0 @ y (gel y {triv; triv} triv); b @ 1 @ y (gel y {triv; triv} triv)}
+        {*; bri x -> b @ x @ 1 triv})
+    (bri x -> bri y -> fun u -> open_box @ x @ y u)
+    (bri x -> bri y -> fun _ -> fst (comp @ x @ y))
+    (lineext (bri x -> [y] (box tt (c @ x) @ y) -> A (p @ y) {*; *})
+      (bri x -> bri y -> fun u -> open_box @ x @ y u)
+      (bri x -> bri y -> fun _ -> fst (comp @ x @ y))
+      (bri x -> lineext (bri y -> (box tt (c @ x) @ y) -> A (p @ y))
+        (bri y -> fun u -> open_box @ x @ y u)
+        (bri y -> fun _ -> fst (comp @ x @ y))
+        (bri y -> funext (box tt (c @ x) @ y) (fun _ -> A (p @ y))
+          (fun u -> open_box @ x @ y u)
+          (fun _ -> fst (comp @ x @ y))
+          (snd (comp @ x @ y)))))
+    (bri y -> bri x -> fst (comp @ x @ y))
+    
+let squeeze0 : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
+  (a : [x] A (p @ x) {*; *}) -> [x] A (p @ 0) {a @ 0; coe10 G A fibA p (a @ 1)}
   =
-  fun G A fibA p a ->
-  let c : [x] cof {*; *} = cof_bdy cof_empty
-  in
-  let tube : [x] (decode (c @ x)) -> [y] A (p @ y) {a @ 0; *} {*; *} =
-    bri x ->
-    adjoin_bdy
-      (bri _ -> [y] A (p @ y) {a @ 0; *})
-      cof_empty
-      (bri y -> coe0 G A fibA p (a @ 0) @ y)
-      (bri y -> a @ y)
-      (fun no -> abort_empty no
-        ([_] [y] A (p @ y) {a @ 0; *} {bri y -> coe0 G A fibA p (a @ 0) @ y; bri y -> a @ y}))
-      @ x
-  in
-  let open_box : [x] [y] (box ff (c @ x) @ y) -> A (p @ y) {fun _ -> a @ 0; *} {*; *} =
-    bri x ->
-    adjoin_cap0
-      (bri y -> A (p @ y))
-      (c @ x)
-      (a @ 0)
-      (tube @ x)
-  in
-  let comp : [x] (a : A (p @ 1)) * (u : decode (c @ x)) -> Id (A (p @ 1)) (tube @ x u @ 1) a {*; *}
-    =
-    bri x -> fibA p ff (c @ x) (bri y -> open_box @ x @ y) @ 1
-  in
-  subst2 (A (p @ 1)) (A (p @ 1))
-    (fun t0 t1 -> [x] A (p @ 1) {t0; t1})
-    (fst (comp @ 0))
-    (coe01 G A fibA p (a @ 0))
-    (symm (A (p @ 1)) (coe01 G A fibA p (a @ 0)) (fst (comp @ 0)) (snd (comp @ 0) triv))
-    (fst (comp @ 1))
-    (a @ 1)
-    (symm (A (p @ 1)) (a @ 1) (fst (comp @ 1)) (snd (comp @ 1) triv))
-    (bri x -> fst (comp @ x))
+  fun G A fibA p a -> squeeze0Fill G A fibA p a @ 0
 
 let squeeze : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
   (a : [x] A (p @ x) {*; *})
-  -> [x] [y] A (p @ y) {*; *} {bri y -> coe0 G A fibA p (a @ 0) @ y; bri y -> coe1 G A fibA p (a @ 1) @ y}
+  -> [x] [y] A (p @ y) {*; *} {coe0 G A fibA p (a @ 0); coe1 G A fibA p (a @ 1)}
   =
   fun G A fibA p a ->
   let c : [x] cof {*; *} = cof_bdy cof_empty
@@ -295,12 +436,11 @@ let squeeze : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
     adjoin_bdy
       (bri x -> [y] A (p @ y) {squeeze0 G A fibA p a @ x; *})
       cof_empty
-      (bri y -> coe0 G A fibA p (a @ 0) @ y)
-      (bri y -> coe1 G A fibA p (a @ 1) @ y)
+      (coe0 G A fibA p (a @ 0))
+      (coe1 G A fibA p (a @ 1))
       (fun no -> abort_empty no
-        ([x]
-           [y] A (p @ y) {squeeze0 G A fibA p a @ x; *}
-         {bri y -> coe0 G A fibA p (a @ 0) @ y; bri y -> coe1 G A fibA p (a @ 1) @ y}))
+        ([x] [y] A (p @ y) {squeeze0 G A fibA p a @ x; *}
+         {coe0 G A fibA p (a @ 0); coe1 G A fibA p (a @ 1)}))
       @ x
   in
   let open_box : [x] [y] (box ff (c @ x) @ y) -> A (p @ y) {fun _ -> squeeze0 G A fibA p a @ x; *} {*; *} =
@@ -311,33 +451,27 @@ let squeeze : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
       (squeeze0 G A fibA p a @ x)
       (tube @ x)
   in
-  let comp : [x] Filler G A p ff (c @ x) (bri y -> open_box @ x @ y) {*; *} =
-    bri x -> fibA p ff (c @ x) (bri y -> open_box @ x @ y)
+  let comp : [x] Filler G A p ff (c @ x) (open_box @ x) {*; *} =
+    bri x -> fibA p ff (c @ x) (open_box @ x)
   in
   let flipped : [y] [x] A (p @ y) {coe0 G A fibA p (a @ 0) @ y; coe1 G A fibA p (a @ 1) @ y} {*; *} =
      bri y ->
-     subst2 (A (p @ y)) (A (p @ y))
-      (fun t0 t1 -> [x] A (p @ y) {t0; t1})
-      (fst (comp @ 0 @ y))
-      (coe0 G A fibA p (a @ 0) @ y)
-      (symm (A (p @ y)) (coe0 G A fibA p (a @ 0) @ y) (fst (comp @ 0 @ y))
-        (snd (comp @ 0 @ y) (gel y {triv; triv} triv)))
-      (fst (comp @ 1 @ y))
-      (coe1 G A fibA p (a @ 1) @ y)
-      (symm (A (p @ y)) (coe1 G A fibA p (a @ 1) @ y) (fst (comp @ 1 @ y))
-        (snd (comp @ 1 @ y) (gel y {triv; triv} triv)))
+     substinv_ends (bri _ -> A (p @ y))
       (bri x -> fst (comp @ x @ y))
+      (coe0 G A fibA p (a @ 0) @ y)
+      (snd (comp @ 0 @ y) (gel y {triv; triv} triv))
+      (coe1 G A fibA p (a @ 1) @ y)
+      (snd (comp @ 1 @ y) (gel y {triv; triv} triv))
   in
   bri x y -> flipped @ y @ x
 
 let coe : (G : U<0>) (A : G -> U<0>) (fibA : isFib G A) (p : [_] G {*; *})
-  -> [x] (A (p @ x)) -> [y] A (p @ y) {*; *}
-     {fun a -> bri y -> coe0 G A fibA p a @ y; fun a -> bri y -> coe1 G A fibA p a @ y}
+  -> [x] (A (p @ x)) -> [y] A (p @ y) {*; *} {coe0 G A fibA p; coe1 G A fibA p}
   =
   fun G A fibA p -> bri x -> fun a ->
   extent x of a in x -> A (p @ x) at _ _ -> [y] A (p @ y) {*; *} with
-  | a0 -> bri y -> coe0 G A fibA p a0 @ y
-  | a1 -> bri y -> coe1 G A fibA p a1 @ y
+  | a0 -> coe0 G A fibA p a0
+  | a1 -> coe1 G A fibA p a1
   | a0 a1 q x -> squeeze G A fibA p (bri x -> q @ x) @ x
 
 --------------------------------------------------------------------------------
@@ -400,3 +534,158 @@ let fibSigma : (G : U<0>) (A : G -> U<0>) (B : ((g : G) * A g) -> U<0>)
       (snd (cB @ x) u)
   >
 
+--------------------------------------------------------------------------------
+-- Fibrations are closed under pi-types
+--------------------------------------------------------------------------------
+
+let Pi : (G : U<0>) (A : G -> U<0>) (B : ((g : G) * A g) -> U<0>) -> G -> U<0> =
+  fun G A B g -> (a : A g) -> B <g, a>
+
+let fibPiFrom0 : (G : U<0>) (A : G -> U<0>) (B : ((g : G) * A g) -> U<0>)
+  -> (isFib G A) -> (isFib ((g : G) * A g) B)
+  -> (p : [_] G {*; *}) (c : cof)
+  (f : [x] (box ff c @ x) -> (Pi G A B) (p @ x) {*; *})
+  ->
+  [x] (a : Pi G A B (p @ x)) * (u : box ff c @ x) -> Id (Pi G A B (p @ x)) (f @ x u) a {*; *}
+  =
+  fun G A B fibA fibB ->
+  fun p c f ->
+  let from1 : (a1 : A (p @ 1)) -> [x] A (p @ x) {*; a1} = coe1 G A fibA p
+  in
+  let compB1 : (a1 : A (p @ 1)) ->
+    (q : [x] B <p @ x, from1 a1 @ x> {f @ 0 triv (from1 a1 @ 0); *})
+    * (u : decode c) ->
+      [x] Id (B <p @ x, from1 a1 @ x>) (f @ x (gel x {triv; u} triv) (from1 a1 @ x)) (q @ x) {*; *}
+    =
+    fun a1 ->
+    comp0_path ((g : G) * A g) B fibB
+      (bri y -> <p @ y, from1 a1 @ y>) c (bri y -> fun u -> f @ y u (from1 a1 @ y))
+  in
+  let sqz : (q : [x] A (p @ x) {*; *})
+    -> [x] [z] A (p @ x) {q @ x; from1 (q @ 1) @ x} {*; bri _ -> q @ 1}
+    =
+    fun a -> squeeze0Fill G A fibA p a
+  in
+  let tube_part0 : (q : [x] A (p @ x) {*; *}) (u : decode c)
+    -> (r : [z] [x] B <p @ x, sqz q @ x @ z> {f @ 0 triv (sqz q @ 0 @ z); fst (compB1 (q @ 1)) @ 1}
+            {*; bri x -> fst (compB1 (q @ 1)) @ x})
+       * [x] Id (B <p @ x, q @ x>) (f @ x (gel x {triv; u} triv) (q @ x)) (r @ 0 @ x) {*; *}
+    =
+    fun q u -> 
+    subst
+      ([x] B <p @ x, from1 (q @ 1) @ x> {f @ 0 triv (from1 (q @ 1) @ 0); *})
+      (fun t ->
+        (r : [z] [x] B <p @ x, sqz q @ x @ z> {f @ 0 triv (sqz q @ 0 @ z); t @ 1} {*; bri x -> t @ x})
+        * [x] Id (B <p @ x, q @ x>) (f @ x (gel x {triv; u} triv) (q @ x)) (r @ 0 @ x) {*; *})
+      (bri x -> f @ x (gel x {triv; u} triv) (from1 (q @ 1) @ x))
+      (fst (compB1 (q @ 1)))
+      (based0ext (bri x -> B <p @ x, from1 (q @ 1) @ x>)
+        (bri x -> f @ x (gel x {triv; u} triv) (from1 (q @ 1) @ x))
+        (fst (compB1 (q @ 1)))
+        (snd (compB1 (q @ 1)) u))
+      < bri z -> bri x -> f @ x (gel x {triv; u} triv) (sqz q @ x @ z)
+      , bri x -> refl (f @ x (gel x {triv; u} triv) (q @ x))
+      >
+  in
+  let tube_part1 : (q : [x] A (p @ x) {*; *})
+    -> [x] (decode (cof_bdy c @ x)) -> [z] B <p @ x, sqz q @ x @ z> {*; fst (compB1 (q @ 1)) @ x}
+       {fun _ -> bri z -> f @ 0 triv (sqz q @ 0 @ z); fun _ -> bri _ -> fst (compB1 (q @ 1)) @ 1}
+    =
+    fun q ->
+    adjoin_bdy
+      (bri x -> [z] B <p @ x, sqz q @ x @ z> {*; fst (compB1 (q @ 1)) @ x})
+      c
+      (bri z -> f @ 0 triv (sqz q @ 0 @ z))
+      (bri _ -> fst (compB1 (q @ 1)) @ 1)
+      (fun u -> bri x -> bri z -> fst (tube_part0 q u) @ z @ x)
+  in
+  let open : (q : [x] A (p @ x) {*; *})
+    -> [x] [z] (box tt (cof_bdy c @ x) @ z) -> B <p @ x, sqz q @ x @ z>
+           {*; fun _ -> fst (compB1 (q @ 1)) @ x}
+       {*; *}
+    =
+    fun q -> bri x ->
+    adjoin_cap1
+      (bri z -> B <p @ x, sqz q @ x @ z>)
+      (cof_bdy c @ x)
+      (fst (compB1 (q @ 1)) @ x)
+      (fun u -> bri z -> tube_part1 q @ x u @ z)
+  in
+  let compB : (q : [x] A (p @ x) {*; *})
+    -> [x] (b : B <p @ x, q @ x>)
+           * (u : decode (cof_bdy c @ x)) -> Id (B <p @ x, q @ x>) (open q @ x @ 0 u) b
+       {*; *}
+    =
+    fun q -> bri x ->
+    fibB
+      (bri z -> <p @ x, sqz q @ x @ z>)
+      tt
+      (cof_bdy c @ x)
+      (bri z -> fun u -> open q @ x @ z u)
+      @ 0
+  in
+  let compB_path : (q : [x] A (p @ x) {*; *})
+    -> [x] B <p @ x, q @ x> {f @ 0 triv (q @ 0); fst (compB1 (q @ 1)) @ 1}
+    =
+    fun q ->
+    substinv_ends (bri x -> B <p @ x, q @ x>)
+      (bri x -> fst (compB q @ x))
+      (f @ 0 triv (q @ 0))
+      (snd (compB q @ 0) triv)
+      (fst (compB1 (q @ 1)) @ 1)
+      (snd (compB q @ 1) triv)
+  in
+  let result : [x] Pi G A B (p @ x) {*; *} =
+    bri x -> fun a ->
+    extent x of a in x -> A (p @ x) at x a -> B <p @ x, a> with
+    | a0 -> f @ 0 triv a0
+    | a1 -> fst (compB1 a1) @ 1
+    | a0 a1 q x -> compB_path q @ x
+  in
+  bri x ->
+  < result @ x
+  , fun u ->
+    funext (A (p @ x)) (fun a -> B <p @ x, a>)
+      (f @ x u)
+      (result @ x)
+      (fun a ->
+        extent x of <u,a> in
+        x -> (box ff c @ x) * A (p @ x) at
+        x ua -> Id (B <p @ x, snd ua>) (f @ x (fst ua) (snd ua)) (result @ x (snd ua)) with
+        | ua0 -> refl (f @ 0 triv (snd ua0))
+        | ua1 -> snd (compB1 (snd ua1)) (fst ua1) @ 1
+        | ua0 ua1 ua x ->
+          set_id_bridge_ends
+            (bri x -> B <p @ x, snd (ua @ x)>)
+            (bri x -> f @ x (fst (ua @ x)) (snd (ua @ x)))
+            (bri x -> result @ x (snd (ua @ x)))
+            (refl (f @ 0 triv (snd ua0)))
+            (snd (compB1 (snd ua1)) (fst ua1) @ 1)
+            (substinv_ends_eq
+              (bri x -> B <p @ x, snd (ua @ x)>)
+              (bri x -> f @ x (fst (ua @ x)) (snd (ua @ x)))
+              (bri x -> fst (compB (bri x -> snd (ua @ x)) @ x))
+              (f @ 0 triv (snd ua0))
+              (snd (compB (bri x -> snd (ua @ x)) @ 0) triv)
+              (fst (compB1 (snd ua1)) @ 1)
+              (snd (compB (bri x -> snd (ua @ x)) @ 1) triv)
+              (bri x ->
+                trans
+                  (B <p @ x, snd (ua @ x)>)
+                  (f @ x (fst (ua @ x)) (snd (ua @ x)))
+                  (f @ x (gel x {triv; fst ua1} triv) (snd (ua @ x)))
+                  (fst (compB (bri x -> snd (ua @ x)) @ x))
+                  (cong (box ff c @ x) (B <p @ x, snd (ua @ x)>)
+                    (fun u -> f @ x u (snd (ua @ x)))
+                    (fst (ua @ x))
+                    (gel x {triv; fst ua1} triv)
+                    (gel_eta unit (decode c) (fun _ _ -> unit) triv (fst ua1) (bri x -> fst (ua @ x)) @ x))
+                  (trans
+                    (B <p @ x, snd (ua @ x)>)
+                    (f @ x (gel x {triv; fst ua1} triv) (snd (ua @ x)))
+                    (fst (tube_part0 (bri x -> snd (ua @ x)) (fst ua1)) @ 0 @ x)
+                    (fst (compB (bri x -> snd (ua @ x)) @ x))
+                    (snd (tube_part0 (bri x -> snd (ua @ x)) (fst ua1)) @ x)
+                    (snd (compB (bri x -> snd (ua @ x)) @ x) (gel x {triv; triv} (fst ua1))))))
+            @ x)
+  >
