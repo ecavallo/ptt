@@ -9,6 +9,8 @@ type env_entry =
   | Var of {level : D.lvl; tp : D.t}
   | Def of {term : D.t; tp : D.t}
   | Restrict of Syn.idx
+  | TopLevel of {term : D.t; tp : D.t}
+  | Postulate of {level : D.lvl; tp : D.t}
 [@@deriving show, eq]
 type env = env_entry list
 [@@deriving show, eq]
@@ -16,9 +18,10 @@ type env = env_entry list
 type error =
     Cannot_synth_term of Syn.t
   | Dim_mismatch of D.dim * D.dim
-  | Type_mismatch of D.t * D.t
+  | Type_mismatch of Syn.t * Syn.t
   | Expecting_universe of D.t
   | Expecting_term of D.lvl
+  | Expecting_of of string * D.t
   | Misc of string
 
 let pp_error fmt = function
@@ -34,9 +37,9 @@ let pp_error fmt = function
     Format.fprintf fmt "@]@]@,"
   | Type_mismatch (t1, t2) ->
     Format.fprintf fmt "@[<v>Cannot equate@,@[<hov 2>  ";
-    D.pp fmt t1;
+    Syn.pp fmt t2;
     Format.fprintf fmt "@]@ with@,@[<hov 2>  ";
-    D.pp fmt t2;
+    Syn.pp fmt t1;
     Format.fprintf fmt "@]@]@,"
   | Expecting_universe d ->
     Format.fprintf fmt "@[<v>Expected some universe but found@ @[<hov 2>";
@@ -45,6 +48,12 @@ let pp_error fmt = function
   | Expecting_term j ->
     Format.fprintf fmt "@[<v>Expected term variable but found dimension@ @[<hov 2>";
     Format.pp_print_int fmt j;
+    Format.fprintf fmt "@]@]@,"
+  | Expecting_of (s, t) ->
+    Format.fprintf fmt "@[<v>Expecting@,@[<hov 2>  ";
+    Format.pp_print_string fmt s;
+    Format.fprintf fmt "@]@ but found@,@[<hov 2>  ";
+    D.pp fmt t;
     Format.fprintf fmt "@]@]@,"
   | Misc s -> Format.pp_print_string fmt s
 
@@ -58,6 +67,8 @@ let rec env_to_sem_env = function
   | Var {level; tp} :: env -> D.Tm (D.Neutral {tp; term = D.root (D.Var level)}) :: env_to_sem_env env
   | Def {term; _} :: env -> D.Tm term :: env_to_sem_env env
   | Restrict _ :: env -> env_to_sem_env env
+  | Postulate {level; tp} :: env -> D.TopLevel (D.Neutral {tp; term = D.root (D.Var level)}) :: env_to_sem_env env
+  | TopLevel {term; _} :: env -> D.TopLevel term :: env_to_sem_env env
 
 let rec env_to_quote_env = function
   | [] -> []
@@ -65,6 +76,8 @@ let rec env_to_quote_env = function
   | Var {level; tp} :: env -> Q.Var {level; tp} :: env_to_quote_env env
   | Def {term; _} :: env -> Q.Def term :: env_to_quote_env env
   | Restrict _ :: env -> env_to_quote_env env
+  | TopLevel {term; _} :: env -> Q.TopLevel term :: env_to_quote_env env
+  | Postulate {level; tp} :: env -> Q.Postulate {level; tp} :: env_to_quote_env env
 
 let rec synth_var env x =
   match x, env with
@@ -76,6 +89,8 @@ let rec synth_var env x =
   | 0, Var {tp; _} :: _ -> tp
   | 0, Def {tp; _} :: _ -> tp
   | 0, DVar {level; _} :: _ -> tp_error (Expecting_term level)
+  | 0, TopLevel {tp; _} :: _ -> tp
+  | 0, Postulate {tp; _} :: _ -> tp
   | x, _ :: env -> synth_var env (x - 1)
 
 let mk_bvar width env size =
@@ -98,12 +113,12 @@ let restrict_env r env =
 let assert_subtype env size t1 t2 =
   if Q.check_tp ~subtype:true env size t1 t2
   then ()
-  else tp_error (Type_mismatch (t1, t2))
+  else tp_error (Type_mismatch (Q.read_back_tp env size t1, Q.read_back_tp env size t2))
 
 let assert_equal env size t1 t2 tp =
   if Q.check_nf env size (D.Normal {tp; term = t1}) (D.Normal {tp; term = t2})
   then ()
-  else tp_error (Type_mismatch (t1, t2))
+  else tp_error (Type_mismatch (Q.read_back_tp env size t1, Q.read_back_tp env size t2))
 
 let assert_dim_equal b1 b2 =
   if b1 = b2 then ()
@@ -185,7 +200,7 @@ and check_inert ~env ~size ~term ~tp =
         let term = E.eval term sem_env size in
         assert_equal quote_env size term left tp;
         assert_equal quote_env size term right tp
-      | t -> tp_error (Misc ("Expecting Id but found\n" ^ D.show t))
+      | t -> tp_error (Expecting_of ("Id", t))
     end
   | Pi (l, r) | Sg (l, r) ->
     begin
@@ -204,7 +219,7 @@ and check_inert ~env ~size ~term ~tp =
         let (arg, arg_env) = mk_var arg_tp env size in
         let dest_tp = E.do_clos (size + 1) clos (D.Tm arg) in
         check ~env:arg_env ~size:(size + 1) ~term:body ~tp:dest_tp;
-      | t -> tp_error (Misc ("Expecting Pi but found\n" ^ D.show t))
+      | t -> tp_error (Expecting_of ("Pi", t))
     end
   | Pair (left, right) ->
     begin
@@ -213,7 +228,7 @@ and check_inert ~env ~size ~term ~tp =
         check ~env ~size ~term:left ~tp:left_tp;
         let left_sem = E.eval left (env_to_sem_env env) size in
         check ~env ~size ~term:right ~tp:(E.do_clos size right_tp (D.Tm left_sem))
-      | t -> tp_error (Misc ("Expecting Sg but found\n" ^ D.show t))
+      | t -> tp_error (Expecting_of ("Sigma", t))
     end
   | Bridge (term, ends) ->
     begin
@@ -245,7 +260,7 @@ and check_inert ~env ~size ~term ~tp =
                   let tp = E.do_clos size clos (D.Dim (D.Const o)) in
                   assert_equal quote_env size body_o pt tp))
           ends
-      | t -> tp_error (Misc ("Expecting Bridge but found\n" ^ D.show t))
+      | t -> tp_error (Expecting_of ("Bridge", t))
     end
   | Gel (r, ends, rel) ->
     begin
@@ -316,7 +331,7 @@ and synth_quasi ~env ~size ~term =
     begin
       match synth ~env ~size ~term:p with
       | Sg (left_tp, _) -> left_tp
-      | t -> tp_error (Misc ("Expecting Sg but found\n" ^ D.show t))
+      | t -> tp_error (Expecting_of ("Sg", t))
     end
   | Snd p ->
     begin
@@ -324,7 +339,7 @@ and synth_quasi ~env ~size ~term =
       | Sg (_, right_tp) ->
         let proj = E.eval (Fst p) (env_to_sem_env env) size in
         E.do_clos size right_tp (D.Tm proj)
-      | t -> tp_error (Misc ("Expecting Sg but found\n" ^ D.show t))
+      | t -> tp_error (Expecting_of ("Sg", t))
     end
   | Ap (f, a) ->
     begin
@@ -333,7 +348,7 @@ and synth_quasi ~env ~size ~term =
         check ~env ~size ~term:a ~tp:src;
         let a_sem = E.eval a (env_to_sem_env env) size in
         E.do_clos size dest (D.Tm a_sem)
-      | t -> tp_error (Misc ("Expecting Pi but found\n" ^ D.show t))
+      | t -> tp_error (Expecting_of ("Pi", t))
     end
   | NRec (mot, zero, suc, n) ->
     check ~env ~size ~term:n ~tp:Nat;
@@ -366,7 +381,7 @@ and synth_quasi ~env ~size ~term =
         check_dim ~width ~env ~dim:r;
         let r' = E.eval_dim r (env_to_sem_env env) in
         E.do_clos size clos (D.Dim r')
-      | t -> tp_error (Misc ("Expecting Bridge but found\n" ^ D.show t ^ "\n" ^ Syn.show term))
+      | t -> tp_error (Expecting_of ("Bridge", t))
     end
   | J (mot, refl, eq) ->
     begin
@@ -383,7 +398,7 @@ and synth_quasi ~env ~size ~term =
             (size + 1) in
         check ~env:mot_env1 ~size:(size + 1) ~term:refl ~tp:refl_tp;
         E.eval mot (D.Tm (E.eval eq sem_env size) :: D.Tm right :: D.Tm left :: sem_env) size
-      | t -> tp_error (Misc ("Expecting Id but found\n" ^ D.show t))
+      | t -> tp_error (Expecting_of ("Id", t))
     end
   | Extent (r, dom, mot, ctx, endcase, varcase) ->
     let width = List.length endcase in
@@ -436,7 +451,7 @@ and synth_quasi ~env ~size ~term =
         let gel_tp = E.eval mot (D.Tm gel_term :: sem_env) (size + 1) in
         check ~env:wit_env ~size:(size + 1) ~term:case ~tp:gel_tp;
         E.eval mot (D.Tm (D.BLam (D.Clos {term; env = sem_env})) :: sem_env) size
-      | t -> tp_error (Misc ("Expecting Gel but found\n" ^ D.show t))
+      | t -> tp_error (Expecting_of ("Gel", t))
     end
   | _ -> tp_error (Cannot_synth_term term)
 

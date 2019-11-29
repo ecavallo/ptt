@@ -8,6 +8,7 @@ let eval_dim r (env : D.env) =
   | Syn.DVar i ->
     begin
       match List.nth env i with
+      | D.TopLevel _ -> raise (Eval_failed "Not a dimension term")
       | D.Dim s -> s
       | D.Tm _ -> raise (Eval_failed "Not a dimension term")
     end
@@ -19,6 +20,7 @@ let rec do_clos size clo a =
   | D.Pseudo {var; term; ends} ->
     begin
       match a with
+      | D.TopLevel _ -> raise (Eval_failed "Applied psuedo-closure to term")
       | D.Dim (D.DVar i) -> D.instantiate i var term
       | D.Dim (D.Const o) -> List.nth ends o
       | D.Tm _ -> raise (Eval_failed "Applied psuedo-closure to term")
@@ -223,6 +225,7 @@ and eval t (env : D.env) size =
   | Syn.Var i ->
     begin
       match List.nth env i with
+      | D.TopLevel t -> t
       | D.Tm t -> t
       | D.Dim _-> raise (Eval_failed "Not a term variable")
     end

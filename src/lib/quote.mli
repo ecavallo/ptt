@@ -4,6 +4,8 @@ type env_entry =
   | DVar of int
   | Var of {level : Domain.lvl; tp : Domain.t}
   | Def of Domain.t
+  | TopLevel of Domain.t
+  | Postulate of {level : Domain.lvl; tp : Domain.t}
 type env = env_entry list
 
 val mk_bvar : env -> Domain.lvl -> Domain.dim * env

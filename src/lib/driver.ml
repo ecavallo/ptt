@@ -166,21 +166,21 @@ let process_decl (Env {check_env; bindings; size})  = function
     let sem_tp = Eval.eval tp sem_env size in
     Check.check ~env:check_env ~size ~term:def ~tp:sem_tp;
     let sem_def = Eval.eval def sem_env size in
-    let new_env = Check.Def {term = sem_def; tp = sem_tp} :: check_env in
+    let new_env = Check.TopLevel {term = sem_def; tp = sem_tp} :: check_env in
     NoOutput (Env {check_env = new_env; bindings = Term name :: bindings; size})
   | CS.Postulate {name; tp} ->
     let tp = bind bindings tp in
     Check.check_tp ~env:check_env ~size ~term:tp;
     let sem_env = Check.env_to_sem_env check_env in
     let sem_tp = Eval.eval tp sem_env size in
-    let new_env = Check.Var {level = size; tp = sem_tp} :: check_env in
+    let new_env = Check.Postulate {level = size; tp = sem_tp} :: check_env in
     NoOutput (Env {check_env = new_env; bindings = Term name :: bindings; size = size + 1})
   | CS.NormalizeDef name ->
     let err = Check.Type_error (Check.Misc ("Unbound variable: " ^ name)) in
     begin
       let i = find_idx name bindings in
       match List.nth check_env i with
-      | Check.Def {term; tp} ->
+      | Check.TopLevel {term; tp} ->
         let quote_env = Check.env_to_quote_env check_env in
         NF_def (name, Quote.read_back_nf quote_env size (D.Normal {term; tp}))
       | _ -> raise err

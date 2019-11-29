@@ -1,9 +1,10 @@
 type error =
     Cannot_synth_term of Syntax.t
   | Dim_mismatch of Domain.dim * Domain.dim
-  | Type_mismatch of Domain.t * Domain.t
+  | Type_mismatch of Syntax.t * Syntax.t
   | Expecting_universe of Domain.t
   | Expecting_term of Domain.lvl
+  | Expecting_of of string * Domain.t
   | Misc of string
 
 val pp_error : Format.formatter -> error -> unit
@@ -15,6 +16,8 @@ type env_entry =
   | Var of {level : Domain.lvl; tp : Domain.t}
   | Def of {term : Domain.t; tp : Domain.t}
   | Restrict of Syntax.idx
+  | TopLevel of {term : Domain.t; tp : Domain.t}
+  | Postulate of {level : Domain.lvl; tp : Domain.t}
 
 type env = env_entry list
 

@@ -7,6 +7,7 @@ type dim =
 [@@deriving show, eq]
 
 type env_entry =
+  | TopLevel of t
   | Dim of dim
   | Tm of t
 and env = env_entry list
@@ -92,6 +93,7 @@ let instantiate_dim r i = function
   | Const o -> Const o
 
 let rec instantiate_entry r i = function
+  | TopLevel t -> TopLevel t
   | Dim s -> Dim (instantiate_dim r i s)
   | Tm t -> Tm (instantiate r i t)
 
