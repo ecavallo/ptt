@@ -1,5 +1,9 @@
 --------------------------------------------------------------------------------
--- Some BCH
+-- An (incomplete) experiment with using parametric type theory as an internal
+-- language of BCH cubical sets to develop the BCH model of cubical type theory
+-- in Orton-Pitts style. It's not obvious how to specify dependent Path-types or
+-- G-types in this way, because we cannot express the separated product of a
+-- context with an interval.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
@@ -293,10 +297,10 @@ let adjoin_bdy : (A : [x] U<0> {*; *}) (c : cof)
   -> [x] (decode (cof_bdy c @ x)) -> A @ x {fun _ -> f0; fun _ -> f1}
   =
   fun A c f0 f1 f -> bri x -> fun u01 ->
-  extent x of u01 in x -> Gel x {unit; unit} (_ _ -> decode c) at x _ -> A @ x with
+  extent x of u01 in x -> decode (cof_bdy c @ x) at x _ -> A @ x with
   | _ -> f0
   | _ -> f1
-  | a0 a1 q x ->
+  | _ _ q x ->
     (ungel x : 2 -> q @ x at _ -> [x] A @ x {f0; f1} with
      | gel u -> f u)
     @ x
