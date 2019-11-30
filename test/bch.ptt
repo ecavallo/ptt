@@ -693,3 +693,187 @@ let fibPiFrom0 : (G : U<0>) (A : G -> U<0>) (B : ((g : G) * A g) -> U<0>)
                     (snd (compB (bri x -> snd (ua @ x)) @ x) (gel x {triv; triv} (fst ua1))))))
             @ x)
   >
+
+--------------------------------------------------------------------------------
+-- Experiment with a "circle": the Church encoding of a circle type
+-- (a) does contain a loop
+-- (b) supports a non-dependent recursor that does the right thing on the loop
+--     up to a path
+-- The trick is to use the fact that fibrant types support a "diagonal"
+-- operation even though the interval itself is affine.
+--
+-- This provides some evidence that BCH cubical type theory may support at least
+-- some higher inductive types in the sense of the HoTT book (where computation
+-- rules for path constructors are propositional).
+--------------------------------------------------------------------------------
+
+let isFibrant : U<0> -> U<1> =
+  fun A ->
+  (t : bool) (c : cof)
+  (f : [x] (box t c @ x) -> A {*; *})
+  ->
+  Filler unit (fun _ -> A) (bri _ -> triv) t c f
+
+-- This is a standard construction in cartesian cubical type theory and could be defined in the
+-- same way here. Let's take it for granted.
+postulate connection_and : (A : U<0>) (fibA : isFibrant A) (p : [y] A {*; *})
+  -> [x] [z] A {p @ 0; p @ x} {bri _ -> p @ 0; bri z -> p @ z}
+
+let diagonal_filler : (A : [x] U<0> {*; *}) (fibA : [x] isFibrant (A @ x) {*; *})
+  (p : [x] [y] A @ x {*; *} {*; *})
+  -> [z] [x] A @ x {p @ 0 @ 0; p @ 1 @ z} {bri x -> p @ x @ 0; *}
+  =
+  fun A fibA p ->
+  let tube : [x] (decode (cof_bdy cof_empty @ x)) -> [y] A @ x {p @ x @ 0; *} {*; *} =
+    adjoin_bdy
+      (bri x -> [y] A @ x {p @ x @ 0; *})
+      cof_empty
+      (bri _ -> p @ 0 @ 0)
+      (bri y -> p @ 1 @ y)
+      (fun no ->
+        abort_empty no
+          ([x] [y] A @ x {p @ x @ 0; *} {bri _ -> p @ 0 @ 0; bri y -> p @ 1 @ y}))
+  in
+  let open : [x] [y] (box ff (cof_bdy cof_empty @ x) @ y) -> A @ x {fun _ -> p @ x @ 0; *} {*; *} =
+    bri x ->
+    adjoin_cap0
+      (bri _ -> A @ x)
+      (cof_bdy cof_empty @ x)
+      (p @ x @ 0)
+      (tube @ x)
+  in
+  let filler : [x] Filler unit (fun _ -> A @ x) (bri _ -> triv) ff (cof_bdy cof_empty @ x) (open @ x) {*; *} =
+    bri x -> (fibA @ x) ff (cof_bdy cof_empty @ x) (open @ x)
+  in
+  substinv
+    ([x] [y] (box ff (cof_bdy cof_empty @ x) @ y) -> A @ x {*; *} {*; *})
+    (fun q ->
+       [z] [x] A @ x {q @ 0 @ z (gel z {triv; triv} triv); q @ 1 @ z (gel z {triv; triv} triv)}
+       {bri x -> q @ x @ 0 triv; *})
+    (bri x y -> fun u -> open @ x @ y u)
+    (bri x y -> fun _ -> fst (filler @ x @ y))
+    (lineext
+      (bri x -> [y] (box ff (cof_bdy cof_empty @ x) @ y) -> A @ x {*; *})
+      (bri x y -> fun u -> open @ x @ y u)
+      (bri x y -> fun _ -> fst (filler @ x @ y))
+      (bri x -> lineext
+        (bri y -> (box ff (cof_bdy cof_empty @ x) @ y) -> A @ x)
+        (bri y -> fun u -> open @ x @ y u)
+        (bri y -> fun _ -> fst (filler @ x @ y))
+        (bri y -> funext (box ff (cof_bdy cof_empty @ x) @ y) (fun _ -> A @ x)
+          (fun u -> open @ x @ y u)
+          (fun _ -> fst (filler @ x @ y))
+          (fun u -> snd (filler @ x @ y) u))))
+    (bri z x -> fst (filler @ x @ z))
+
+let diagonal : (A : [x] U<0> {*; *}) (fibA : [x] isFibrant (A @ x) {*; *})
+  (p : [x] [y] A @ x {*; *} {*; *})
+  -> [x] A @ x {p @ 0 @ 0; p @ 1 @ 1}
+  =
+  fun A fibA p -> diagonal_filler A fibA p @ 1
+
+let diagonal_beta : (A : U<0>) (fibA : isFibrant A) (p : [y] A {*; *})
+  -> [z] [x] A {p @ 0; p @ 1} {diagonal (bri _ -> A) (bri _ -> fibA) (bri _ -> p); bri x -> p @ x}
+  =
+  fun A fibA p ->
+  let tube0 : [x] (decode (cof_bdy cof_empty @ x)) -> [y] A {p @ 0; *} {*; *} =
+    adjoin_bdy
+      (bri x -> [y] A {p @ 0; *})
+      cof_empty
+      (bri _ -> p @ 0)
+      (bri y -> p @ y)
+      (fun no ->
+        abort_empty no
+          ([x] [y] A {p @ 0; *} {bri _ -> p @ 0; bri y -> p @ y}))
+  in
+  let tube1_ty : [x] U<0> {*; *} =
+    bri x ->
+    [z] [y] A {p @ 0; *}
+    {bri y -> diagonal_filler (bri _ -> A) (bri _ -> fibA) (bri _ -> p) @ y @ x;
+     bri y -> connection_and A fibA p @ x @ y}
+  in
+  let tube1 : [x] [z] (decode (cof_bdy (cof_bdy cof_empty @ x) @ z)) -> [y] A {p @ 0; *} {*; *} {*; *} =
+    bri x ->
+    adjoin_bdy
+      (bri _ -> [y] A {p @ 0; *})
+      (cof_bdy cof_empty @ x)
+      (bri y -> diagonal_filler (bri _ -> A) (bri _ -> fibA) (bri _ -> p) @ y @ x)
+      (bri y -> connection_and A fibA p @ x @ y)
+      (fun u ->
+        extent x of u in
+        x -> decode (cof_bdy cof_empty @ x) at
+        x _ -> tube1_ty @ x with
+        | u0 -> bri z -> tube0 @ 0 u0
+        | u1 -> bri z -> tube0 @ 1 u1
+        | u0 u1 q x ->
+          abort_empty
+            (gelproj unit unit (fun _ _ -> decode cof_empty) u0 u1 q)
+            ([x] tube1_ty @ x {bri _ -> tube0 @ 0 u0; bri _ -> tube0 @ 1 u1})
+            @ x)
+  in
+  let open : [x] [z] [y] (box ff (cof_bdy (cof_bdy cof_empty @ x) @ z) @ y) -> A {*; *} {*; *} {*; *} =
+    bri x z ->
+    adjoin_cap0
+      (bri _ -> A)
+      (cof_bdy (cof_bdy cof_empty @ x) @ z)
+      (p @ 0)
+      (tube1 @ x @ z)
+  in
+  substinv
+    ([x] [z] (decode (cof_bdy (cof_bdy cof_empty @ x) @ z)) -> A {*; *} {*; *})
+    (fun q ->
+      [z] [x] A {q @ 0 @ z (gel z {triv; triv} triv); q @ 1 @ z (gel z {triv; triv} triv)}
+      {bri x -> q @ x @ 0 triv; bri x -> q @ x @ 1 triv})
+    (bri x z -> open @ x @ z @ 1)
+    (bri x z -> fun _ -> fst (fibA ff (cof_bdy (cof_bdy cof_empty @ x) @ z) (open @ x @ z) @ 1))
+    (lineext
+      (bri x -> [z] (decode (cof_bdy (cof_bdy cof_empty @ x) @ z)) -> A {*; *})
+      (bri x z -> open @ x @ z @ 1)
+      (bri x z -> fun _ -> fst (fibA ff (cof_bdy (cof_bdy cof_empty @ x) @ z) (open @ x @ z) @ 1))
+      (bri x -> lineext
+        (bri z -> (decode (cof_bdy (cof_bdy cof_empty @ x) @ z)) -> A)
+        (bri z -> open @ x @ z @ 1)
+        (bri z -> fun _ -> fst (fibA ff (cof_bdy (cof_bdy cof_empty @ x) @ z) (open @ x @ z) @ 1))
+        (bri z -> funext
+          (decode (cof_bdy (cof_bdy cof_empty @ x) @ z))
+          (fun _ -> A)
+          (open @ x @ z @ 1)
+          (fun _ -> fst (fibA ff (cof_bdy (cof_bdy cof_empty @ x) @ z) (open @ x @ z) @ 1))
+          (fun u -> snd (fibA ff (cof_bdy (cof_bdy cof_empty @ x) @ z) (open @ x @ z) @ 1) u))))
+    (bri z x -> fst (fibA ff (cof_bdy (cof_bdy cof_empty @ x) @ z) (open @ x @ z) @ 1))
+
+let circle : U<2> =
+  (A : U<0>) -> (isFibrant A) -> (b : A) (l : [x] A {b; b}) -> A
+
+let base : circle = fun A fibA b l -> b
+
+let loop : [x] circle {base; base} =
+  bri x -> fun A fibA b l ->
+  extent x of <A,<fibA,<b,l>>> in
+  _ -> (A : U<0>) * (fibA : isFibrant A) * (b : A) * [x] A {b; b} at
+  _ s -> fst s with
+  | s0 -> fst (snd (snd s0))
+  | s1 -> fst (snd (snd s1))
+  | s0 s1 q x ->
+    diagonal
+      (bri x -> fst (q @ x))
+      (bri x -> fst (snd (q @ x)))
+      (bri x -> snd (snd (snd (q @ x))))
+      @ x
+
+let circle_rec : (A : U<0>) (fibA : isFibrant A)
+  (b : A) (l : [x] A {b; b}) -> circle -> A
+  =
+  fun A fibA b l c -> c A fibA b l
+
+let circle_rec_base : (A : U<0>) (fibA : isFibrant A)
+  (b : A) (l : [x] A {b; b})
+  -> Id A (circle_rec A fibA b l base) b
+  =
+  fun A fibA b l -> refl b
+
+let circle_rec_loop : (A : U<0>) (fibA : isFibrant A)
+  (b : A) (l : [x] A {b; b})
+  -> [z] [x] A {b; b} {bri x -> circle_rec A fibA b l (loop @ x); l}
+  =
+  fun A fibA b l -> diagonal_beta A fibA l
