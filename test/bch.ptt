@@ -117,6 +117,26 @@ let subst_ends : (A : [x] U<0> {*; *}) (p : [x] A @ x {*; *})
     (p @ 1) a1 eq1
     (bri x -> p @ x)
 
+let subst_ends_eq : (A : [x] U<0> {*; *})
+  (q : [x] A @ x {*; *})
+  (p : [x] A @ x {*; *})
+  (a0 : A @ 0) (eq0 : Id (A @ 0) (p @ 0) a0)
+  (a1 : A @ 1) (eq1 : Id (A @ 1) (p @ 1) a1)
+  -> ([x] Id (A @ x) (q @ x) (p @ x) {*; *})
+  -> ([x] Id (A @ x) (q @ x) (subst_ends A p a0 eq0 a1 eq1 @ x) {*; *})
+  =
+  fun A q p ->
+  based0_J (A @ 0) (p @ 0)
+    (fun a0 eq0 ->
+      (a1 : A @ 1) (eq1 : Id (A @ 1) (p @ 1) a1)
+      -> ([x] Id (A @ x) (q @ x) (p @ x) {*; *})
+      -> ([x] Id (A @ x) (q @ x) (subst_ends A p a0 eq0 a1 eq1 @ x) {*; *}))
+    (based0_J (A @ 1) (p @ 1)
+      (fun a1 eq1 ->
+        ([x] Id (A @ x) (q @ x) (p @ x) {*; *})
+        -> ([x] Id (A @ x) (q @ x) (subst_ends A p (p @ 0) (refl (p @ 0)) a1 eq1 @ x) {*; *}))
+      (fun t -> t))
+
 let subst2inv : (A : U<0>) (B : U<0>) (C : A -> B -> U<0>)
   (a0 : A) (a1 : A) (eqA : Id A a0 a1)
   (b0 : B) (b1 : B) (eqB : Id B b0 b1)
@@ -176,13 +196,13 @@ let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
   match eq at a0 a1 _ -> Id B (f a0) (f a1) with
   | refl z -> refl (f z)
 
-let cong_bapp : (A0 : U<0>) (A1 : U<0>) (A : [_] U<0> {A0; A1}) (a0 : A0) (a1 : A1)
-  (b0 : [x] A @ x {a0; a1}) (b1 : [x] A @ x {a0; a1})
-  -> (Id ([x] A @ x {a0; a1}) b0 b1)
-  -> [x] Id (A @ x) (b0 @ x) (b1 @ x) {refl a0; refl a1}
+let cong_bapp : (A : [_] U<0> {*; *})
+  (b0 : [x] A @ x {*; *}) (b1 : [x] A @ x {*; *})
+  -> (Id ([x] A @ x {*; *}) b0 b1)
+  -> [x] Id (A @ x) (b0 @ x) (b1 @ x) {*; *}
   =
-  fun A0 A1 A a0 a1 b0 b1 eq ->
-  match eq at c0 c1 _ -> [x] Id (A @ x) (c0 @ x) (c1 @ x) {refl a0; refl a1} with
+  fun A b0 b1 eq ->
+  match eq at c0 c1 _ -> [x] Id (A @ x) (c0 @ x) (c1 @ x) {*; *} with
   | refl c -> bri x -> refl (c @ x)
 
 let lineext : (A : [x] U<0> {*; *})
@@ -324,6 +344,22 @@ let adjoin_cap1 : (A : [x] U<0> {*; *}) (c : cof) (a1 : A @ 1)
   | u -> f u @ 0
   | _ -> a1
   | u _ _ x -> f u @ x
+
+
+--------------------------------------------------------------------------------
+-- Fibrancy (hcom)
+--------------------------------------------------------------------------------
+
+let is_fibrant : U<0> -> U<1> =
+  fun A ->
+  (t : bool) (c : cof)
+  (f : [x] (box t c @ x) -> A {*; *})
+  ->
+  Filler unit (fun _ -> A) (bri _ -> triv) t c f
+
+let fibrant_to_fib : (A : U<0>) -> (is_fibrant A) -> (G : U<0>) -> is_fib G (fun _ -> A) =
+  fun A fibA G p t c f ->
+  fibA t c f
 
 --------------------------------------------------------------------------------
 -- Coercion and squeezing
@@ -701,13 +737,6 @@ let fibPiFrom0 : (G : U<0>) (A : G -> U<0>) (B : ((g : G) * A g) -> U<0>)
 -- to the loop. We construct such a term.
 --------------------------------------------------------------------------------
 
-let is_fibrant : U<0> -> U<1> =
-  fun A ->
-  (t : bool) (c : cof)
-  (f : [x] (box t c @ x) -> A {*; *})
-  ->
-  Filler unit (fun _ -> A) (bri _ -> triv) t c f
-
 postulate circle : U<0>
 postulate base : circle
 postulate loop : [x] circle {base; base}
@@ -888,3 +917,162 @@ let circle_elim_loop_beta :
   -> [y] [x] A (loop @ x) {b; b} {bri x -> circle_elim_loop @ x A fibA b l; l}
   =
   fun A fibA b l -> diagonald_beta circle circle_is_fibrant loop A fibA l
+
+--------------------------------------------------------------------------------
+-- hcom + coe + "squeeze square" => com
+--------------------------------------------------------------------------------
+
+let is_fib0 : (G : U<0>) (A : G -> U<0>) -> U<1> =
+  fun G A ->
+  (p : [_] G {*; *}) (c : cof)
+  (f : [x] (box ff c @ x) -> A (p @ x) {*; *})
+  ->
+  Filler G A p ff c f
+
+let has_coe0 : (G : U<0>) (A : G -> U<0>) -> U<1> =
+  fun G A ->
+  (p : [x] G {*; *}) (a : A (p @ 0)) -> [x] A (p @ x) {a; *}
+
+let has_coe1 : (G : U<0>) (A : G -> U<0>) -> U<1> =
+  fun G A ->
+  (p : [x] G {*; *}) (a : A (p @ 1)) -> [x] A (p @ x) {*; a}
+
+let has_square0 : (G : U<0>) (A : G -> U<0>) -> (has_coe0 G A) -> U<1> =
+  fun G A coeA0 ->
+  (p : [_] G {*; *}) (q : [x] A (p @ x) {*; *})
+  -> [y] [x] A (p @ x) {q @ 0; *} {coeA0 p (q @ 0); bri x -> q @ x}
+
+let has_square1 : (G : U<0>) (A : G -> U<0>) -> (has_coe1 G A) -> U<1> =
+  fun G A coeA1 ->
+  (p : [_] G {*; *}) (q : [x] A (p @ x) {*; *})
+  -> [y] [x] A (p @ x) {*; q @ 1} {bri x -> q @ x; coeA1 p (q @ 1)}
+
+let hcom_and_coe_to_fib : (G : U<0>) (A : G -> U<0>)
+  (fib : (g : G) -> is_fibrant (A g))
+  (coe0 : has_coe0 G A) (sq0 : has_square0 G A coe0)
+  -> is_fib0 G A
+  =
+  fun G A fib coe0 sq0 ->
+  fun p c f ->
+  let tube_step0 : (decode c) -> [y] [x] A (p @ x) {f @ 0 triv; *} {coe0 p (f @ 0 triv); *} =
+    fun u -> sq0 p (bri y -> f @ y (gel y {triv; u} triv))
+  in
+  let open_step0 : [y] (box ff c @ y) -> [x] A (p @ x) {f @ 0 triv; *} {fun _ -> coe0 p (f @ 0 triv); *} =
+    adjoin_cap0
+      (bri _ -> [x] A (p @ x) {f @ 0 triv; *})
+      c
+      (coe0 p (f @ 0 triv))
+      tube_step0
+  in
+  let comp1 :
+    (q : [y] A (p @ 1) {coe0 p (f @ 0 triv) @ 1; *})
+    * (u : decode c) -> [y] Id (A (p @ 1)) (tube_step0 u @ y @ 1) (q @ y) {*; *}
+    =
+    comp0_path unit
+      (fun _ -> A (p @ 1))
+      (fibrant_to_fib (A (p @ 1)) (fib (p @ 1)) unit)
+      (bri _ -> triv)
+      c
+      (bri y -> fun u -> open_step0 @ y u @ 1)
+  in
+  let tube_step1 : [x] (decode (cof_bdy c @ x)) -> [y] A (p @ x) {coe0 p (f @ 0 triv) @ x; *} {*; *} =
+    adjoin_bdy
+      (bri x -> [y] A (p @ x) {coe0 p (f @ 0 triv) @ x; *})
+      c
+      (bri _ -> f @ 0 triv)
+      (bri y -> fst comp1 @ y)
+      (fun u ->
+        subst_ends
+          (bri x -> [y] A (p @ x) {coe0 p (f @ 0 triv) @ x; *})
+          (bri x y -> tube_step0 u @ y @ x)
+          (bri _ -> f @ 0 triv)
+          (refl (bri _ -> f @ 0 triv))
+          (bri y -> fst comp1 @ y)
+          (based0ext
+            (bri y -> A (p @ 1))
+            (bri y -> tube_step0 u @ y @ 1)
+            (bri y -> fst comp1 @ y)
+            (bri y -> snd comp1 u @ y)))
+  in
+  let tube_step1_eq : (u : decode c)
+    -> [x] Id ([y] A (p @ x) {coe0 p (f @ 0 triv) @ x; *})
+           (bri y -> tube_step0 u @ y @ x)
+           (tube_step1 @ x (gel x {triv; triv} u))
+       {*; *}
+    =
+    fun u ->
+    subst_ends_eq
+      (bri x -> [y] A (p @ x) {coe0 p (f @ 0 triv) @ x; *})
+      (bri x y -> tube_step0 u @ y @ x)
+      (bri x y -> tube_step0 u @ y @ x)
+      (bri _ -> f @ 0 triv)
+      (refl (bri _ -> f @ 0 triv))
+      (bri y -> fst comp1 @ y)
+      (based0ext
+        (bri y -> A (p @ 1))
+        (bri y -> tube_step0 u @ y @ 1)
+        (bri y -> fst comp1 @ y)
+        (bri y -> snd comp1 u @ y))
+      (bri x -> refl (bri y -> tube_step0 u @ y @ x))
+  in
+  let open_step1 : [x] [y] (box ff (cof_bdy c @ x) @ y) -> A (p @ x) {*; *} {*; *} =
+    bri x ->
+    adjoin_cap0
+      (bri _ -> A (p @ x))
+      (cof_bdy c @ x)
+      (coe0 p (f @ 0 triv) @ x)
+      (tube_step1 @ x)
+  in
+  let comp : [x] Filler unit (fun _ -> A (p @ x)) (bri _ -> triv) ff (cof_bdy c @ x) (open_step1 @ x) {*; *} =
+    bri x -> fib (p @ x) ff (cof_bdy c @ x) (open_step1 @ x)
+  in
+  let comp_eq1 : (u : decode c) -> Id (A (p @ 1)) (f @ 1 u) (fst (comp @ 1 @ 1)) =
+    fun u ->
+    trans
+      (A (p @ 1))
+      (f @ 1 u)
+      (fst comp1 @ 1)
+      (fst (comp @ 1 @ 1))
+      (snd comp1 u @ 1)
+      (snd (comp @ 1 @ 1) triv)
+  in
+  bri x ->
+  < fst (comp @ x @ 1)
+  , fun u ->
+    extent x of u in x -> box ff c @ x at x u -> Id (A (p @ x)) (f @ x u) (fst (comp @ x @ 1)) with
+    | _ -> snd (comp @ 0 @ 1) triv
+    | u1 -> comp_eq1 u1
+    | _ u1 u x ->
+      set_id_bridge_ends
+        (bri x -> A (p @ x))
+        (bri x -> f @ x (u @ x))
+        (bri x -> fst (comp @ x @ 1))
+        (snd (comp @ 0 @ 1) triv)
+        (comp_eq1 u1)
+        (bri x ->
+          trans
+            (A (p @ x))
+            (f @ x (u @ x))
+            (f @ x (gel x {triv; u1} triv))
+            (fst (comp @ x @ 1))
+            (cong
+              (box ff c @ x)
+              (A (p @ x))
+              (f @ x)
+              (u @ x)
+              (gel x {triv; u1} triv)
+              (gel_eta unit (decode c) (fun _ _ -> unit) triv u1 u @ x))
+            (trans
+              (A (p @ x))
+              (f @ x (gel x {triv; u1} triv))
+              (tube_step1 @ x (gel x {triv; triv} u1) @ 1)
+              (fst (comp @ x @ 1))
+              (cong_bapp
+                (bri y -> A (p @ x))
+                (bri y -> tube_step0 u1 @ y @ x)
+                (tube_step1 @ x (gel x {triv; triv} u1))
+                (tube_step1_eq u1 @ x)
+                @ 1)
+              (snd (comp @ x @ 1) (gel x {triv; triv} u1))))
+        @ x
+  >
