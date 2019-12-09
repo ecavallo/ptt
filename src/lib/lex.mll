@@ -44,6 +44,7 @@ let keywords =
     ("Gel", GEL);
     ("gel", ENGEL);
     ("ungel", UNGEL);
+    ("coe", COE);
     ("at", AT);
     ("of", OF);
     ("def", DEF);

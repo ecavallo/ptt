@@ -44,6 +44,7 @@ and t =
   | Gel of dim * t list * bindern
   | Engel of ident * t list * t
   | Ungel of {width : int; mot : binder; gel : binder; case : binder}
+  | Coe of binder * dim * dim * t
   | Uni of uni_level
 
 type decl =

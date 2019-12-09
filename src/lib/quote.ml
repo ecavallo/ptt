@@ -223,6 +223,7 @@ and read_back_quasi_ne env size = function
           | Some term -> read_back_nf env size (D.Normal {tp; term})
           | None -> read_back_ne env size (h, s)
         end
+      | D.Coe _ -> read_back_ne env size (h,s)
     end
   | _ -> raise (Quote_failed "Ill-typed read_back_quasi_ne")
 
@@ -233,6 +234,15 @@ and read_back_ne env size (h, s) =
       match h with
       | D.Var i -> Syn.Var (read_back_level env i)
       | D.Ext e -> read_back_extent_head env size e
+      | D.Coe (mot, r, s, t) ->
+        let (dim_arg, dim_env) = mk_dvar env size in
+        let applied_mot = E.do_clos (size + 1) mot (D.Dim dim_arg) in
+        let cap_mot = E.do_clos size mot (D.Dim s) in
+        Syn.Coe
+          (read_back_tp dim_env (size + 1) applied_mot,
+           read_back_dim env r,
+           read_back_dim env s,
+           read_back_nf env size (D.Normal {tp = cap_mot; term = t}))
     end
   | D.Ap arg :: s ->
     Syn.Ap (read_back_ne env size (h, s), read_back_nf env size arg)
@@ -431,6 +441,15 @@ and check_ne env size (h1, s1) (h2, s2) =
       match h1, h2 with
       | Var i1, Var i2 -> i1 = i2
       | Ext e1, Ext e2 -> check_extent_head env size e1 e2
+      | Coe (mot1, r1, s1, t1), Coe (mot2, r2, s2, t2) ->
+        let (dim_arg, dim_env) = mk_dvar env size in
+        let applied_mot1 = E.do_clos (size + 1) mot1 (D.Dim dim_arg) in
+        let applied_mot2 = E.do_clos (size + 1) mot2 (D.Dim dim_arg) in
+        check_tp ~subtype:false dim_env (size + 1) applied_mot1 applied_mot2 &&
+        r1 = r2 &&
+        s1 = s2 &&
+        let cap_mot = E.do_clos size mot1 (D.Dim s1) in
+        check_nf env size (D.Normal {tp = cap_mot; term = t1}) (D.Normal {tp = cap_mot; term = t2})
       | _ -> false
     end
   | D.Ap arg1 :: s1, D.Ap arg2 :: s2 ->

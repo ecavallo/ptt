@@ -43,6 +43,7 @@ and extent_head = {var : lvl; dom : clos; mot : clos2; ctx : t; endcase : clos l
 and head =
   | Var of lvl
   | Ext of extent_head
+  | Coe of clos * dim * dim * t
 and cell =
   | Ap of nf
   | Fst

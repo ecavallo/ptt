@@ -21,6 +21,7 @@ type t =
   | Extent of dim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS *) t list * (* BINDS & BBINDS *) t
   | Gel of dim * t list * (* BINDS n *) t | Engel of idx * t list * t
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
+  | Coe of (* BBINDS *) t * dim * dim * t
   | Uni of uni_level
 
 val equal_uni_level : uni_level -> uni_level -> bool

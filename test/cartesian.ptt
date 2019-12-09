@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------------
--- Cartesian dimension variables
+-- Cartesian dimension variables and coercion
 --------------------------------------------------------------------------------
 
 let diagonal : (A : U<0>) (p : [x : cart] [y : cart] A {} {}) -> ([x : cart] A {}) =
@@ -17,3 +17,33 @@ let funext : (A : U<0>) (B : U<0>) -> (A -> [x : cart] B {}) -> [x : cart] A -> 
 --   fun A -> bri x -> fun a ->
 --   extent x of a in _ -> A at _ _ -> [y : cart] A {} with
 --   | q _ -> q
+
+let path_to_id : (A : U<0>) (a0 : A) (a1 : A) -> [x : cart] A {a0; a1} -> Id A a0 a1 =
+  fun A a0 a1 p ->
+  coe 0 1 (refl a0) in x -> Id A a0 (p @ x)
+
+let id_to_path : (A : U<0>) (a0 : A) (a1 : A) -> (Id A a0 a1) -> [_ : cart] A {a0; a1} =
+  fun A a0 a1 eq ->
+  match eq at a0 a1 _ -> [_ : cart] A {a0; a1} with
+  | refl a -> bri _ -> a
+
+let id_to_path_to_id : (A : U<0>) (a0 : A) (a1 : A) (eq : Id A a0 a1)
+  -> [_ : cart] Id A a0 a1 {path_to_id A a0 a1 (id_to_path A a0 a1 eq); eq}
+  =
+  fun A a0 a1 eq ->
+  match eq at a0 a1 eq -> [_: cart] Id A a0 a1 {path_to_id A a0 a1 (id_to_path A a0 a1 eq); eq} with
+  | refl a -> (bri x -> coe x 1 (refl a) in x -> Id A a a)
+
+let path_to_id_to_path : (A : U<0>) (a0 : A) (a1 : A) (p : [_ : cart] A {a0; a1})
+  -> [_ : cart] [_ : cart] A {a0; a1} {id_to_path A a0 a1 (path_to_id A a0 a1 p); p}
+  =
+  fun A a0 a1 p ->
+  let sq : [y : cart] [_ : cart] A {a0; *} {bri _ -> a0; p} =
+    bri y x -> (coe 0 x (bri _ -> a0) in x -> [_ : cart] A {a0; p @ x}) @ y
+  in
+  coe 0 1
+    (bri y -> id_to_path A a0 a0 (coe y 1 (refl a0) in _ -> Id A a0 a0))
+  in z ->
+  [_ : cart]
+    [_ : cart] A {a0; sq @ z @ 1}
+  {id_to_path A a0 (sq @ z @ 1) (coe 0 1 (refl a0) in x -> Id A a0 (sq @ z @ x)); bri x -> sq @ z @ x}

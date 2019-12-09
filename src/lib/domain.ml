@@ -53,6 +53,7 @@ and extent_head = {var : lvl; dom : clos; mot : clos2; ctx : t; endcase : clos l
 and head =
   | Var of lvl
   | Ext of extent_head
+  | Coe of clos * dim * dim * t
 [@@deriving show, eq]
 and cell =
   | Ap of nf
@@ -216,6 +217,8 @@ and instantiate_ne r i ne =
   let headf r i = function
     | Var j -> Var (instantiate_dvar r i j)
     | Ext e -> Ext (instantiate_extent_head r i e)
+    | Coe (mot, s, t, cap) ->
+      Coe (instantiate_clos r i mot, instantiate_dim r i s, instantiate_dim r i t, instantiate r i cap)
   in
   instantiate_spine headf r i ne
 

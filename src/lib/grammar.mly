@@ -18,6 +18,7 @@
 %token QUIT NORMALIZE
 %token ID REFL MATCH
 %token AFF CART
+%token COE
 %token EOF
 
 %start <Concrete_syntax.signature> sign
@@ -177,7 +178,9 @@ term:
          mot = Binder {name = mot_name; body = mot_body};
          gel = Binder {name = gel_name; body = gel_body};
          case = Binder {name = case_name; body = case_body}} }
-  
+  | COE; r = dim; s = dim; term = term; IN; mot_name = name; RIGHT_ARROW; mot = term;
+    { Coe (Binder {name = mot_name; body = mot}, r, s, term) }
+
 tele_cell:
   | LPR name = name; COLON ty = term; RPR
     { Cell {name; ty} }

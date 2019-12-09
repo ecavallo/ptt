@@ -316,3 +316,12 @@ and eval t (env : D.env) size =
       (D.Clos {term = mot; env})
       (eval gel (D.Dim (D.DVar size) :: env) (size + 1))
       (D.Clos {term = case; env})
+  | Syn.Coe (mot, r, s, t) ->
+    let r' = eval_dim r env in
+    let s' = eval_dim s env in
+    let t' = eval t env size in
+    if r' = s'
+    then t'
+    else
+      let final_tp = eval mot (D.Dim s' :: env) size in
+      D.Neutral {tp = final_tp; term = D.root (D.Coe (D.Clos {term = mot; env}, r', s', t'))}

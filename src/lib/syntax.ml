@@ -26,6 +26,7 @@ type t =
   | Extent of dim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS *) t list * (* BINDS n & BBINDS *) t
   | Gel of dim * t list * (* BINDS n *) t | Engel of idx * t list * t
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
+  | Coe of (* BBINDS *) t * dim * dim * t
   | Uni of uni_level
 [@@deriving eq]
 
@@ -86,6 +87,8 @@ let unsubst_bvar i t =
     | Engel (i, ts, t) -> Engel (go_dvar depth i, List.map (go depth) ts, go depth t)
     | Ungel (width, mot, gel, case) ->
       Ungel (width, go (depth + 1) mot, go (depth + 1) gel, go (depth + 1) case)
+    | Coe (mot, r, s, t) ->
+      Coe (go (depth + 1) mot, go_dim depth r, go_dim depth s, go depth t)
     | Uni j -> Uni j
   in
   try
@@ -188,6 +191,9 @@ let rec pp fmt =
     fprintf fmt "gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp_dim (DVar i) (pp_list pp) ts pp t;
   | Ungel (width, mot, gel, case) ->
     fprintf fmt "ungel(@[<hov>@[<hov>%d@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" width pp mot pp gel pp case
+  | Coe (mot, r, s, t) ->
+    fprintf fmt "coe(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
+      pp mot pp_dim r pp_dim s pp t
   | Uni i -> fprintf fmt "U<%d>" i
 
 let show t =

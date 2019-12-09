@@ -460,6 +460,17 @@ and synth_quasi ~env ~size ~term =
         E.eval mot (D.Tm (D.BLam (D.Clos {term; env = sem_env})) :: sem_env) size
       | t -> tp_error (Expecting_of ("Gel", t))
     end
+  | Coe (mot, r, s, term) ->
+    let sem_env = env_to_sem_env env in
+    let (_, denv) = mk_dvar 2 D.Cartesian env size in
+    check_tp ~env:denv ~size:(size + 1) ~term:mot;
+    check_dim ~env ~dim:r ~width:2 ~sort:D.Cartesian;
+    let r' = E.eval_dim r sem_env in
+    check_dim ~env ~dim:s ~width:2 ~sort:D.Cartesian;
+    let s' = E.eval_dim s sem_env in
+    let mot_cap = E.eval mot (D.Dim r' :: sem_env) size in
+    check ~env ~size ~term ~tp:mot_cap;
+    E.eval mot (D.Dim s' :: sem_env) size
   | _ -> tp_error (Cannot_synth_term term)
 
 and check_tp ~env ~size ~term =
