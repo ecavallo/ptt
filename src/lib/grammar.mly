@@ -17,6 +17,7 @@
 %token UNIV
 %token QUIT NORMALIZE
 %token ID REFL MATCH
+%token AFF CART
 %token EOF
 
 %start <Concrete_syntax.signature> sign
@@ -41,6 +42,10 @@ decl:
 sign:
   | EOF { [] }
   | d = decl; s = sign { d :: s };
+
+dsort:
+  | AFF { Affine }
+  | CART { Cartesian }
 
 dim:
   | r = name { DVar r }
@@ -80,7 +85,9 @@ atomic:
   | LANGLE left = term; COMMA; right = term; RANGLE
     { Pair (left, right) }
   | LBR; name = name; RBR; body = term; endpoints = endpoint_options
-    { Bridge(Binder {name; body}, endpoints) }
+    { Bridge(Affine, Binder {name; body}, endpoints) }
+  | LBR; name = name; COLON; dsort = dsort; RBR; body = term; endpoints = endpoint_options
+    { Bridge(dsort, Binder {name; body}, endpoints) }
   | FST; t = atomic { Fst t }
   | SND; t = atomic { Snd t }
 

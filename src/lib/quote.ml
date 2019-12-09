@@ -21,7 +21,7 @@ type env_entry =
   | Postulate of {level : D.lvl; tp : D.t}
 type env = env_entry list
 
-let mk_bvar env size =
+let mk_dvar env size =
   (D.DVar size, DVar size :: env)
 
 let mk_var tp env size =
@@ -42,6 +42,10 @@ let env_to_sem_env env =
     | Postulate {level; tp} -> D.TopLevel (D.Neutral {tp; term = D.root (D.Var level)})
   in
   List.map go env
+
+let read_back_dsort = function
+  | D.Affine -> Syn.Affine
+  | D.Cartesian -> Syn.Cartesian
 
 let read_back_level env x =
   let rec go acc = function
@@ -139,8 +143,8 @@ and read_back_nf env size nf =
   | D.Normal {tp = D.Bool; term = D.True} -> Syn.True
   | D.Normal {tp = D.Bool; term = D.False} -> Syn.False
   (* Bridge *)
-  | D.Normal {tp = D.Bridge (dest, _); term} ->
-    let (arg, arg_env) = mk_bvar env size in
+  | D.Normal {tp = D.Bridge (_, dest, _); term} ->
+    let (arg, arg_env) = mk_dvar env size in
     let nf = D.Normal
         {tp = E.do_clos (size + 1) dest (D.Dim arg);
          term = E.do_bapp (size + 1) term arg} in
@@ -182,11 +186,12 @@ and read_back_tp env size d =
     Syn.Sg
       (read_back_tp env size fst,
        read_back_tp arg_env (size + 1) (E.do_clos (size + 1) snd (D.Tm arg)))
-  | D.Bridge (dest, ends) ->
+  | D.Bridge (src, dest, ends) ->
     let width = List.length ends in
-    let (arg, arg_env) = mk_bvar env size in
+    let (arg, arg_env) = mk_dvar env size in
     Syn.Bridge
-      (read_back_tp arg_env (size + 1) (E.do_clos (size + 1) dest (D.Dim arg)),
+      (read_back_dsort src,
+       read_back_tp arg_env (size + 1) (E.do_clos (size + 1) dest (D.Dim arg)),
        List.map2
          (fun tp -> Option.map (fun term -> read_back_nf env size (D.Normal {tp; term})))
          (E.do_consts size dest width)
@@ -291,7 +296,7 @@ and read_back_ne env size (h, s) =
 
 and read_back_extent_head env size ({var = i; dom; mot; ctx; endcase; varcase} : D.extent_head) =
   let i' = read_back_level env i in
-  let (barg, benv) = mk_bvar env size in
+  let (barg, benv) = mk_dvar env size in
   let applied_dom = E.do_clos (size + 1) dom (D.Dim barg) in
   let dom' = read_back_tp benv (size + 1) applied_dom in
   let (dom_arg, dom_env) = mk_var applied_dom benv (size + 1) in
@@ -312,8 +317,8 @@ and read_back_extent_head env size ({var = i; dom; mot; ctx; endcase; varcase} :
   let endtps = E.do_consts size dom width in
   let (end_args, ends_env) = mk_vars endtps env size in
   let (bridge_arg, bridge_env) =
-    mk_var (D.Bridge (dom, List.map Option.some end_args)) ends_env (size + width) in
-  let (varcase_barg, varcase_benv) = mk_bvar bridge_env (size + width + 1) in
+    mk_var (D.Bridge (D.Affine, dom, List.map Option.some end_args)) ends_env (size + width) in
+  let (varcase_barg, varcase_benv) = mk_dvar bridge_env (size + width + 1) in
   let varcase_inst = E.do_bapp (size + width + 2) bridge_arg varcase_barg in
   let varcase_mot = E.do_clos2 (size + width + 2) mot (D.Dim varcase_barg) (D.Tm varcase_inst) in
   let applied_varcase = E.do_clos_extent (size + width + 2) varcase end_args bridge_arg varcase_barg in
@@ -358,9 +363,10 @@ let rec check_nf env size nf1 nf2 =
     D.Normal {tp = D.Id (_, _, _); term = D.Refl term2} ->
     check_nf env size (D.Normal {tp; term = term1}) (D.Normal {tp; term = term2})
   (* Bridge *)
-  | D.Normal {tp = D.Bridge (dest1, _); term = p1},
-    D.Normal {tp = D.Bridge (dest2, _); term = p2} ->
-    let (arg, arg_env) = mk_bvar env size in
+  | D.Normal {tp = D.Bridge (src1, dest1, _); term = p1},
+    D.Normal {tp = D.Bridge (src2, dest2, _); term = p2} ->
+    src1 = src2 &&
+    let (arg, arg_env) = mk_dvar env size in
     let nf1 = D.Normal {tp = E.do_clos (size + 1) dest1 (D.Dim arg); term = E.do_bapp (size + 1) p1 arg} in
     let nf2 = D.Normal {tp = E.do_clos (size + 1) dest2 (D.Dim arg); term = E.do_bapp (size + 1) p2 arg} in
     check_nf arg_env (size + 1) nf1 nf2
@@ -506,7 +512,7 @@ and check_extent_head env size
     ({var = i2; dom = dom2; mot = mot2; ctx = ctx2; endcase = endcase2; varcase = varcase2} : D.extent_head)
   =
   i1 = i2 &&
-  let (barg, benv) = mk_bvar env size in
+  let (barg, benv) = mk_dvar env size in
   let applied_dom1 = E.do_clos (size + 1) dom1 (D.Dim barg) in
   let applied_dom2 = E.do_clos (size + 1) dom2 (D.Dim barg) in
   check_tp ~subtype:false benv (size + 1) applied_dom1 applied_dom2 &&
@@ -531,8 +537,8 @@ and check_extent_head env size
   let endtps = E.do_consts size dom1 width in
   let (end_args, ends_env) = mk_vars endtps env size in
   let (bridge_arg, bridge_env) =
-    mk_var (D.Bridge (dom1, List.map Option.some end_args)) ends_env (size + width) in
-  let (varcase_barg, varcase_benv) = mk_bvar bridge_env (size + width + 1) in
+    mk_var (D.Bridge (D.Affine, dom1, List.map Option.some end_args)) ends_env (size + width) in
+  let (varcase_barg, varcase_benv) = mk_dvar bridge_env (size + width + 1) in
   let varcase_inst = E.do_bapp (size + width + 2) bridge_arg varcase_barg in
   let varcase_mot = E.do_clos2 (size + width + 2) mot1 (D.Dim varcase_barg) (D.Tm varcase_inst) in
   let applied_varcase1 = E.do_clos_extent (size + width + 2) varcase1 end_args bridge_arg varcase_barg in
@@ -562,9 +568,10 @@ and check_tp ~subtype env size d1 d2 =
     check_tp ~subtype arg_env (size + 1)
       (E.do_clos (size + 1) snd (D.Tm arg))
       (E.do_clos (size + 1) snd' (D.Tm arg))
-  | D.Bridge (dest, ends), D.Bridge (dest', ends') ->
+  | D.Bridge (src, dest, ends), D.Bridge (src', dest', ends') ->
+    src = src' &&
     let width = List.length ends in
-    let (barg, barg_env) = mk_bvar env size in
+    let (barg, barg_env) = mk_dvar env size in
     check_tp ~subtype barg_env (size + 1)
       (E.do_clos (size + 1) dest (D.Dim barg))
       (E.do_clos (size + 1) dest' (D.Dim barg)) &&

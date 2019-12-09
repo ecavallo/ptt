@@ -3,6 +3,10 @@ module D = Domain
 
 exception Eval_failed of string
 
+let eval_dsort = function
+  | Syn.Affine -> D.Affine
+  | Syn.Cartesian -> D.Cartesian
+
 let eval_dim r (env : D.env) =
   match r with
   | Syn.DVar i ->
@@ -152,7 +156,7 @@ and do_id_right tp =
 
 and do_bridge_cod size tp s =
   match tp with
-  | D.Bridge (clos, _) ->
+  | D.Bridge (_, clos, _) ->
     do_clos size clos (D.Dim s)
   | D.Neutral {tp; term} ->
     D.Neutral {tp; term = D.(Quasi (BridgeCod s) @: term)}
@@ -160,7 +164,7 @@ and do_bridge_cod size tp s =
 
 and do_bridge_endpoint size tp ne o =
   match tp with
-  | D.Bridge (_, ts) ->
+  | D.Bridge (_, _, ts) ->
     begin
       match List.nth ts o with
       | Some t -> t
@@ -214,7 +218,8 @@ and do_gel_bridge size f end_tms =
   match f with
   | D.Gel (_, end_tps, rel) ->
     D.Bridge
-      (D.Pseudo {var = size; term = D.Gel (size, end_tps, rel); ends = end_tps},
+      (D.Affine,
+       D.Pseudo {var = size; term = D.Gel (size, end_tps, rel); ends = end_tps},
        List.map Option.some end_tms)
   | D.Neutral {tp; term} ->
     D.Neutral {tp; term = D.(Quasi (GelBridge end_tms) @: term)}
@@ -260,8 +265,8 @@ and eval t (env : D.env) size =
   | Syn.Pair (t1, t2) -> D.Pair (eval t1 env size, eval t2 env size)
   | Syn.Fst t -> do_fst (eval t env size)
   | Syn.Snd t -> do_snd size (eval t env size)
-  | Syn.Bridge (dest, ts) ->
-    D.Bridge (Clos {term = dest; env}, List.map (Option.map (fun t -> eval t env size)) ts)
+  | Syn.Bridge (ds, dest, ts) ->
+    D.Bridge (eval_dsort ds, Clos {term = dest; env}, List.map (Option.map (fun t -> eval t env size)) ts)
   | Syn.BApp (t,r) ->
     let r' = eval_dim r env in
     do_bapp size (eval t env size) r'

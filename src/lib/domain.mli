@@ -1,5 +1,8 @@
 type lvl = int
 
+type dsort =
+  | Affine
+  | Cartesian
 type dim =
   | DVar of lvl
   | Const of int
@@ -29,7 +32,7 @@ and t =
   | Pi of t * clos
   | Sg of t * clos
   | Pair of t * t
-  | Bridge of clos * t option list
+  | Bridge of dsort * clos * t option list
   | BLam of clos
   | Refl of t
   | Id of t * t * t
@@ -71,18 +74,19 @@ val root : 'a -> 'a * spine
 val (@:) : cell -> 'a * spine -> 'a * spine
 
 val instantiate : lvl -> lvl -> t -> t
-val instantiate_bvar : lvl -> lvl -> lvl -> lvl
 val instantiate_extent_head : lvl -> lvl -> extent_head -> extent_head
 val instantiate_spine : (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine -> 'a * spine
 val instantiate_ne : lvl -> lvl -> ne -> ne
 
 val equal : t -> t -> bool
 val equal_lvl : lvl -> lvl -> bool
+val equal_dsort : dsort -> dsort -> bool
 val equal_ne : ne -> ne -> bool
 val equal_nf : nf -> nf -> bool
 
 val pp : Format.formatter -> t -> unit
 val pp_lvl : Format.formatter -> lvl -> unit
+val pp_dsort : Format.formatter -> dsort -> unit
 val pp_dim : Format.formatter -> dim -> unit
 val pp_nf : Format.formatter -> nf -> unit
 val pp_ne : Format.formatter -> ne -> unit

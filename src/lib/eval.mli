@@ -1,6 +1,7 @@
 exception Eval_failed of string
 
 (* Evaluation *)
+val eval_dsort : Syntax.dsort -> Domain.dsort
 val eval_dim : Syntax.dim -> Domain.env -> Domain.dim
 val eval : Syntax.t -> Domain.env -> Domain.lvl -> Domain.t
 

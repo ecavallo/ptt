@@ -4,6 +4,10 @@ type idx = int
 type uni_level = int
 [@@deriving show{ with_path = false }, eq]
 
+type dsort =
+  | Affine
+  | Cartesian
+[@@deriving eq]
 type dim =
   | DVar of idx
   | Const of int
@@ -18,7 +22,7 @@ type t =
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
   | Sg of t * (* BINDS *) t | Pair of t * t | Fst of t | Snd of t
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
-  | Bridge of (* BBINDS *) t * t option list | BApp of t * dim | BLam of (* BBINDS *) t
+  | Bridge of dsort * (* BBINDS *) t * t option list | BApp of t * dim | BLam of (* BBINDS *) t
   | Extent of dim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS *) t list * (* BINDS n & BBINDS *) t
   | Gel of dim * t list * (* BINDS n *) t | Engel of idx * t list * t
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
@@ -67,7 +71,7 @@ let unsubst_bvar i t =
     | Refl t -> Refl (go depth t)
     | J (mot, refl, eq) ->
       J (go (depth + 3) mot, go (depth + 1) refl, go depth eq)
-    | Bridge (t, ts) -> Bridge (go (depth + 1) t, List.map (Option.map (go depth)) ts)
+    | Bridge (ds, t, ts) -> Bridge (ds, go (depth + 1) t, List.map (Option.map (go depth)) ts)
     | BLam t -> BLam (go (depth + 1) t)
     | BApp (t, r) -> BApp (go depth t, go_dim depth r)
     | Extent (r, dom, mot, ctx, endcase, varcase) ->
@@ -98,6 +102,12 @@ let rec condense = function
       | None -> None
     end
   | _ -> None
+
+let pp_dsort fmt =
+  let open Format in
+  function
+  | Affine -> fprintf fmt "aff"
+  | Cartesian -> fprintf fmt "cart"
 
 let pp_dim fmt =
   let open Format in
@@ -162,9 +172,9 @@ let rec pp fmt =
     fprintf fmt "refl(@[<hov>%a@])" pp t
   | J (mot, refl, eq) ->
     fprintf fmt "J(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp mot pp refl pp eq;
-  | Bridge (t, ts) ->
-    fprintf fmt "Bridge(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])"
-      pp t (pp_list (pp_option pp)) ts;
+  | Bridge (ds, t, ts) ->
+    fprintf fmt "Bridge(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
+      pp_dsort ds pp t (pp_list (pp_option pp)) ts;
   | BLam t ->
     fprintf fmt "blam(@[<hov>%a@])" pp t;
   | BApp (t, r) ->

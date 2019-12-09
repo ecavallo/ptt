@@ -1,6 +1,10 @@
 type lvl = int
 [@@deriving show{ with_path = false }, eq]
 
+type dsort =
+  | Affine
+  | Cartesian
+[@@deriving show, eq]
 type dim =
   | DVar of lvl
   | Const of int
@@ -36,7 +40,7 @@ and t =
   | Pi of t * clos
   | Sg of t * clos
   | Pair of t * t
-  | Bridge of clos * t option list
+  | Bridge of dsort * clos * t option list
   | BLam of clos
   | Refl of t
   | Id of t * t * t
@@ -85,11 +89,11 @@ and nf =
 let root h = (h, [])
 let (@:) cell (h, s) = (h, cell :: s)
 
-let instantiate_bvar r i j =
+let instantiate_dvar r i j =
   if j = i then r else j
 
 let instantiate_dim r i = function
-  | DVar j -> DVar (instantiate_bvar r i j)
+  | DVar j -> DVar (instantiate_dvar r i j)
   | Const o -> Const o
 
 let rec instantiate_entry r i = function
@@ -133,16 +137,16 @@ and instantiate r i = function
   | Pi (src, dst) -> Pi (instantiate r i src, instantiate_clos r i dst)
   | Sg (src, dst) -> Sg (instantiate r i src, instantiate_clos r i dst)
   | Pair (t, u) -> Pair (instantiate r i t, instantiate r i u)
-  | Bridge (dst, ts) -> Bridge (instantiate_clos r i dst, List.map (Option.map (instantiate r i)) ts)
+  | Bridge (src, dst, ts) -> Bridge (src, instantiate_clos r i dst, List.map (Option.map (instantiate r i)) ts)
   | BLam clo -> BLam (instantiate_clos r i clo)
   | Refl t -> Refl (instantiate r i t)
   | Id (ty, t, u) -> Id (instantiate r i ty, instantiate r i t, instantiate r i u)
-  | Gel (j, ts, t) -> Gel (instantiate_bvar r i j, List.map (instantiate r i) ts, instantiate_closN r i t)
-  | Engel (j, ts, t) -> Engel (instantiate_bvar r i j, List.map (instantiate r i) ts, instantiate r i t)
+  | Gel (j, ts, t) -> Gel (instantiate_dvar r i j, List.map (instantiate r i) ts, instantiate_closN r i t)
+  | Engel (j, ts, t) -> Engel (instantiate_dvar r i j, List.map (instantiate r i) ts, instantiate r i t)
   | Uni i -> Uni i
 
 and instantiate_extent_head r i {var; dom; mot; ctx; endcase; varcase} =
-  {var = instantiate_bvar r i var;
+  {var = instantiate_dvar r i var;
    dom = instantiate_clos r i dom;
    mot = instantiate_clos2 r i mot;
    ctx = instantiate r i ctx;
@@ -210,7 +214,7 @@ and instantiate_quasi_cell r i =
 
 and instantiate_ne r i ne =
   let headf r i = function
-    | Var j -> Var (instantiate_bvar r i j)
+    | Var j -> Var (instantiate_dvar r i j)
     | Ext e -> Ext (instantiate_extent_head r i e)
   in
   instantiate_spine headf r i ne

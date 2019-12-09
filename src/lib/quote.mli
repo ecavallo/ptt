@@ -8,9 +8,6 @@ type env_entry =
   | Postulate of {level : Domain.lvl; tp : Domain.t}
 type env = env_entry list
 
-val mk_bvar : env -> Domain.lvl -> Domain.dim * env
-val mk_var : Domain.t -> env -> Domain.lvl -> Domain.t * env
-
 val env_to_sem_env : env -> Domain.env
 
 val reduce_extent : env -> Domain.lvl -> Domain.extent_head * Domain.spine -> Domain.t option

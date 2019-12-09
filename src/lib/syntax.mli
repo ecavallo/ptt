@@ -1,6 +1,9 @@
 type idx = int
 type uni_level = int
 
+type dsort =
+  | Affine
+  | Cartesian
 type dim =
   | DVar of idx (* DeBruijn indices for variables *)
   | Const of int
@@ -14,7 +17,7 @@ type t =
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
   | Sg of t * (* BINDS *) t | Pair of t * t | Fst of t | Snd of t
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
-  | Bridge of (* BBINDS *) t * t option list | BApp of t * dim | BLam of (* BBINDS *) t
+  | Bridge of dsort * (* BBINDS *) t * t option list | BApp of t * dim | BLam of (* BBINDS *) t
   | Extent of dim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS *) t list * (* BINDS & BBINDS *) t
   | Gel of dim * t list * (* BINDS n *) t | Engel of idx * t list * t
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t

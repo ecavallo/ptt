@@ -47,6 +47,8 @@ let keywords =
     ("at", AT);
     ("of", OF);
     ("def", DEF);
+    ("aff", AFF);
+    ("cart", CART);
     ("postulate", POSTULATE);
     ("normalize", NORMALIZE);
     ("quit", QUIT);

@@ -12,7 +12,7 @@ val pp_error : Format.formatter -> error -> unit
 exception Type_error of error
 
 type env_entry =
-  | DVar of {level : Domain.lvl; width : int}
+  | DVar of {level : Domain.lvl; width : int; sort : Domain.dsort}
   | Var of {level : Domain.lvl; tp : Domain.t}
   | Def of {term : Domain.t; tp : Domain.t}
   | Restrict of Syntax.idx

@@ -1,0 +1,19 @@
+--------------------------------------------------------------------------------
+-- Cartesian dimension variables
+--------------------------------------------------------------------------------
+
+let diagonal : (A : U<0>) (p : [x : cart] [y : cart] A {} {}) -> ([x : cart] A {}) =
+  fun A p -> bri x -> p @ x @ x
+
+let funext : (A : U<0>) (B : U<0>) -> (A -> [x : cart] B {}) -> [x : cart] A -> B {} =
+    fun A B f -> bri x -> fun a -> f a @ x
+
+-- uses restricted dimension variable
+-- let diagonal : (A : U<0>) (p : [x : aff] [y : aff] A {} {}) -> ([x : aff] A {}) =
+--   fun A p -> bri x -> p @ x @ x
+
+-- dimension sort mismatch
+-- let extent_test : (A : U<0>) -> [x : cart] (A -> [y : cart] A {}) {} =
+--   fun A -> bri x -> fun a ->
+--   extent x of a in _ -> A at _ _ -> [y : cart] A {} with
+--   | q _ -> q

@@ -55,6 +55,10 @@ let rec extent_env env = function
   | name :: names -> extent_env (Term name :: env) names
   | _ -> raise (Check.Type_error (Check.Misc ("Bad length in extent")))
 
+let bind_dsort = function
+  | CS.Affine -> S.Affine
+  | CS.Cartesian -> S.Cartesian
+
 let bind_dim env = function
   | CS.DVar i -> S.DVar (find_idx i env)
   | CS.Const o -> S.Const o
@@ -113,8 +117,8 @@ let rec bind env = function
   | CS.Id (tp, left, right) ->
     S.Id (bind env tp, bind env left, bind env right)
   | CS.Refl t -> S.Refl (bind env t)
-  | CS.Bridge (Binder {name; body}, endpoints) ->
-    S.Bridge (bind (Dim name :: env) body, List.map (Option.map (bind env)) endpoints)
+  | CS.Bridge (sort, Binder {name; body}, endpoints) ->
+    S.Bridge (bind_dsort sort, bind (Dim name :: env) body, List.map (Option.map (bind env)) endpoints)
   | CS.BLam (BinderN {names = []; body}) ->
     bind env body
   | CS.BLam (BinderN {names = i :: names; body}) ->
