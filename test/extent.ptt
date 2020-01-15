@@ -126,3 +126,10 @@ normalize def extent_test6
 let extent_test6a : Id ([x] nat -> [y] nat {} {}) extent_test6 (bri x -> fun n -> bri y -> zero)
   =
   refl (bri x -> fun n -> bri y -> zero)
+
+let extent_test7 : (A : U<0>) (B : U<0>) ->
+ [x] (extent x of triv in _ -> unit at _ _ -> U<0> with | _ _ -> A -> B) -> A -> B {}
+ =
+ fun A B -> bri x -> fun f a -> f a
+
+normalize def extent_test7
