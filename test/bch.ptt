@@ -1,13 +1,18 @@
 --------------------------------------------------------------------------------
 -- An (incomplete) experiment with using parametric type theory as an internal
 -- language of BCH cubical sets to develop the BCH model of cubical type theory
--- in Orton-Pitts style. It's not obvious how to specify dependent Path-types or
--- G-types in this way, because we cannot express the separated product of a
--- context with an interval.
+-- in Orton-Pitts style.
+
+-- It's not obvious how to specify dependent Path-types or G-types in this way,
+-- because we cannot express the separated product of a context with an
+-- interval. It's also likely that interpreting parametric type theory in the
+-- naive way will not give the same definition of fibration as in the BCH
+-- paper. (See Section 9.3 in Swan, "Lifting Problems in Grothendieck
+-- Fibrations".)
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
--- Postulates (some)
+-- Postulates
 --------------------------------------------------------------------------------
 
 postulate is_cof : U<0> -> U<0>
