@@ -126,17 +126,6 @@ let tighten : (p : [x] nat {*; *}) -> Id nat (p @ 0) (p @ 1) =
     (p @ 0) (nat_eta (p @ 0))
     (p @ 1) (nat_eta (p @ 1))
 
-let tighten_refl : (m : nat)
-  -> [x] Id nat (tighten (refl m)) m {refl m; refl m}
-  =
-  fun m ->
-  rec m at m -> [x] Id nat (tighten (refl m)) m {refl m; refl m} with
-  | zero -> bri x -> refl
-  | suc m, pf ->
-    
-
-quit
-
 let tighten_loosen_refl : (m : nat)
   -> Id (Id nat m m) (tighten (loosen m m (refl m))) (refl m)
   =
