@@ -1,16 +1,42 @@
 --------------------------------------------------------------------------------
 -- Part of a proof that nat is bridge-discrete
--- Unclear if the full result follows from nullary parametricity
 --------------------------------------------------------------------------------
 
 -- Identity type lemmas
 
-let subst : (A : nat -> U<0>) (n : nat) (m : nat) -> (Id nat n m) -> (A n) -> (A m) =
-  fun A n m prf ->
-  match prf at x y prf -> (A x) -> (A y) with
-  | refl _ -> fun x -> x
+let subst : (A : U<0>) (B : A -> U<0>)
+  (a0 : A) (a1 : A) (eq : Id A a0 a1)
+  -> (B a0) -> B a1
+  =
+  fun A B a0 a1 eq ->
+  match eq at a0 a1 _ -> (B a0) -> B a1 with
+  | refl _ -> fun b -> b
 
-normalize def subst
+let subst2 : (A : U<0>) (B : U<0>) (C : A -> B -> U<0>)
+  (a0 : A) (a1 : A) (eqA : Id A a0 a1)
+  (b0 : B) (b1 : B) (eqB : Id B b0 b1)
+  -> (C a0 b0) -> C a1 b1
+  =
+  fun A B C a0 a1 eq ->
+  match eq at a0 a1 _ -> (b0 : B) (b1 : B) -> (Id B b0 b1) -> (C a0 b0) -> C a1 b1 with
+  | refl a -> subst B (C a)
+
+let trans : (A : U<0>) (a : A) (b : A) (c : A) -> (Id A a b) -> (Id A b c) -> Id A a c =
+  fun A a b c eq0 ->
+  match eq0 at x y _ -> (Id A y c) -> Id A x c with
+  | refl z -> fun eq1 -> eq1
+
+let comp : (A : U<0>)
+  (a0 : A) (a1 : A) (eq : Id A a0 a1)
+  (a0' : A) (eq0 : Id A a0 a0')
+  (a1' : A) (eq1 : Id A a1 a1')
+  -> Id A a0' a1'
+  =
+  fun A a0 a1 eq a0' eq0 a1' eq1 ->
+  subst2 A A (fun t0 t1 -> Id A t0 t1)
+    a0 a0' eq0
+    a1 a1' eq1
+    eq
 
 let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
   -> (Id A a0 a1) -> Id B (f a0) (f a1)
@@ -19,51 +45,123 @@ let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
   match eq at x0 x1 _ -> Id B (f x0) (f x1) with
   | refl z -> refl (f z)
 
-normalize def cong
+let cong_comp : (A : U<0>) (B : U<0>) (f : A -> B)
+  (a0 : A) (a1 : A) (eq : Id A a0 a1)
+  (a0' : A) (eq0 : Id A a0 a0')
+  (a1' : A) (eq1 : Id A a1 a1')
+  -> Id (Id B (f a0') (f a1'))
+     (comp B (f a0) (f a1) (cong A B f a0 a1 eq)
+       (f a0') (cong A B f a0 a0' eq0) (f a1') (cong A B f a1 a1' eq1))
+     (cong A B f a0' a1' (comp A a0 a1 eq a0' eq0 a1' eq1))
+  =
+  fun A B f ->
+  let Goal : (a0 : A) (a1 : A) (eq : Id A a0 a1)
+    (a0' : A) (eq0 : Id A a0 a0') (a1' : A) (eq1 : Id A a1 a1')
+    -> U<0>
+    =
+    fun a0 a1 eq a0' eq0 a1' eq1 ->
+    Id (Id B (f a0') (f a1'))
+     (comp B (f a0) (f a1) (cong A B f a0 a1 eq)
+       (f a0') (cong A B f a0 a0' eq0) (f a1') (cong A B f a1 a1' eq1))    
+     (cong A B f a0' a1' (comp A a0 a1 eq a0' eq0 a1' eq1))
+  in
+  fun a0 a1 eq a0' eq0 a1' eq1 ->
+  (match eq0 at
+    a0 a0' eq0 -> (a1 : A) (a1' : A) (eq1 : Id A a1 a1') (eq : Id A a0 a1) -> Goal a0 a1 eq a0' eq0 a1' eq1
+    with
+    | refl a0 ->
+      fun a1 a1' eq1 ->
+      match eq1 at
+      a1 a1' eq1 -> (eq : Id A a0 a1) -> Goal a0 a1 eq a0 (refl a0) a1' eq1
+      with
+      | refl a1 -> fun eq -> refl (cong A B f a0 a1 eq))
+    a1 a1' eq1 eq
 
 -- Gel type lemmas
 
-let gelproj : (A : U<0>) -> [x] Gel x A {} -> A =
-  fun A p ->
-  ungel x : 0 -> p @ x at _ -> A with | gel a -> a
+let gelproj : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
+  -> (p : [x] Gel x {A; B} (a b -> R a b) {*; *}) -> R (p @ 0) (p @ 1)
+  =
+  fun A B R p ->
+  ungel x : 2 -> p @ x at _ -> R (p @ 0) (p @ 1) with | gel r -> r
 
-normalize def gelproj
+-- -- nat is a retract of [x] nat {}
 
-let mapGel : (A : U<0>) (B : U<0>) -> (A -> B) -> [x] (Gel x A) -> Gel x B {} =
-  fun A B f -> bri x -> fun g ->
-  extent x of g in y -> Gel y A at y _ -> Gel y B with
-  | q y -> gel y (f (gelproj A q))
+let loosen : (m : nat) (n : nat) -> (Id nat m n) -> [x] nat {m; n} =
+  fun m n eq -> subst nat (fun k -> [x] nat {m; k}) m n eq (bri _ -> m)
 
-normalize def mapGel
-
--- nat is a retract of [x] nat {}
-
-let stretch : nat -> [x] nat {} =
-  fun n -> bri _ -> n
-
-normalize def stretch
-
-let flatten_aux : [x] nat -> Gel x nat {} =
-  bri x -> fun n ->
-  rec n at _ -> Gel x nat with
-  | zero -> gel x zero
-  | suc _, g -> mapGel nat nat (fun m -> suc m) @ x g
-
-normalize def flatten_aux
-
-let flatten : [x] nat {} -> nat =
-  fun p -> gelproj nat (bri x -> flatten_aux @ x (p @ x))
-
-normalize def flatten
-
-let flatten_stretch : (n : nat) -> Id nat (flatten (stretch n)) n =
+let nat_id : nat -> nat =
   fun n ->
-  rec n at n -> Id nat (flatten (stretch n)) n with
+  rec n at _ -> nat with
+  | zero -> zero
+  | suc _, n -> suc n
+
+let nat_eta : (n : nat) -> Id nat (nat_id n) n =
+  fun n ->
+  rec n at n -> Id nat (nat_id n) n with
   | zero -> refl zero
-  | suc k, q -> cong nat nat (fun m -> suc m) (flatten (stretch k)) k q
+  | suc n, eq -> cong nat nat (fun t -> suc t) (nat_id n) n eq
 
-normalize def flatten_stretch
+let tighten_aux : [x] nat -> Gel x {nat; nat} (m n -> Id nat m n) {nat_id; nat_id} =
+  bri x -> fun k ->
+  rec k at _ -> Gel x {nat; nat} (m n -> Id nat m n) with
+  | zero -> gel x {zero; zero} (refl zero)
+  | suc _, g ->
+    extent x of g in
+    y -> Gel y {nat; nat} (m n -> Id nat m n) at
+    y _ -> Gel y {nat; nat} (m n -> Id nat m n) with
+    | m -> suc m
+    | n -> suc n
+    | m n q y ->
+      gel y {suc m; suc n}
+        (cong nat nat (fun t -> suc t) m n
+          (gelproj nat nat (fun m n -> Id nat m n) q))
 
--- can we prove that this is an equivalence (modulo bridge extensionality),
--- or do we need binary parametricity?
--- let stretch_flatten : (p : [x] nat {}) -> Id ([x] nat {}) (stretch (flatten p)) p =
+let tighten : (p : [x] nat {*; *}) -> Id nat (p @ 0) (p @ 1) =
+  fun p ->
+  comp nat
+    (nat_id (p @ 0)) (nat_id (p @ 1))
+    (gelproj nat nat (fun m n -> Id nat m n)
+      (bri x -> tighten_aux @ x (p @ x)))
+    (p @ 0) (nat_eta (p @ 0))
+    (p @ 1) (nat_eta (p @ 1))
+
+let tighten_refl : (m : nat)
+  -> [x] Id nat (tighten (refl m)) m {refl m; refl m}
+  =
+  fun m ->
+  rec m at m -> [x] Id nat (tighten (refl m)) m {refl m; refl m} with
+  | zero -> bri x -> refl
+  | suc m, pf ->
+    
+
+quit
+
+let tighten_loosen_refl : (m : nat)
+  -> Id (Id nat m m) (tighten (loosen m m (refl m))) (refl m)
+  =
+  fun m ->
+  rec m at m -> Id (Id nat m m) (tighten (loosen m m (refl m))) (refl m) with
+  | zero -> (refl (refl zero))
+  | suc m, pf ->
+    trans (Id nat (suc m) (suc m))
+      (tighten (loosen (suc m) (suc m) (refl (suc m))))
+      (cong nat nat (fun k -> suc k) m m (tighten (loosen m m (refl m))))
+      (refl (suc m))
+      (cong_comp nat nat (fun k -> suc k)
+        (nat_id m) (nat_id m)
+        (gelproj nat nat (fun m n -> Id nat m n)
+          (bri x -> tighten_aux @ x m))
+        m (nat_eta m)
+        m (nat_eta m))
+      (cong (Id nat m m) (Id nat (suc m) (suc m)) (cong nat nat (fun k -> suc k) m m)
+        (tighten (loosen m m (refl m)))
+        (refl m)
+        pf)
+        
+let tighten_loosen : (m : nat) (n : nat) (eq : Id nat m n)
+  -> Id (Id nat m n) (tighten (loosen m n eq)) eq
+  =
+  fun m n eq ->
+  match eq at m n eq -> Id (Id nat m n) (tighten (loosen m n eq)) eq with
+  | refl m -> tighten_loosen_refl m
