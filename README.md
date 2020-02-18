@@ -17,7 +17,7 @@ Syntax | Description
 `[x] A {a0; ...; an}` | Type of bridges across `A` in dimension `x` with endpoints `a1`,...,`an`
 `bri x -> a` | Bridge abstraction
 `p @ x` | Bridge application
-`Gel x {A1; ...; An} (a1 ... an -> R)` | Gel-type for an *n*-ary relation `R(a1,...,an)` on types `A1`,...,`An`
+`Gel x {A1; ...; An} (a1 ... an -> R)` | Gel-type for an *n*-ary relation `R(a1,...,an)` on types `A1`,...,`An`. As a special case, 0-ary Gel types are simply written `Gel x A`
 `gel x {a1; ...; an} b` | Constructor for elements of Gel-type
 `ungel x : n -> p at q -> C with`<br>`\| gel b -> t` | Elimination from bridges `x.p` over an *n*-ary Gel-type into a type family `q.C`
 `extent x of t in y -> A at y a -> B with`<br>`\| a0 -> b0`<br>`\| ...`<br>`\| an -> bn`<br>`\| a1 ... an q y -> b` | *n*-ary extent term mapping from `A` to `B`, casing on `x` in `t : A<x/y>`, with endpoint cases `b0`,...`bn` and bridge case `b`
