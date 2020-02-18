@@ -22,7 +22,7 @@ Syntax | Description
 `ungel x : n -> p at q -> C with`<br>`\| gel b -> t` | Elimination from bridges `x.p` over an *n*-ary Gel-type into a type family `q.C`
 `extent x of t in y -> A at y a -> B with`<br>`\| a0 -> b0`<br>`\| ...`<br>`\| an -> bn`<br>`\| a1 ... an q y -> b` | *n*-ary extent term mapping from `A` to `B`, casing on `x` in `t : A<x/y>`, with endpoint cases `b0`,...`bn` and bridge case `b`
 
-Bridge-types with partially-specified endpoints can be defined using the wildcard `*`; for example, `[x] A {a0; *}` is the type of binary bridges whose `0` endpoint is `a0`. The type `[x] A {a0; a1}` is a sub-type of `[x] A {a0; *}`. 
+Bridge-types with partially-specified endpoints can be defined using the wildcard `*`; for example, `[x] A {a0; *}` is the type of binary bridges whose `0` endpoint is `a0`. The type `[x] A {a0; a1}` is a sub-type of `[x] A {a0; *}`, but a term `p : [x] A {a0; *}` cannot be used as an element of `[x] A {a0; p @ 1}` without eta-expansion.
 
 ## Building
 
