@@ -1,6 +1,7 @@
 --------------------------------------------------------------------------------
--- Parts of the proof of relativity that can be defined without univalence
--- With no endpoints, the expected principle says [_] U<0> is equivalent to U<0>
+-- Parts of the proof of (nullary) relativity that can be defined without
+-- univalence.  With no endpoints, the expected principle says [_] U<0> is
+-- equivalent to U<0>.
 --------------------------------------------------------------------------------
 
 let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
