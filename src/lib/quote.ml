@@ -91,6 +91,8 @@ and reduce_extent env size es =
     | D.Ungel (end_tms, _, _, mot, i, case) :: s ->
       let es' = D.instantiate_spine D.instantiate_extent_head size i (e, s) in
       E.do_ungel size end_tms mot (go (DVar size :: env) (size + 1) es') case
+    | D.Unglobe :: s -> E.do_unglobe (go env size (e, s))
+    | D.Undisc (_, mot, case) :: s -> E.do_undisc size mot (go env size (e, s)) case
     | D.Quasi q :: s ->
       begin
         match q with 
@@ -105,6 +107,8 @@ and reduce_extent env size es =
         | D.BridgeEndpoint (ne, o) -> E.do_bridge_endpoint size (go env size (e,s)) ne o
         | D.GelRel ts -> E.do_gel_rel size (go env size (e,s)) ts
         | D.GelBridge ts -> E.do_gel_bridge size (go env size (e,s)) ts
+        | D.GlobalTp -> E.do_global_tp (go env size (e,s))
+        | D.DiscreteTp -> E.do_discrete_tp (go env size (e,s))
       end
   in
   try
@@ -156,6 +160,13 @@ and read_back_nf env size nf =
       (i',
        List.map2 (fun tp term -> read_back_nf env size (D.Normal {tp; term})) endtps ts,
        read_back_nf env size (D.Normal {tp = applied_rel; term = t}))
+  (* Global *)
+  | D.Normal {tp = D.Global tp; term = t} ->
+    let t' = E.do_unglobe t in
+    Syn.Englobe (read_back_nf env size (D.Normal {tp; term = t'}))
+  (* Discrete *)
+  | D.Normal {tp = D.Discrete tp; term = D.Endisc term} ->
+    Syn.Endisc (read_back_nf env size (D.Normal {tp; term}))
   (* Types *)
   | D.Normal {tp = D.Uni _; term = t} -> read_back_tp env size t
   (* Extent type *)
@@ -204,6 +215,8 @@ and read_back_tp env size d =
       (Syn.DVar i',
        List.map (read_back_tp env size) endtps,
        read_back_tp rel_env rel_size (E.do_closN rel_size rel rel_args))
+  | D.Global tp -> Syn.Global (read_back_tp env size tp)
+  | D.Discrete tp -> Syn.Discrete (read_back_tp env size tp)
   | D.Uni k -> Syn.Uni k
   | _ -> read_back_quasi_ne env size d
 
@@ -285,6 +298,20 @@ and read_back_ne env size (h, s) =
             tp = E.do_clos (size + 1) mot (D.Tm gel_term)}) in
     let ne' = D.instantiate_ne size i (h, s) in
     Syn.Ungel (List.length end_tms, mot', read_back_ne (DVar size :: env) (size + 1) ne', case')
+  | D.Unglobe :: s -> Syn.Unglobe (read_back_ne env size (h, s))
+  | D.Undisc (tp, mot, case) :: s ->
+    let (mot_arg, mot_env) = mk_var (D.Global (D.Discrete tp)) env size in
+    let mot' = read_back_tp mot_env (size + 1) (E.do_clos (size + 1) mot (D.Tm mot_arg)) in
+    let (case_arg, case_env) = mk_var tp env size in
+    let case' =
+      read_back_nf
+        case_env
+        (size + 1)
+        (D.Normal
+           {term = E.do_clos (size + 1) case (D.Tm case_arg);
+            tp = E.do_clos (size + 1) mot (D.Tm (D.Englobe (D.Endisc case_arg)))})
+    in
+    Syn.Undisc (mot', read_back_ne env size (h, s), case')
   | D.Quasi _ :: _ ->
     failwith "Invariant: this can never happen"
 
@@ -373,6 +400,14 @@ let rec check_nf env size nf1 nf2 =
     let applied_rel1 = E.do_closN size rel1 ts1 in
     let applied_rel2 = E.do_closN size rel2 ts2 in
     check_nf env size (D.Normal {tp = applied_rel1; term = t1}) (D.Normal {tp = applied_rel2; term = t2})
+  (* Global *)
+  | D.Normal {tp = D.Global tp1; term = t1}, D.Normal {tp = D.Global tp2; term = t2} ->
+    let t1',t2' = E.do_unglobe t1, t2 in
+    check_nf env size (D.Normal {tp = tp1; term = t1'}) (D.Normal {tp = tp2; term = t2'})
+  (* Discrete *)
+  | D.Normal {tp = D.Discrete tp1; term = D.Endisc term1},
+    D.Normal {tp = D.Discrete tp2; term = D.Endisc term2} ->
+    check_nf env size (D.Normal {tp = tp1; term = term1}) (D.Normal {tp = tp2; term = term2})
   (* Types *)
   | D.Normal {tp = D.Uni _; term = t1}, D.Normal {tp = D.Uni _; term = t2} ->
     check_tp ~subtype:false env size t1 t2
@@ -499,6 +534,23 @@ and check_ne env size (h1, s1) (h2, s2) =
     let ne1' = D.instantiate_ne size i1 (h1, s1) in
     let ne2' = D.instantiate_ne size i2 (h2, s2) in
     check_ne (DVar size :: env) (size + 1) ne1' ne2'
+  | D.Unglobe :: s1, D.Unglobe :: s2 -> check_ne env size (h1, s1) (h2, s2)
+  | D.Undisc (tp1, mot1, case1) :: s1, D.Undisc (_, mot2, case2) :: s2 ->
+    let (mot_arg, mot_env) = mk_var (D.Global (D.Discrete tp1)) env size in
+    check_tp ~subtype:false mot_env (size + 1)
+      (E.do_clos (size + 1) mot1 (D.Tm mot_arg))
+      (E.do_clos (size + 1) mot2 (D.Tm mot_arg)) &&
+    let (case_arg, case_env) = mk_var tp1 env size in
+    check_nf
+      case_env
+      (size + 1)
+      (D.Normal
+         {term = E.do_clos (size + 1) case1 (D.Tm case_arg);
+          tp = E.do_clos (size + 1) mot1 (D.Tm (D.Englobe (D.Endisc case_arg)))})
+      (D.Normal
+         {term = E.do_clos (size + 1) case2 (D.Tm case_arg);
+          tp = E.do_clos (size + 1) mot2 (D.Tm (D.Englobe (D.Endisc case_arg)))}) &&
+    check_ne env size (h1, s1) (h2, s2)
   | _ -> false
 
 and check_extent_head env size
@@ -590,5 +642,7 @@ and check_tp ~subtype env size d1 d2 =
     check_tp ~subtype rel_env rel_size
       (E.do_closN rel_size rel rel_args)
       (E.do_closN rel_size rel' rel_args)
+  | D.Global tp, D.Global tp' -> check_tp ~subtype env size tp tp'
+  | D.Discrete tp, D.Discrete tp' -> check_tp ~subtype env size tp tp'
   | D.Uni k, D.Uni j -> if subtype then k <= j else k = j
   | _ -> check_quasi_ne env size d1 d2

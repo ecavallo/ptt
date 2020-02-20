@@ -126,13 +126,28 @@ and do_ungel size ends mot gel case =
     | _ -> raise (Eval_failed "Not a gel or neutral in do_ungel")
   end
 
+and do_unglobe t =
+  match t with
+  | D.Englobe t -> t
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp = do_global_tp tp; term = D.(Unglobe @: term)}
+  | _ -> raise (Eval_failed "Couldn't unglobe argument in do_unglobe")
+
+and do_undisc size mot t case =
+  match t with
+  | D.Endisc t -> do_clos size case (D.Tm t)
+  | D.Neutral {tp; term} ->
+    D.Neutral
+      {tp = do_clos size mot (D.Tm t);
+       term = D.(Undisc (do_discrete_tp tp, mot, case) @: term)}
+  | _ -> raise (Eval_failed "Couldn't undisc argument in do_undisc")
+
 and do_id_tp tp = 
   match tp with 
   | D.Id (tp, _, _) -> tp
   | D.Neutral {tp; term} ->
     D.Neutral {tp; term = D.(Quasi IdTp @: term)}
   | _ -> raise (Eval_failed "Not something that can become a identity type")
-
 
 and do_id_left tp = 
   match tp with 
@@ -219,6 +234,20 @@ and do_gel_bridge size f end_tms =
   | D.Neutral {tp; term} ->
     D.Neutral {tp; term = D.(Quasi (GelBridge end_tms) @: term)}
   | _ -> raise (Eval_failed "Not something that can become a gel type")
+
+and do_global_tp f = 
+  match f with 
+  | D.Global tp -> tp
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi GlobalTp @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a global type")
+
+and do_discrete_tp f = 
+  match f with 
+  | D.Discrete tp -> tp
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi DiscreteTp @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a discrete type")
 
 and eval t (env : D.env) size =
   match t with
@@ -310,4 +339,15 @@ and eval t (env : D.env) size =
       (do_consts size (D.Clos {term = gel; env}) width)
       (D.Clos {term = mot; env})
       (eval gel (D.Dim (D.DVar size) :: env) (size + 1))
+      (D.Clos {term = case; env})
+  | Syn.Global t -> D.Global (eval t env size)
+  | Syn.Englobe t -> D.Englobe (eval t env size)
+  | Syn.Unglobe t -> do_unglobe (eval t env size)
+  | Syn.Discrete t -> D.Discrete (eval t env size)
+  | Syn.Endisc t -> D.Endisc (eval t env size)
+  | Syn.Undisc (mot, t, case) ->
+    do_undisc
+      size
+      (D.Clos {term = mot; env})
+      (eval t env size)
       (D.Clos {term = case; env})

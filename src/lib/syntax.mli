@@ -19,7 +19,7 @@ type t =
   | Gel of dim * t list * (* BINDS n *) t | Engel of idx * t list * t
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
   | Global of t | Englobe of t | Unglobe of t
-  | Discrete of t | Endisc of t | Undisc of t
+  | Discrete of t | Endisc of t | Undisc of (* BINDS *) t * t * (* BINDS *) t
   | Uni of uni_level
 
 val equal_uni_level : uni_level -> uni_level -> bool

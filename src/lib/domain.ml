@@ -64,7 +64,7 @@ and cell =
   | J of clos3 * clos * t * t * t
   | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
   | Unglobe
-  | Undisc
+  | Undisc of t * clos * clos
   | Quasi of quasi_cell
 [@@deriving show, eq]
 and quasi_cell = 
@@ -204,7 +204,12 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
       @: ne
     | Quasi q :: s -> Quasi (instantiate_quasi_cell r i q) @: go r i (h, s)
     | Unglobe :: s -> Unglobe @: go r i (h, s)
-    | Undisc :: s -> Undisc @: go r i (h, s)
+    | Undisc (tp, mot, case) :: s ->
+      Undisc
+        (instantiate r i tp,
+         instantiate_clos r i mot,
+         instantiate_clos r i case)
+      @: go r i (h, s)
   in
   go
 

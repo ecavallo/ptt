@@ -23,7 +23,7 @@ type t =
   | Gel of dim * t list * (* BINDS n *) t | Engel of idx * t list * t
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
   | Global of t | Englobe of t | Unglobe of t
-  | Discrete of t | Endisc of t | Undisc of t
+  | Discrete of t | Endisc of t | Undisc of (* BINDS *) t * t * (* BINDS *) t
   | Uni of uni_level
 [@@deriving eq]
 
@@ -89,7 +89,7 @@ let unsubst_bvar i t =
     | Unglobe t -> Unglobe (go depth t)
     | Discrete t -> Discrete (go depth t)
     | Endisc t -> Endisc (go depth t)
-    | Undisc t -> Undisc (go depth t)
+    | Undisc (mot, t, case) -> Undisc (go (depth + 1) mot, go depth t, go (depth + 1) case)
     | Uni j -> Uni j
   in
   try
@@ -196,8 +196,8 @@ let rec pp fmt =
     fprintf fmt "discrete(@[<hov>%a@])" pp t
   | Endisc t ->
     fprintf fmt "endisc(@[<hov>%a@])" pp t
-  | Undisc t ->
-    fprintf fmt "undisc(@[<hov>%a@])" pp t
+  | Undisc (mot, t, case) ->
+    fprintf fmt "undisc(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp mot pp t pp case
   | Uni i -> fprintf fmt "U<%d>" i
 
 let show t =

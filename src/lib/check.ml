@@ -7,6 +7,7 @@ module Q = Quote
 type mode =
   | Pointwise
   | Parametric
+[@@deriving show, eq]
 
 type env_entry =
   | DVar of {level : D.lvl; width : int}
@@ -23,6 +24,7 @@ type env = env_entry list
 
 type error =
     Cannot_synth_term of Syn.t
+  | Mode_mismatch of mode * mode
   | Dim_mismatch of D.dim * D.dim
   | Type_mismatch of Syn.t * Syn.t
   | Expecting_universe of D.t
@@ -34,6 +36,12 @@ let pp_error fmt = function
   | Cannot_synth_term t ->
     Format.fprintf fmt "@[<v> Cannot synthesize the type of: @[<hov 2>  ";
     Syn.pp fmt t;
+    Format.fprintf fmt "@]@]@,"
+  | Mode_mismatch (m1, m2) ->
+    Format.fprintf fmt "@[<v>Cannot equate@,@[<hov 2>  ";
+    pp_mode fmt m1;
+    Format.fprintf fmt "@]@ with@,@[<hov 2>  ";
+    pp_mode fmt m2;
     Format.fprintf fmt "@]@]@,"
   | Dim_mismatch (b1, b2) ->
     Format.fprintf fmt "@[<v>Cannot equate@,@[<hov 2>  ";
@@ -89,6 +97,10 @@ let rec env_to_quote_env = function
   | TopLevel {term; _} :: env -> Q.TopLevel term :: env_to_quote_env env
   | Postulate {level; tp} :: env -> Q.Postulate {level; tp} :: env_to_quote_env env
 
+let assert_mode_equal m1 m2 =
+  if m1 = m2 then ()
+  else tp_error (Mode_mismatch (m1, m2))
+
 let synth_var ~mode env x =
   let rec go new_mode env x =
     match x, env with
@@ -100,26 +112,18 @@ let synth_var ~mode env x =
     | x, Discrete :: env ->
       if mode = Pointwise
       then go Pointwise env x
-      else tp_error (Misc "Tried to use variable under discrete\n")
+      else tp_error (Misc "Tried to use variable beneath discrete\n")
     | x, Components :: env ->
       go Parametric env x
     | 0, Var {tp; _} :: _ ->
-      if new_mode = mode
-      then tp
-      else tp_error (Misc "Mode mismatch\n")
+      assert_mode_equal new_mode mode; tp
     | 0, Def {tp; _} :: _ ->
-      if new_mode = mode
-      then tp
-      else tp_error (Misc "Mode mismatch\n")
+      assert_mode_equal new_mode mode; tp
     | 0, DVar {level; _} :: _ -> tp_error (Expecting_term level)
     | 0, TopLevel {tp; _} :: _ ->
-      if new_mode = mode
-      then tp
-      else tp_error (Misc "Mode mismatch\n")
+      assert_mode_equal new_mode mode; tp
     | 0, Postulate {tp; _} :: _ ->
-      if new_mode = mode
-      then tp
-      else tp_error (Misc "Mode mismatch\n")
+      assert_mode_equal new_mode mode; tp
     | x, _ :: env -> go new_mode env (x - 1)
   in
   go mode env x
@@ -156,28 +160,29 @@ let assert_dim_equal b1 b2 =
   else tp_error (Dim_mismatch (b1, b2))
 
 let check_dim ~mode ~env ~dim ~width =
-  let rec go new_mode i env =
+  let rec go i env =
     match i, env with
     | _, [] -> tp_error (Misc "Tried to access non-existent variable\n")
     | i, Restrict j :: env ->
       if i = j
       then tp_error (Misc "Tried to use restricted dimension\n")
-      else go new_mode i env
-    | i, Discrete :: env ->
-      if mode = Pointwise
-      then go Pointwise i env
-      else tp_error (Misc "Tried to use variable under discrete\n")
-    | i, Components :: env ->
-      go Parametric i env
+      else go i env
+    | _, Discrete :: _ ->
+      tp_error (Misc "Tried to use dimension beneath discrete\n")
+    | _, Components :: _ ->
+      tp_error (Misc "Broken invariant\n")
     | 0, DVar {width = w; _} :: _ ->
       if width = w
       then ()
       else tp_error (Misc "Dimension width mismatch\n")
     | 0, _ :: _ -> tp_error (Misc "Expected bridge dimension\n")
-    | i, _ :: env -> go new_mode (i - 1) env
+    | i, _ :: env -> go (i - 1) env
   in
   match dim with
-  | Syn.DVar i -> go mode i env
+  | Syn.DVar i ->
+    if mode = Parametric
+    then go i env
+    else tp_error (Misc "Tried to use dimension in pointwise mode\n")
   | Syn.Const o ->
     if o < width
     then ()
@@ -268,6 +273,7 @@ and check_inert ~mode ~env ~size ~term ~tp =
       | t -> tp_error (Expecting_of ("Sigma", t))
     end
   | Bridge (term, ends) ->
+    assert_mode_equal mode Parametric;
     begin
       match tp with
       | Uni _ ->
@@ -280,6 +286,7 @@ and check_inert ~mode ~env ~size ~term ~tp =
       | t -> tp_error (Expecting_universe t)
     end
   | BLam body ->
+    assert_mode_equal mode Parametric;
     begin
       match tp with
       | Bridge (clos, ends) ->
@@ -300,6 +307,7 @@ and check_inert ~mode ~env ~size ~term ~tp =
       | t -> tp_error (Expecting_of ("Bridge", t))
     end
   | Gel (r, ends, rel) ->
+    assert_mode_equal mode Parametric;
     begin
       match tp with
       | Uni _ ->
@@ -314,6 +322,7 @@ and check_inert ~mode ~env ~size ~term ~tp =
       | t -> tp_error (Expecting_universe t)
     end
   | Engel (i, ts, term) ->
+    assert_mode_equal mode Parametric;
     begin
       match tp with
       | Gel (j, ends, rel) ->
@@ -327,6 +336,38 @@ and check_inert ~mode ~env ~size ~term ~tp =
         let ts' = List.map (fun t -> E.eval t sem_env size) ts in
         check ~mode ~env:res_env ~size ~term ~tp:(E.do_closN size rel ts')
       | t -> tp_error (Misc ("Expecting Gel but found\n" ^ D.show t))
+    end
+  | Global term ->
+    assert_mode_equal mode Pointwise;
+    begin
+      match tp with
+      | D.Uni _ ->
+        check ~mode:Parametric ~env:(Discrete :: env) ~size ~term ~tp;
+      | t -> tp_error (Expecting_universe t)
+    end
+  | Englobe term ->
+    assert_mode_equal mode Pointwise;
+    begin
+      match tp with
+      | D.Global tp ->
+        check ~mode:Parametric ~env:(Discrete :: env) ~size ~term ~tp;
+      | t -> tp_error (Expecting_of ("Global", t))
+    end
+  | Discrete term ->
+    assert_mode_equal mode Parametric;
+    begin
+      match tp with
+      | D.Uni _ ->
+        check ~mode:Pointwise ~env:(Components :: env) ~size ~term ~tp;
+      | t -> tp_error (Expecting_universe t)
+    end
+  | Endisc term ->
+    assert_mode_equal mode Parametric;
+    begin
+      match tp with
+      | D.Discrete tp ->
+        check ~mode:Pointwise ~env:(Components :: env) ~size ~term ~tp;
+      | t -> tp_error (Expecting_of ("Discrete", t))
     end
   | Uni i ->
     begin
@@ -438,6 +479,7 @@ and synth_quasi ~mode ~env ~size ~term =
       | t -> tp_error (Expecting_of ("Id", t))
     end
   | Extent (r, dom, mot, ctx, endcase, varcase) ->
+    assert_mode_equal mode Parametric;
     let width = List.length endcase in
     check_dim ~mode ~env ~dim:r ~width;
     let sem_env = env_to_sem_env env in
@@ -468,6 +510,7 @@ and synth_quasi ~mode ~env ~size ~term =
     check ~mode ~env:varcase_benv ~size:(size + width + 2) ~term:varcase ~tp:varcase_mot;
     E.eval mot (D.Tm (E.eval ctx sem_env size) :: D.Dim r' :: sem_env) size
   | Ungel (width, mot, term, case) ->
+    assert_mode_equal mode Parametric;
     let (var_arg, var_env) = mk_bvar width env size in
     begin
       match synth ~mode ~env:var_env ~size:(size + 1) ~term with
@@ -489,6 +532,27 @@ and synth_quasi ~mode ~env ~size ~term =
         check ~mode ~env:wit_env ~size:(size + 1) ~term:case ~tp:gel_tp;
         E.eval mot (D.Tm (D.BLam (D.Clos {term; env = sem_env})) :: sem_env) size
       | t -> tp_error (Expecting_of ("Gel", t))
+    end
+  | Unglobe term ->
+    assert_mode_equal mode Parametric;
+    begin
+      match synth ~mode:Pointwise ~env:(Components :: env) ~size ~term with
+      | Global tp -> tp
+      | t -> tp_error (Expecting_of ("Global", t))
+    end
+  | Undisc (mot, term, case) ->
+    assert_mode_equal mode Parametric;
+    begin
+      match synth ~mode:Parametric ~env:(Discrete :: env) ~size ~term with
+      | D.Discrete tp' ->
+        let sem_env = env_to_sem_env env in
+        let (_, mot_env) = mk_var (D.Global (D.Discrete tp')) env size in
+        check_tp ~mode:Pointwise ~env:mot_env ~size:(size + 1) ~term:mot;
+        let (case_arg, case_env) = mk_var tp' env size in
+        let case_tp = E.eval mot (D.Tm (D.Englobe (D.Endisc case_arg)) :: sem_env) (size + 1) in
+        check ~mode:Pointwise ~env:case_env ~size:(size + 1) ~term:case ~tp:case_tp;
+        E.eval mot (D.Tm (D.Englobe (E.eval term sem_env size)) :: sem_env) size
+      | t -> tp_error (Expecting_of ("Discrete", t))
     end
   | _ -> tp_error (Cannot_synth_term term)
 

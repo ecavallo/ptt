@@ -1,5 +1,10 @@
+type mode =
+  | Pointwise
+  | Parametric
+
 type error =
     Cannot_synth_term of Syntax.t
+  | Mode_mismatch of mode * mode
   | Dim_mismatch of Domain.dim * Domain.dim
   | Type_mismatch of Syntax.t * Syntax.t
   | Expecting_universe of Domain.t
@@ -10,10 +15,6 @@ type error =
 val pp_error : Format.formatter -> error -> unit
 
 exception Type_error of error
-
-type mode =
-  | Pointwise
-  | Parametric
 
 type env_entry =
   | DVar of {level : Domain.lvl; width : int}

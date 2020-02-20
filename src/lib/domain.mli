@@ -54,7 +54,7 @@ and cell =
   | J of clos3 * clos * t * t * t
   | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
   | Unglobe
-  | Undisc
+  | Undisc of t * clos * clos
   | Quasi of quasi_cell
 and quasi_cell = 
   | PiDom
