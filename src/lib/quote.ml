@@ -405,11 +405,11 @@ let rec check_nf env size nf1 nf2 =
     check_nf env size (D.Normal {tp = applied_rel1; term = t1}) (D.Normal {tp = applied_rel2; term = t2})
   (* Global *)
   | D.Normal {tp = D.Global tp1; term = t1}, D.Normal {tp = D.Global tp2; term = t2} ->
-    let t1',t2' = E.do_unglobe t1, t2 in
+    let t1',t2' = E.do_unglobe t1, E.do_unglobe t2 in
     check_nf env size (D.Normal {tp = tp1; term = t1'}) (D.Normal {tp = tp2; term = t2'})
   (* Discrete *)
   | D.Normal {tp = D.Discrete tp1; term = t1}, D.Normal {tp = D.Discrete tp2; term = t2} ->
-    let t1',t2' = E.do_undisc t1, t2 in
+    let t1',t2' = E.do_undisc t1, E.do_undisc t2 in
     check_nf env size (D.Normal {tp = tp1; term = t1'}) (D.Normal {tp = tp2; term = t2'})
   (* Types *)
   | D.Normal {tp = D.Uni _; term = t1}, D.Normal {tp = D.Uni _; term = t2} ->

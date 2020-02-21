@@ -45,7 +45,7 @@ let keywords =
     ("gel", ENGEL);
     ("ungel", UNGEL);
     ("Global", GLOBAL);
-    ("global", ENGLOBE);
+    ("glob", ENGLOBE);
     ("unglob", UNGLOBE);
     ("Discrete", DISCRETE);
     ("disc", ENDISC);
@@ -56,6 +56,8 @@ let keywords =
     ("def", DEF);
     ("postulate", POSTULATE);
     ("normalize", NORMALIZE);
+    ("par", PAR);
+    ("pt", PT);
     ("quit", QUIT);
   ]
 }

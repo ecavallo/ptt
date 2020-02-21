@@ -51,10 +51,10 @@ and t =
   | Uni of uni_level
 
 type decl =
-    Def of {name : ident; def : t; tp : t}
-  | Postulate of {name : ident; tp : t}
+    Def of {name : ident; mode : Check.mode; def : t; tp : t}
+  | Postulate of {name : ident; mode : Check.mode; tp : t}
   | NormalizeDef of ident
-  | NormalizeTerm of {term : t; tp : t}
+  | NormalizeTerm of {term : t; mode : Check.mode; tp : t}
   | Quit
 
 type signature = decl list

@@ -172,42 +172,42 @@ and bind_spine env = function
   | CS.Dim b -> fun f -> S.BApp (f, bind_dim env b)
 
 let process_decl (Env {check_env; bindings; size})  = function
-  | CS.Def {name; def; tp} ->
+  | CS.Def {name; mode; def; tp} ->
     let def = bind bindings def in
     let tp = bind bindings tp in
-    Check.check_tp ~mode:Check.Parametric ~env:check_env ~size ~term:tp;
+    Check.check_tp ~mode ~env:check_env ~size ~term:tp;
     let sem_env = Check.env_to_sem_env check_env in
     let sem_tp = Eval.eval tp sem_env size in
-    Check.check ~mode:Check.Parametric ~env:check_env ~size ~term:def ~tp:sem_tp;
+    Check.check ~mode ~env:check_env ~size ~term:def ~tp:sem_tp;
     let sem_def = Eval.eval def sem_env size in
-    let new_env = Check.TopLevel {term = sem_def; tp = sem_tp} :: check_env in
+    let new_env = Check.TopLevel {mode; term = sem_def; tp = sem_tp} :: check_env in
     NoOutput (Env {check_env = new_env; bindings = Term name :: bindings; size})
-  | CS.Postulate {name; tp} ->
+  | CS.Postulate {name; mode; tp} ->
     let tp = bind bindings tp in
-    Check.check_tp ~mode:Check.Parametric ~env:check_env ~size ~term:tp;
+    Check.check_tp ~mode ~env:check_env ~size ~term:tp;
     let sem_env = Check.env_to_sem_env check_env in
     let sem_tp = Eval.eval tp sem_env size in
-    let new_env = Check.Postulate {level = size; tp = sem_tp} :: check_env in
+    let new_env = Check.Postulate {level = size; mode; tp = sem_tp} :: check_env in
     NoOutput (Env {check_env = new_env; bindings = Term name :: bindings; size = size + 1})
   | CS.NormalizeDef name ->
     let err = Check.Type_error (Check.Misc ("Unbound variable: " ^ name)) in
     begin
       let i = find_idx name bindings in
       match List.nth check_env i with
-      | Check.TopLevel {term; tp} ->
+      | Check.TopLevel {term; tp; _} ->
         let quote_env = Check.env_to_quote_env check_env in
         NF_def (name, Quote.read_back_nf quote_env size (D.Normal {term; tp}))
       | _ -> raise err
       | exception Failure _ -> raise err
     end
-  | CS.NormalizeTerm {term; tp} ->
+  | CS.NormalizeTerm {mode; term; tp} ->
     let term = bind bindings term in
     let tp = bind bindings tp in
-    Check.check_tp ~mode:Check.Parametric ~env:check_env ~size ~term:tp;
+    Check.check_tp ~mode ~env:check_env ~size ~term:tp;
     let quote_env = Check.env_to_quote_env check_env in
     let sem_env = Quote.env_to_sem_env quote_env in
     let sem_tp = Eval.eval tp sem_env size in
-    Check.check ~mode:Check.Parametric ~env:check_env ~size ~term ~tp:sem_tp;
+    Check.check ~mode ~env:check_env ~size ~term ~tp:sem_tp;
     let sem_term = Eval.eval term sem_env size in
     let norm_term = Quote.read_back_nf quote_env size (D.Normal {term = sem_term; tp = sem_tp}) in
     NF_term (term, norm_term)

@@ -7,7 +7,7 @@ module Q = Quote
 type mode =
   | Pointwise
   | Parametric
-[@@deriving show, eq]
+[@@deriving show{ with_path = false }, eq]
 
 type env_entry =
   | DVar of {level : D.lvl; width : int}
@@ -17,8 +17,8 @@ type env_entry =
   | Discrete
   | Components
   | RestrictComponents
-  | TopLevel of {term : D.t; tp : D.t}
-  | Postulate of {level : D.lvl; tp : D.t}
+  | TopLevel of {mode : mode; term : D.t; tp : D.t}
+  | Postulate of {mode : mode; level : D.lvl; tp : D.t}
 [@@deriving show, eq]
 type env = env_entry list
 [@@deriving show, eq]
@@ -39,13 +39,13 @@ let pp_error fmt = function
     Syn.pp fmt t;
     Format.fprintf fmt "@]@]@,"
   | Mode_mismatch (m1, m2) ->
-    Format.fprintf fmt "@[<v>Cannot equate@,@[<hov 2>  ";
+    Format.fprintf fmt "@[<v>Cannot equate mode@,@[<hov 2>  ";
     pp_mode fmt m1;
     Format.fprintf fmt "@]@ with@,@[<hov 2>  ";
     pp_mode fmt m2;
     Format.fprintf fmt "@]@]@,"
   | Dim_mismatch (b1, b2) ->
-    Format.fprintf fmt "@[<v>Cannot equate@,@[<hov 2>  ";
+    Format.fprintf fmt "@[<v>Cannot equate dimension@,@[<hov 2>  ";
     D.pp_dim fmt b1;
     Format.fprintf fmt "@]@ with@,@[<hov 2>  ";
     D.pp_dim fmt b2;
@@ -85,8 +85,9 @@ let rec env_to_sem_env = function
   | Discrete :: env -> env_to_sem_env env
   | Components :: env -> env_to_sem_env env
   | RestrictComponents :: env -> env_to_sem_env env
-  | Postulate {level; tp} :: env -> D.TopLevel (D.Neutral {tp; term = D.root (D.Var level)}) :: env_to_sem_env env
   | TopLevel {term; _} :: env -> D.TopLevel term :: env_to_sem_env env
+  | Postulate {level; tp; _} :: env ->
+    D.TopLevel (D.Neutral {tp; term = D.root (D.Var level)}) :: env_to_sem_env env
 
 let rec env_to_quote_env = function
   | [] -> []
@@ -98,7 +99,7 @@ let rec env_to_quote_env = function
   | Components :: env -> env_to_quote_env env
   | RestrictComponents :: env -> env_to_quote_env env
   | TopLevel {term; _} :: env -> Q.TopLevel term :: env_to_quote_env env
-  | Postulate {level; tp} :: env -> Q.Postulate {level; tp} :: env_to_quote_env env
+  | Postulate {level; tp; _} :: env -> Q.Postulate {level; tp} :: env_to_quote_env env
 
 let assert_mode_equal m1 m2 =
   if m1 = m2 then ()
@@ -106,6 +107,7 @@ let assert_mode_equal m1 m2 =
 
 type synth_var_mode =
   | Id
+  | Discrete
   | Components
   | RestrictComponents
 
@@ -113,7 +115,7 @@ let assert_synth_at_id = function
   | Id -> ()
   | _ -> tp_error (Misc "Tried to use variable under modality")
 
-let synth_var ~mode:_ env x =
+let synth_var ~mode env x =
   let rec go synth_mode env x =
     match x, env with
     | _, [] -> tp_error (Misc "Tried to access non-existent variable\n")
@@ -124,7 +126,7 @@ let synth_var ~mode:_ env x =
     | x, Discrete :: env ->
       if synth_mode = Components
       then go Id env x
-      else tp_error (Misc "Tried to use variable beneath discrete\n")
+      else go Discrete env x
     | x, Components :: env ->
       if synth_mode = RestrictComponents
       then go Id env x
@@ -133,6 +135,7 @@ let synth_var ~mode:_ env x =
       begin
         match synth_mode with
         | Id -> go RestrictComponents env x
+        | Discrete -> go Discrete env x
         | Components -> go Components env x
         | RestrictComponents -> tp_error (Misc "Nonsensical environment")
       end
@@ -141,10 +144,10 @@ let synth_var ~mode:_ env x =
     | 0, Def {tp; _} :: _ ->
       assert_synth_at_id synth_mode; tp
     | 0, DVar {level; _} :: _ -> tp_error (Expecting_term level)
-    | 0, TopLevel {tp; _} :: _ ->
-      assert_synth_at_id synth_mode; tp
-    | 0, Postulate {tp; _} :: _ ->
-      assert_synth_at_id synth_mode; tp
+    | 0, TopLevel {mode = m; tp; _} :: _ ->
+      assert_mode_equal mode m; tp
+    | 0, Postulate {mode = m; tp; _} :: _ ->
+      assert_mode_equal mode m; tp
     | x, _ :: env -> go synth_mode env (x - 1)
   in
   go Id env x
@@ -569,7 +572,7 @@ and synth_quasi ~mode ~env ~size ~term =
       | t -> tp_error (Expecting_of ("Discrete", t))
     end
   | Extract (mot, term, case) ->
-    assert_mode_equal mode Parametric;
+    assert_mode_equal mode Pointwise;
     begin
       match synth ~mode:Parametric ~env:(Discrete :: env) ~size ~term with
       | D.Discrete tp' ->

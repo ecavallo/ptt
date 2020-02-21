@@ -24,8 +24,8 @@ type env_entry =
   | Discrete
   | Components
   | RestrictComponents
-  | TopLevel of {term : Domain.t; tp : Domain.t}
-  | Postulate of {level : Domain.lvl; tp : Domain.t}
+  | TopLevel of {mode : mode; term : Domain.t; tp : Domain.t}
+  | Postulate of {mode : mode; level : Domain.lvl; tp : Domain.t}
 
 type env = env_entry list
 

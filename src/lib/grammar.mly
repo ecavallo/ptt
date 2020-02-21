@@ -19,6 +19,7 @@
 %token UNIV
 %token QUIT NORMALIZE
 %token ID REFL MATCH
+%token PAR PT
 %token EOF
 
 %start <Concrete_syntax.signature> sign
@@ -30,15 +31,20 @@ name:
   | UNDERSCORE
     { "_" }
 
+mode:
+  | { Check.Parametric }
+  | PAR { Check.Parametric }
+  | PT { Check.Pointwise }
+    
 decl:
-  | LET; nm = name; COLON; tp = term; EQUALS; body = term
-    { Def {name = nm; def = body; tp} }
-  | POSTULATE; nm = name; COLON; tp = term
-    { Postulate {name = nm; tp} }
+  | LET; mode = mode; nm = name; COLON; tp = term; EQUALS; body = term
+    { Def {mode; name = nm; def = body; tp} }
+  | POSTULATE; mode = mode; nm = name; COLON; tp = term
+    { Postulate {mode; name = nm; tp} }
   | QUIT { Quit }
   | NORMALIZE; DEF; a = name
     { NormalizeDef a  }
-  | NORMALIZE; tm = term; AT; tp = term { NormalizeTerm {term = tm; tp} };
+  | NORMALIZE; mode = mode; tm = term; AT; tp = term { NormalizeTerm {mode; term = tm; tp} };
 
 sign:
   | EOF { [] }
@@ -105,7 +111,7 @@ term:
     { Let (def, Binder {name; body}) }
   | LPR t = term; AT; tp = term RPR
     { Check {term = t; tp} }
-  | SUC; t = term { Suc t }
+  | SUC; t = atomic { Suc t }
   | REC; n = term; AT; mot_name = name; RIGHT_ARROW; mot = term; WITH;
     PIPE; ZERO; RIGHT_ARROW; zero_case = term;
     PIPE; SUC; suc_var = name; COMMA; ih_var = name; RIGHT_ARROW; suc_case = term
@@ -172,12 +178,12 @@ term:
          mot = Binder {name = mot_name; body = mot_body};
          gel = Binder {name = gel_name; body = gel_body};
          case = Binder {name = case_name; body = case_body}} }
-  | GLOBAL; t = term { Global t }
-  | ENGLOBE; t = term { Englobe t }
-  | UNGLOBE; t = term { Unglobe t }
-  | DISCRETE; t = term { Discrete t }
-  | ENDISC; t = term { Endisc t }
-  | UNDISC; t = term { Undisc t }
+  | GLOBAL; t = atomic { Global t }
+  | ENGLOBE; t = atomic { Englobe t }
+  | UNGLOBE; t = atomic { Unglobe t }
+  | DISCRETE; t = atomic { Discrete t }
+  | ENDISC; t = atomic { Endisc t }
+  | UNDISC; t = atomic { Undisc t }
   | EXTRACT; t = term; AT; mot_name = name; RIGHT_ARROW; mot_body = term; WITH;
     PIPE; ENDISC; case_name = name; RIGHT_ARROW; case_body = term;
     { Extract
