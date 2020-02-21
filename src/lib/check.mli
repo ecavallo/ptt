@@ -23,6 +23,7 @@ type env_entry =
   | Restrict of Syntax.idx
   | Discrete
   | Components
+  | RestrictComponents
   | TopLevel of {term : Domain.t; tp : Domain.t}
   | Postulate of {level : Domain.lvl; tp : Domain.t}
 

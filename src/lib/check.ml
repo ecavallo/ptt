@@ -16,6 +16,7 @@ type env_entry =
   | Restrict of Syn.idx
   | Discrete
   | Components
+  | RestrictComponents
   | TopLevel of {term : D.t; tp : D.t}
   | Postulate of {level : D.lvl; tp : D.t}
 [@@deriving show, eq]
@@ -83,6 +84,7 @@ let rec env_to_sem_env = function
   | Restrict _ :: env -> env_to_sem_env env
   | Discrete :: env -> env_to_sem_env env
   | Components :: env -> env_to_sem_env env
+  | RestrictComponents :: env -> env_to_sem_env env
   | Postulate {level; tp} :: env -> D.TopLevel (D.Neutral {tp; term = D.root (D.Var level)}) :: env_to_sem_env env
   | TopLevel {term; _} :: env -> D.TopLevel term :: env_to_sem_env env
 
@@ -94,6 +96,7 @@ let rec env_to_quote_env = function
   | Restrict _ :: env -> env_to_quote_env env
   | Discrete :: env -> env_to_quote_env env
   | Components :: env -> env_to_quote_env env
+  | RestrictComponents :: env -> env_to_quote_env env
   | TopLevel {term; _} :: env -> Q.TopLevel term :: env_to_quote_env env
   | Postulate {level; tp} :: env -> Q.Postulate {level; tp} :: env_to_quote_env env
 
@@ -101,32 +104,50 @@ let assert_mode_equal m1 m2 =
   if m1 = m2 then ()
   else tp_error (Mode_mismatch (m1, m2))
 
-let synth_var ~mode env x =
-  let rec go new_mode env x =
+type synth_var_mode =
+  | Id
+  | Components
+  | RestrictComponents
+
+let assert_synth_at_id = function
+  | Id -> ()
+  | _ -> tp_error (Misc "Tried to use variable under modality")
+
+let synth_var ~mode:_ env x =
+  let rec go synth_mode env x =
     match x, env with
     | _, [] -> tp_error (Misc "Tried to access non-existent variable\n")
     | x, Restrict j :: env ->
       if x < j
       then tp_error (Misc "Tried to use restricted term variable\n")
-      else go new_mode env x
+      else go synth_mode env x
     | x, Discrete :: env ->
-      if mode = Pointwise
-      then go Pointwise env x
+      if synth_mode = Components
+      then go Id env x
       else tp_error (Misc "Tried to use variable beneath discrete\n")
     | x, Components :: env ->
-      go Parametric env x
+      if synth_mode = RestrictComponents
+      then go Id env x
+      else go Components env x
+    | x, RestrictComponents :: env ->
+      begin
+        match synth_mode with
+        | Id -> go RestrictComponents env x
+        | Components -> go Components env x
+        | RestrictComponents -> tp_error (Misc "Nonsensical environment")
+      end
     | 0, Var {tp; _} :: _ ->
-      assert_mode_equal new_mode mode; tp
+      assert_synth_at_id synth_mode; tp
     | 0, Def {tp; _} :: _ ->
-      assert_mode_equal new_mode mode; tp
+      assert_synth_at_id synth_mode; tp
     | 0, DVar {level; _} :: _ -> tp_error (Expecting_term level)
     | 0, TopLevel {tp; _} :: _ ->
-      assert_mode_equal new_mode mode; tp
+      assert_synth_at_id synth_mode; tp
     | 0, Postulate {tp; _} :: _ ->
-      assert_mode_equal new_mode mode; tp
-    | x, _ :: env -> go new_mode env (x - 1)
+      assert_synth_at_id synth_mode; tp
+    | x, _ :: env -> go synth_mode env (x - 1)
   in
-  go mode env x
+  go Id env x
 
 let mk_bvar width env size =
   (D.DVar size, DVar {level = size; width} :: env)
@@ -540,7 +561,14 @@ and synth_quasi ~mode ~env ~size ~term =
       | Global tp -> tp
       | t -> tp_error (Expecting_of ("Global", t))
     end
-  | Undisc (mot, term, case) ->
+  | Undisc term ->
+    assert_mode_equal mode Pointwise;
+    begin
+      match synth ~mode:Parametric ~env:(RestrictComponents :: env) ~size ~term with
+      | Discrete tp -> tp
+      | t -> tp_error (Expecting_of ("Discrete", t))
+    end
+  | Extract (mot, term, case) ->
     assert_mode_equal mode Parametric;
     begin
       match synth ~mode:Parametric ~env:(Discrete :: env) ~size ~term with
@@ -597,6 +625,12 @@ and check_tp ~mode ~env ~size ~term =
     let ends' = List.map (fun term -> E.eval term sem_env size) ends in
     let (_, rel_env) = mk_vars ends' res_env size in
     check_tp ~mode ~env:rel_env ~size:(size + width) ~term:rel
+  | Global tp ->
+    assert_mode_equal mode Pointwise;
+    check_tp ~mode:Parametric ~env:(Discrete :: env) ~size ~term:tp
+  | Discrete tp ->
+    assert_mode_equal mode Parametric;
+    check_tp ~mode:Pointwise ~env:(Components :: env) ~size ~term:tp
   | term ->
     begin
       match synth ~mode ~env ~size ~term with

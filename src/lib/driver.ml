@@ -151,6 +151,20 @@ let rec bind env = function
        bind (Term mot_name :: env) mot_body,
        bind (Dim gel_name :: env) gel_body,
        bind (Term case_name :: env) case_body)
+  | CS.Global t -> S.Global (bind env t)
+  | CS.Englobe t -> S.Englobe (bind env t)
+  | CS.Unglobe t -> S.Unglobe (bind env t)
+  | CS.Discrete t -> S.Discrete (bind env t)
+  | CS.Endisc t -> S.Endisc (bind env t)
+  | CS.Undisc t -> S.Undisc (bind env t)
+  | CS.Extract
+      (t,
+       Binder {name = mot_name; body = mot_body},
+       Binder {name = case_name; body = case_body}) ->
+    S.Extract
+      (bind (Term mot_name :: env) mot_body,
+       bind env t,
+       bind (Term case_name :: env) case_body)
   | CS.Uni i -> S.Uni i
 
 and bind_spine env = function

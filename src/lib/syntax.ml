@@ -23,7 +23,7 @@ type t =
   | Gel of dim * t list * (* BINDS n *) t | Engel of idx * t list * t
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
   | Global of t | Englobe of t | Unglobe of t
-  | Discrete of t | Endisc of t | Undisc of (* BINDS *) t * t * (* BINDS *) t
+  | Discrete of t | Endisc of t | Undisc of t | Extract of (* BINDS *) t * t * (* BINDS *) t
   | Uni of uni_level
 [@@deriving eq]
 
@@ -89,7 +89,8 @@ let unsubst_bvar i t =
     | Unglobe t -> Unglobe (go depth t)
     | Discrete t -> Discrete (go depth t)
     | Endisc t -> Endisc (go depth t)
-    | Undisc (mot, t, case) -> Undisc (go (depth + 1) mot, go depth t, go (depth + 1) case)
+    | Undisc t -> Undisc (go depth t)
+    | Extract (mot, t, case) -> Extract (go (depth + 1) mot, go depth t, go (depth + 1) case)
     | Uni j -> Uni j
   in
   try
@@ -187,17 +188,19 @@ let rec pp fmt =
   | Ungel (width, mot, gel, case) ->
     fprintf fmt "ungel(@[<hov>@[<hov>%d@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" width pp mot pp gel pp case
   | Global t ->
-    fprintf fmt "global(@[<hov>%a@])" pp t
+    fprintf fmt "Global(@[<hov>%a@])" pp t
   | Englobe t ->
     fprintf fmt "englobe(@[<hov>%a@])" pp t
   | Unglobe t ->
     fprintf fmt "unglobe(@[<hov>%a@])" pp t
   | Discrete t ->
-    fprintf fmt "discrete(@[<hov>%a@])" pp t
+    fprintf fmt "Discrete(@[<hov>%a@])" pp t
   | Endisc t ->
     fprintf fmt "endisc(@[<hov>%a@])" pp t
-  | Undisc (mot, t, case) ->
-    fprintf fmt "undisc(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp mot pp t pp case
+  | Undisc t ->
+    fprintf fmt "undisc(@[<hov>%a@])" pp t
+  | Extract (mot, t, case) ->
+    fprintf fmt "extract(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp mot pp t pp case
   | Uni i -> fprintf fmt "U<%d>" i
 
 let show t =

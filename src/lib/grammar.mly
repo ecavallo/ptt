@@ -11,6 +11,8 @@
 %token LAM LET IN END WITH OF DEF POSTULATE
 %token BRI ATSIGN EXTENT
 %token GEL ENGEL UNGEL
+%token GLOBAL ENGLOBE UNGLOBE
+%token DISCRETE ENDISC UNDISC EXTRACT
 %token UNIT TRIV
 %token REC SUC NAT ZERO
 %token IF TRUE FALSE BOOL
@@ -170,6 +172,18 @@ term:
          mot = Binder {name = mot_name; body = mot_body};
          gel = Binder {name = gel_name; body = gel_body};
          case = Binder {name = case_name; body = case_body}} }
+  | GLOBAL; t = term { Global t }
+  | ENGLOBE; t = term { Englobe t }
+  | UNGLOBE; t = term { Unglobe t }
+  | DISCRETE; t = term { Discrete t }
+  | ENDISC; t = term { Endisc t }
+  | UNDISC; t = term { Undisc t }
+  | EXTRACT; t = term; AT; mot_name = name; RIGHT_ARROW; mot_body = term; WITH;
+    PIPE; ENDISC; case_name = name; RIGHT_ARROW; case_body = term;
+    { Extract
+        (t,
+         Binder {name = mot_name; body = mot_body},
+         Binder {name = case_name; body = case_body})}
   
 tele_cell:
   | LPR name = name; COLON ty = term; RPR

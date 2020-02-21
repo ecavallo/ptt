@@ -133,14 +133,21 @@ and do_unglobe t =
     D.Neutral {tp = do_global_tp tp; term = D.(Unglobe @: term)}
   | _ -> raise (Eval_failed "Couldn't unglobe argument in do_unglobe")
 
-and do_undisc size mot t case =
+and do_undisc t =
+  match t with
+  | D.Endisc t -> t
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp = do_discrete_tp tp; term = D.(Undisc @: term)}
+  | _ -> raise (Eval_failed "Couldn't unglobe argument in do_unglobe")
+
+and do_extract size mot t case =
   match t with
   | D.Endisc t -> do_clos size case (D.Tm t)
   | D.Neutral {tp; term} ->
     D.Neutral
       {tp = do_clos size mot (D.Tm t);
-       term = D.(Undisc (do_discrete_tp tp, mot, case) @: term)}
-  | _ -> raise (Eval_failed "Couldn't undisc argument in do_undisc")
+       term = D.(Extract (do_discrete_tp tp, mot, case) @: term)}
+  | _ -> raise (Eval_failed "Couldn't extract argument in do_extract")
 
 and do_id_tp tp = 
   match tp with 
@@ -345,8 +352,9 @@ and eval t (env : D.env) size =
   | Syn.Unglobe t -> do_unglobe (eval t env size)
   | Syn.Discrete t -> D.Discrete (eval t env size)
   | Syn.Endisc t -> D.Endisc (eval t env size)
-  | Syn.Undisc (mot, t, case) ->
-    do_undisc
+  | Syn.Undisc t -> do_undisc (eval t env size)
+  | Syn.Extract (mot, t, case) ->
+    do_extract
       size
       (D.Clos {term = mot; env})
       (eval t env size)

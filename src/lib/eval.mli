@@ -14,7 +14,8 @@ val do_snd : Domain.lvl -> Domain.t -> Domain.t
 val do_j : Domain.lvl -> Domain.clos3 -> Domain.clos -> Domain.t -> Domain.t
 val do_ungel : Domain.lvl -> Domain.t list -> Domain.clos -> Domain.t -> Domain.clos -> Domain.t
 val do_unglobe : Domain.t -> Domain.t
-val do_undisc : Domain.lvl -> Domain.clos -> Domain.t -> Domain.clos -> Domain.t
+val do_undisc : Domain.t -> Domain.t
+val do_extract : Domain.lvl -> Domain.clos -> Domain.t -> Domain.clos -> Domain.t
 
 val do_pi_dom : Domain.t -> Domain.t
 val do_pi_cod : Domain.lvl -> Domain.t -> Domain.t -> Domain.t
