@@ -42,10 +42,10 @@ and t =
   | Id of t * t * t
   | Gel of lvl * t list * closN
   | Engel of lvl * t list * t
+  | Codisc of t
+  | Encodisc of t
   | Global of t
   | Englobe of t
-  | Discrete of t
-  | Endisc of t
   | Uni of Syntax.uni_level
 [@@deriving show, eq]
 and extent_head = {var : lvl; dom : clos; mot : clos2; ctx : t; endcase : clos list; varcase : closN}
@@ -63,9 +63,8 @@ and cell =
   | If of clos * t * t
   | J of clos3 * clos * t * t * t
   | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
+  | Uncodisc
   | Unglobe
-  | Undisc
-  | Extract of t * clos * clos
   | Quasi of quasi_cell
 [@@deriving show, eq]
 and quasi_cell = 
@@ -80,8 +79,8 @@ and quasi_cell =
   | BridgeEndpoint of ne * int
   | GelRel of t list
   | GelBridge of t list
+  | CodiscTp
   | GlobalTp
-  | DiscreteTp
 [@@deriving show, eq]
 and spine = cell list
 [@@deriving show, eq]
@@ -148,10 +147,10 @@ and instantiate r i = function
   | Id (ty, t, u) -> Id (instantiate r i ty, instantiate r i t, instantiate r i u)
   | Gel (j, ts, t) -> Gel (instantiate_bvar r i j, List.map (instantiate r i) ts, instantiate_closN r i t)
   | Engel (j, ts, t) -> Engel (instantiate_bvar r i j, List.map (instantiate r i) ts, instantiate r i t)
+  | Codisc t -> Codisc (instantiate r i t)
+  | Encodisc t -> Encodisc (instantiate r i t)
   | Global t -> Global (instantiate r i t)
   | Englobe t -> Englobe (instantiate r i t)
-  | Discrete t -> Discrete (instantiate r i t)
-  | Endisc t -> Endisc (instantiate r i t)
   | Uni i -> Uni i
 
 and instantiate_extent_head r i {var; dom; mot; ctx; endcase; varcase} =
@@ -205,13 +204,7 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
       @: ne
     | Quasi q :: s -> Quasi (instantiate_quasi_cell r i q) @: go r i (h, s)
     | Unglobe :: s -> Unglobe @: go r i (h, s)
-    | Undisc :: s -> Undisc @: go r i (h, s)
-    | Extract (tp, mot, case) :: s ->
-      Extract
-        (instantiate r i tp,
-         instantiate_clos r i mot,
-         instantiate_clos r i case)
-      @: go r i (h, s)
+    | Uncodisc :: s -> Uncodisc @: go r i (h, s)
   in
   go
 
@@ -228,8 +221,8 @@ and instantiate_quasi_cell r i =
   | BridgeEndpoint (t, o) -> BridgeEndpoint (instantiate_ne r i t, o)
   | GelRel ts -> GelRel (List.map (instantiate r i) ts)
   | GelBridge ts -> GelBridge (List.map (instantiate r i) ts)
+  | CodiscTp -> CodiscTp
   | GlobalTp -> GlobalTp
-  | DiscreteTp -> DiscreteTp
 
 and instantiate_ne r i ne =
   let headf r i = function

@@ -12,7 +12,7 @@
 %token BRI ATSIGN EXTENT
 %token GEL ENGEL UNGEL
 %token GLOBAL ENGLOBE UNGLOBE
-%token DISCRETE ENDISC UNDISC EXTRACT
+%token CODISC ENCODISC UNCODISC
 %token UNIT TRIV
 %token REC SUC NAT ZERO
 %token IF TRUE FALSE BOOL
@@ -178,18 +178,12 @@ term:
          mot = Binder {name = mot_name; body = mot_body};
          gel = Binder {name = gel_name; body = gel_body};
          case = Binder {name = case_name; body = case_body}} }
+  | CODISC; t = atomic { Codisc t }
+  | ENCODISC; t = atomic { Encodisc t }
+  | UNCODISC; t = atomic { Uncodisc t }
   | GLOBAL; t = atomic { Global t }
   | ENGLOBE; t = atomic { Englobe t }
   | UNGLOBE; t = atomic { Unglobe t }
-  | DISCRETE; t = atomic { Discrete t }
-  | ENDISC; t = atomic { Endisc t }
-  | UNDISC; t = atomic { Undisc t }
-  | EXTRACT; t = term; AT; mot_name = name; RIGHT_ARROW; mot_body = term; WITH;
-    PIPE; ENDISC; case_name = name; RIGHT_ARROW; case_body = term;
-    { Extract
-        (t,
-         Binder {name = mot_name; body = mot_body},
-         Binder {name = case_name; body = case_body})}
   
 tele_cell:
   | LPR name = name; COLON ty = term; RPR

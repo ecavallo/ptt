@@ -35,10 +35,10 @@ and t =
   | Id of t * t * t
   | Gel of lvl * t list * closN
   | Engel of lvl * t list * t
+  | Codisc of t
+  | Encodisc of t
   | Global of t
   | Englobe of t
-  | Discrete of t
-  | Endisc of t
   | Uni of Syntax.uni_level
 and extent_head = {var : lvl; dom : clos; mot : clos2; ctx : t; endcase : clos list; varcase : closN}
 and head =
@@ -53,9 +53,8 @@ and cell =
   | If of clos * t * t
   | J of clos3 * clos * t * t * t
   | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
+  | Uncodisc
   | Unglobe
-  | Undisc
-  | Extract of t * clos * clos
   | Quasi of quasi_cell
 and quasi_cell = 
   | PiDom
@@ -69,8 +68,8 @@ and quasi_cell =
   | BridgeEndpoint of ne * int
   | GelRel of t list
   | GelBridge of t list
+  | CodiscTp
   | GlobalTp
-  | DiscreteTp
 and spine = cell list
 and ne = head * spine
 and nf =

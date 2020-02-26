@@ -14,9 +14,9 @@ type env_entry =
   | Var of {level : D.lvl; tp : D.t}
   | Def of {term : D.t; tp : D.t}
   | Restrict of Syn.idx
+  | Global
   | Discrete
   | Components
-  | RestrictComponents
   | TopLevel of {mode : mode; term : D.t; tp : D.t}
   | Postulate of {mode : mode; level : D.lvl; tp : D.t}
 [@@deriving show, eq]
@@ -82,9 +82,9 @@ let rec env_to_sem_env = function
   | Var {level; tp} :: env -> D.Tm (D.Neutral {tp; term = D.root (D.Var level)}) :: env_to_sem_env env
   | Def {term; _} :: env -> D.Tm term :: env_to_sem_env env
   | Restrict _ :: env -> env_to_sem_env env
+  | Global :: env -> env_to_sem_env env
   | Discrete :: env -> env_to_sem_env env
   | Components :: env -> env_to_sem_env env
-  | RestrictComponents :: env -> env_to_sem_env env
   | TopLevel {term; _} :: env -> D.TopLevel term :: env_to_sem_env env
   | Postulate {level; tp; _} :: env ->
     D.TopLevel (D.Neutral {tp; term = D.root (D.Var level)}) :: env_to_sem_env env
@@ -95,9 +95,9 @@ let rec env_to_quote_env = function
   | Var {level; tp} :: env -> Q.Var {level; tp} :: env_to_quote_env env
   | Def {term; _} :: env -> Q.Def term :: env_to_quote_env env
   | Restrict _ :: env -> env_to_quote_env env
+  | Global :: env -> env_to_quote_env env
   | Discrete :: env -> env_to_quote_env env
   | Components :: env -> env_to_quote_env env
-  | RestrictComponents :: env -> env_to_quote_env env
   | TopLevel {term; _} :: env -> Q.TopLevel term :: env_to_quote_env env
   | Postulate {level; tp; _} :: env -> Q.Postulate {level; tp} :: env_to_quote_env env
 
@@ -107,13 +107,13 @@ let assert_mode_equal m1 m2 =
 
 type synth_var_mode =
   | Id
+  | Global
   | Discrete
   | Components
-  | RestrictComponents
 
 let assert_synth_at_id = function
   | Id -> ()
-  | _ -> tp_error (Misc "Tried to use variable under modality")
+  | _ -> tp_error (Misc "Tried to use variable under modality\n")
 
 let synth_var ~mode env x =
   let rec go synth_mode env x =
@@ -123,21 +123,29 @@ let synth_var ~mode env x =
       if x < j
       then tp_error (Misc "Tried to use restricted term variable\n")
       else go synth_mode env x
-    | x, Discrete :: env ->
-      if synth_mode = Components
-      then go Id env x
-      else go Discrete env x
-    | x, Components :: env ->
-      if synth_mode = RestrictComponents
-      then go Id env x
-      else go Components env x
-    | x, RestrictComponents :: env ->
+    | x, Global :: env ->
       begin
         match synth_mode with
-        | Id -> go RestrictComponents env x
-        | Discrete -> go Discrete env x
-        | Components -> go Components env x
-        | RestrictComponents -> tp_error (Misc "Nonsensical environment")
+        | Id -> go Global env x
+        | Global -> tp_error (Misc "Ill-formed context\n")
+        | Discrete -> go Id env x
+        | Components -> tp_error (Misc "Ill-formed context\n")
+      end
+    | x, Discrete :: env ->
+      begin
+        match synth_mode with
+        | Id -> go Discrete env x
+        | Global -> go Id env x
+        | Discrete -> tp_error (Misc "Ill-formed context\n")
+        | Components -> go Id env x
+      end
+    | x, Components :: env ->
+      begin
+        match synth_mode with
+        | Id -> go Components env x
+        | Global -> tp_error (Misc "Ill-formed context\n")
+        | Discrete -> go Id env x
+        | Components -> tp_error (Misc "Ill-formed context\n")
       end
     | 0, Var {tp; _} :: _ ->
       assert_synth_at_id synth_mode; tp
@@ -361,6 +369,22 @@ and check_inert ~mode ~env ~size ~term ~tp =
         check ~mode ~env:res_env ~size ~term ~tp:(E.do_closN size rel ts')
       | t -> tp_error (Misc ("Expecting Gel but found\n" ^ D.show t))
     end
+  | Codisc term ->
+    assert_mode_equal mode Parametric;
+    begin
+      match tp with
+      | D.Uni _ ->
+        check ~mode:Pointwise ~env:(Global :: env) ~size ~term ~tp;
+      | t -> tp_error (Expecting_universe t)
+    end
+  | Encodisc term ->
+    assert_mode_equal mode Parametric;
+    begin
+      match tp with
+      | D.Codisc tp ->
+        check ~mode:Pointwise ~env:(Global :: env) ~size ~term ~tp;
+      | t -> tp_error (Expecting_of ("Codisc", t))
+    end
   | Global term ->
     assert_mode_equal mode Pointwise;
     begin
@@ -376,22 +400,6 @@ and check_inert ~mode ~env ~size ~term ~tp =
       | D.Global tp ->
         check ~mode:Parametric ~env:(Discrete :: env) ~size ~term ~tp;
       | t -> tp_error (Expecting_of ("Global", t))
-    end
-  | Discrete term ->
-    assert_mode_equal mode Parametric;
-    begin
-      match tp with
-      | D.Uni _ ->
-        check ~mode:Pointwise ~env:(Components :: env) ~size ~term ~tp;
-      | t -> tp_error (Expecting_universe t)
-    end
-  | Endisc term ->
-    assert_mode_equal mode Parametric;
-    begin
-      match tp with
-      | D.Discrete tp ->
-        check ~mode:Pointwise ~env:(Components :: env) ~size ~term ~tp;
-      | t -> tp_error (Expecting_of ("Discrete", t))
     end
   | Uni i ->
     begin
@@ -557,33 +565,19 @@ and synth_quasi ~mode ~env ~size ~term =
         E.eval mot (D.Tm (D.BLam (D.Clos {term; env = sem_env})) :: sem_env) size
       | t -> tp_error (Expecting_of ("Gel", t))
     end
+  | Uncodisc term ->
+    assert_mode_equal mode Pointwise;
+    begin
+      match synth ~mode:Parametric ~env:(Discrete :: env) ~size ~term with
+      | Codisc tp -> tp
+      | t -> tp_error (Expecting_of ("Codisc", t))
+    end
   | Unglobe term ->
     assert_mode_equal mode Parametric;
     begin
       match synth ~mode:Pointwise ~env:(Components :: env) ~size ~term with
       | Global tp -> tp
       | t -> tp_error (Expecting_of ("Global", t))
-    end
-  | Undisc term ->
-    assert_mode_equal mode Pointwise;
-    begin
-      match synth ~mode:Parametric ~env:(RestrictComponents :: env) ~size ~term with
-      | Discrete tp -> tp
-      | t -> tp_error (Expecting_of ("Discrete", t))
-    end
-  | Extract (mot, term, case) ->
-    assert_mode_equal mode Pointwise;
-    begin
-      match synth ~mode:Parametric ~env:(Discrete :: env) ~size ~term with
-      | D.Discrete tp' ->
-        let sem_env = env_to_sem_env env in
-        let (_, mot_env) = mk_var (D.Global (D.Discrete tp')) env size in
-        check_tp ~mode:Pointwise ~env:mot_env ~size:(size + 1) ~term:mot;
-        let (case_arg, case_env) = mk_var tp' env size in
-        let case_tp = E.eval mot (D.Tm (D.Englobe (D.Endisc case_arg)) :: sem_env) (size + 1) in
-        check ~mode:Pointwise ~env:case_env ~size:(size + 1) ~term:case ~tp:case_tp;
-        E.eval mot (D.Tm (D.Englobe (E.eval term sem_env size)) :: sem_env) size
-      | t -> tp_error (Expecting_of ("Discrete", t))
     end
   | _ -> tp_error (Cannot_synth_term term)
 
@@ -628,12 +622,12 @@ and check_tp ~mode ~env ~size ~term =
     let ends' = List.map (fun term -> E.eval term sem_env size) ends in
     let (_, rel_env) = mk_vars ends' res_env size in
     check_tp ~mode ~env:rel_env ~size:(size + width) ~term:rel
+  | Codisc tp ->
+    assert_mode_equal mode Parametric;
+    check_tp ~mode:Pointwise ~env:(Global :: env) ~size ~term:tp
   | Global tp ->
     assert_mode_equal mode Pointwise;
     check_tp ~mode:Parametric ~env:(Discrete :: env) ~size ~term:tp
-  | Discrete tp ->
-    assert_mode_equal mode Parametric;
-    check_tp ~mode:Pointwise ~env:(Components :: env) ~size ~term:tp
   | term ->
     begin
       match synth ~mode ~env ~size ~term with

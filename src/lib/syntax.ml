@@ -22,8 +22,8 @@ type t =
   | Extent of dim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS *) t list * (* BINDS n & BBINDS *) t
   | Gel of dim * t list * (* BINDS n *) t | Engel of idx * t list * t
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
+  | Codisc of t | Encodisc of t | Uncodisc of t
   | Global of t | Englobe of t | Unglobe of t
-  | Discrete of t | Endisc of t | Undisc of t | Extract of (* BINDS *) t * t * (* BINDS *) t
   | Uni of uni_level
 [@@deriving eq]
 
@@ -87,10 +87,9 @@ let unsubst_bvar i t =
     | Global t -> Global (go depth t)
     | Englobe t -> Englobe (go depth t)
     | Unglobe t -> Unglobe (go depth t)
-    | Discrete t -> Discrete (go depth t)
-    | Endisc t -> Endisc (go depth t)
-    | Undisc t -> Undisc (go depth t)
-    | Extract (mot, t, case) -> Extract (go (depth + 1) mot, go depth t, go (depth + 1) case)
+    | Codisc t -> Codisc (go depth t)
+    | Encodisc t -> Encodisc (go depth t)
+    | Uncodisc t -> Uncodisc (go depth t)
     | Uni j -> Uni j
   in
   try
@@ -193,14 +192,12 @@ let rec pp fmt =
     fprintf fmt "englobe(@[<hov>%a@])" pp t
   | Unglobe t ->
     fprintf fmt "unglobe(@[<hov>%a@])" pp t
-  | Discrete t ->
-    fprintf fmt "Discrete(@[<hov>%a@])" pp t
-  | Endisc t ->
-    fprintf fmt "endisc(@[<hov>%a@])" pp t
-  | Undisc t ->
-    fprintf fmt "undisc(@[<hov>%a@])" pp t
-  | Extract (mot, t, case) ->
-    fprintf fmt "extract(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp mot pp t pp case
+  | Codisc t ->
+    fprintf fmt "Codisc(@[<hov>%a@])" pp t
+  | Encodisc t ->
+    fprintf fmt "encodisc(@[<hov>%a@])" pp t
+  | Uncodisc t ->
+    fprintf fmt "uncodisc(@[<hov>%a@])" pp t
   | Uni i -> fprintf fmt "U<%d>" i
 
 let show t =

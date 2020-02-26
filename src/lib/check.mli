@@ -21,9 +21,9 @@ type env_entry =
   | Var of {level : Domain.lvl; tp : Domain.t}
   | Def of {term : Domain.t; tp : Domain.t}
   | Restrict of Syntax.idx
+  | Global
   | Discrete
   | Components
-  | RestrictComponents
   | TopLevel of {mode : mode; term : Domain.t; tp : Domain.t}
   | Postulate of {mode : mode; level : Domain.lvl; tp : Domain.t}
 
