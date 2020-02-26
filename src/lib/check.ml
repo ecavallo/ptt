@@ -144,7 +144,7 @@ let synth_var ~mode env x =
         match synth_mode with
         | Id -> go Components env x
         | Global -> tp_error (Misc "Ill-formed context\n")
-        | Discrete -> go Id env x
+        | Discrete -> tp_error (Misc "Tried to access variable under components restriction\n")
         | Components -> tp_error (Misc "Ill-formed context\n")
       end
     | 0, Var {tp; _} :: _ ->
