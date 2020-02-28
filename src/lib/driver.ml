@@ -36,7 +36,7 @@ let output = function
 
 let find_idx key =
   let rec go i = function
-    | [] -> raise (Check.Type_error (Check.Misc ("Unbound variable: " ^ key)))
+    | [] -> raise (Check.Type_error (Check.Misc ("Unbound variable: " ^ key ^ "\n")))
     | Dim x :: xs -> if String.equal x key then i else go (i + 1) xs
     | Term x :: xs -> if String.equal x key then i else go (i + 1) xs
   in
@@ -182,7 +182,7 @@ let process_decl (Env {check_env; bindings; size})  = function
     let new_env = Check.Postulate {level = size; mode; tp = sem_tp} :: check_env in
     NoOutput (Env {check_env = new_env; bindings = Term name :: bindings; size = size + 1})
   | CS.NormalizeDef name ->
-    let err = Check.Type_error (Check.Misc ("Unbound variable: " ^ name)) in
+    let err = Check.Type_error (Check.Misc ("Unbound variable: " ^ name ^ "\n")) in
     begin
       let i = find_idx name bindings in
       match List.nth check_env i with
