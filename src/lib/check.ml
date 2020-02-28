@@ -201,6 +201,7 @@ let check_dim ~mode ~env ~dim ~width =
       else go i env
     | _, Discrete :: _ ->
       tp_error (Misc "Tried to use dimension beneath discrete\n")
+    | _, Global :: _
     | _, Components :: _ ->
       tp_error (Misc "Broken invariant\n")
     | 0, DVar {width = w; _} :: _ ->
