@@ -53,6 +53,17 @@ and do_rec size tp zero suc n =
     D.Neutral {tp = final_tp; term = D.(NRec (tp, zero, suc) @: term)}
   | _ -> raise (Eval_failed "Not a number")
 
+and do_list_rec size mot nil cons l =
+  match l with
+  | D.Nil -> nil
+  | D.Cons (a, l) ->
+    do_clos3 size cons a l (do_list_rec size mot nil cons l)
+  | D.Neutral {term; tp} ->
+    let dom = do_list_tp tp in
+    let final_tp = do_clos size mot (D.Tm l) in
+    D.Neutral {tp = final_tp; term = D.(ListRec (dom, mot, nil, cons) @: term)}
+  | _ -> raise (Eval_failed "Not a list")
+
 and do_if size mot tt ff b =
   match b with
   | D.True -> tt
@@ -60,7 +71,7 @@ and do_if size mot tt ff b =
   | D.Neutral {term; _} ->
     let final_tp = do_clos size mot (D.Tm b) in
     D.Neutral {tp = final_tp; term = D.(If (mot, tt, ff) @: term)}
-  | _ -> raise (Eval_failed "Not a number")
+  | _ -> raise (Eval_failed "Not a boolean")
 
 and do_fst p =
   match p with
@@ -139,6 +150,13 @@ and do_unglobe t =
   | D.Neutral {tp; term} ->
     D.Neutral {tp = do_global_tp tp; term = D.(Unglobe @: term)}
   | _ -> raise (Eval_failed "Couldn't unglobe argument in do_unglobe")
+
+and do_list_tp tp =
+  match tp with
+  | D.List tp -> tp
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi ListTp @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a list type")
 
 and do_id_tp tp = 
   match tp with 
@@ -261,6 +279,7 @@ and eval t (env : D.env) size =
   | Syn.Unit -> D.Unit
   | Syn.Triv -> D.Triv
   | Syn.Nat -> D.Nat
+  | Syn.List t -> D.List (eval t env size)
   | Syn.Zero -> D.Zero
   | Syn.Suc t -> D.Suc (eval t env size)
   | Syn.NRec (tp, zero, suc, n) ->
@@ -269,6 +288,14 @@ and eval t (env : D.env) size =
       (eval zero env size)
       (Clos2 {term = suc; env})
       (eval n env size)
+  | Syn.Nil -> D.Nil
+  | Syn.Cons (a, t) -> D.Cons (eval a env size, eval t env size)
+  | Syn.ListRec (mot, nil, cons, l) ->
+    do_list_rec size
+      (Clos {term = mot; env})
+      (eval nil env size)
+      (Clos3 {term = cons; env})
+      (eval l env size)
   | Syn.Bool -> D.Bool
   | Syn.True -> D.True
   | Syn.False -> D.False

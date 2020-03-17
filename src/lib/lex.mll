@@ -25,6 +25,10 @@ let keywords =
     ("nat", NAT);
     ("tt", TRUE);
     ("ff", FALSE);
+    ("list", LIST);
+    ("nil", NIL);
+    ("cons", CONS);
+    ("listrec", LISTREC);
     ("bool", BOOL);
     ("let", LET);
     ("in", IN);

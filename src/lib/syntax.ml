@@ -14,6 +14,7 @@ type t =
   | Let of t * (* BINDS *) t | Check of t * t
   | Unit | Triv
   | Nat | Zero | Suc of t | NRec of (* BINDS *) t * t * (* BINDS 2 *) t * t
+  | List of t | Nil | Cons of t * t | ListRec of (* BINDS *) t * t * (* BINDS 3 *) t * t
   | Bool | True | False | If of (* BINDS *) t * t * t * t
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
   | Sg of t * (* BINDS *) t | Pair of t * t | Fst of t | Snd of t
@@ -53,6 +54,11 @@ let unsubst_bvar i t =
     | Suc t -> Suc (go depth t)
     | NRec (mot, zero, suc, n) ->
       NRec (go (depth + 1) mot, go depth zero, go (depth + 2) suc, go depth n)
+    | List t -> List (go depth t)
+    | Nil -> Nil
+    | Cons (a, t) -> Cons (go depth a, go depth t)
+    | ListRec (mot, nil, cons, l) ->
+      ListRec (go (depth + 1) mot, go depth nil, go (depth + 3) cons, go depth l)
     | Bool -> Bool
     | True -> True
     | False -> False
@@ -144,6 +150,12 @@ let rec pp fmt =
   | NRec (mot, zero, suc, n) ->
     fprintf fmt "rec(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
       pp mot pp zero pp suc pp n;
+  | List t -> fprintf fmt "list(@[<hov>%a@])" pp t
+  | Nil -> fprintf fmt "nil"
+  | Cons (a, t) -> fprintf fmt "cons(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp a pp t
+  | ListRec (mot, nil, cons, l) ->
+    fprintf fmt "listrec(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
+      pp mot pp nil pp cons pp l;
   | Bool -> fprintf fmt "bool"
   | True -> fprintf fmt "true"
   | False -> fprintf fmt "false"

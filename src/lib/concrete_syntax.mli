@@ -21,6 +21,10 @@ and t =
   | Suc of t
   | Lit of int
   | NRec of {mot : binder; zero : t; suc : binder2; nat : t}
+  | List of t
+  | Nil
+  | Cons of t * t
+  | ListRec of {mot : binder; nil : t; cons : binder3; list : t}
   | Bool
   | True
   | False

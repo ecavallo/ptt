@@ -30,6 +30,9 @@ and t =
   | Nat
   | Zero
   | Suc of t
+  | List of t
+  | Nil
+  | Cons of t * t
   | Bool
   | True
   | False
@@ -60,6 +63,7 @@ and cell =
   | Snd
   | BApp of dim
   | NRec of clos * t * clos2
+  | ListRec of t * clos * t * clos3
   | If of clos * t * t
   | J of clos3 * clos * t * t * t
   | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
@@ -72,6 +76,7 @@ and quasi_cell =
   | PiCod of t
   | SgDom
   | SgCod of t
+  | ListTp
   | IdTp
   | IdLeft
   | IdRight
@@ -135,6 +140,9 @@ and instantiate r i = function
   | Nat -> Nat
   | Zero -> Zero
   | Suc t -> Suc (instantiate r i t)
+  | List t -> List (instantiate r i t)
+  | Nil -> Nil
+  | Cons (a, t) -> Cons (instantiate r i a, instantiate r i t)
   | Bool -> Bool
   | True -> True
   | False -> False
@@ -176,6 +184,13 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
          instantiate r i zero,
          instantiate_clos2 r i suc)
       @: go r i (h, s)
+    | ListRec (tp, mot, nil, cons) :: s ->
+      ListRec
+        (instantiate r i tp,
+         instantiate_clos r i mot,
+         instantiate r i nil,
+         instantiate_clos3 r i cons)
+      @: go r i (h, s)
     | If (mot, tt, ff) :: s ->
       If
         (instantiate_clos r i mot,
@@ -214,6 +229,7 @@ and instantiate_quasi_cell r i =
   | PiCod v -> PiCod (instantiate r i v)
   | SgDom -> SgDom 
   | SgCod v -> SgCod (instantiate r i v)
+  | ListTp -> ListTp
   | IdLeft -> IdLeft
   | IdRight -> IdRight
   | IdTp -> IdTp

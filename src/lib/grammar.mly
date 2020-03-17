@@ -15,6 +15,7 @@
 %token CODISC ENCODISC UNCODISC
 %token UNIT TRIV
 %token REC SUC NAT ZERO
+%token LIST NIL CONS LISTREC
 %token IF TRUE FALSE BOOL
 %token UNIV
 %token QUIT NORMALIZE
@@ -75,6 +76,8 @@ atomic:
     { Triv }
   | ZERO
     { Lit 0 }
+  | NIL
+    { Nil }
   | TRUE
     { True }
   | FALSE
@@ -120,7 +123,18 @@ term:
         zero = zero_case;
         suc = Binder2 {name1 = suc_var; name2 = ih_var; body = suc_case};
         nat = n
-      } }
+        } }
+  | LIST; t = atomic { List t }
+  | CONS; a = atomic; t = atomic { Cons (a, t) }
+  | LISTREC; l = term; AT; mot_name = name; RIGHT_ARROW; mot = term; WITH;
+    PIPE; NIL; RIGHT_ARROW; nil_case = term;
+    PIPE; CONS; a_var = name; t_var = name; COMMA; ih_var = name; RIGHT_ARROW; cons_case = term
+    { ListRec {
+        mot = Binder {name = mot_name; body = mot};
+        nil = nil_case;
+        cons = Binder3 {name1 = a_var; name2 = t_var; name3 = ih_var; body = cons_case};
+        list = l
+        } }
   | IF; b = term; AT; mot_name = name; RIGHT_ARROW; mot = term; WITH;
     PIPE; TRUE; RIGHT_ARROW; true_case = term;
     PIPE; FALSE; RIGHT_ARROW; false_case = term;

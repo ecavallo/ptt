@@ -79,6 +79,19 @@ let rec bind env = function
        bind env zero,
        bind (Term suc_name2 :: Term suc_name1 :: env) suc_body,
        bind env nat)
+  | CS.List t -> S.List (bind env t)
+  | CS.Nil -> S.Nil
+  | CS.Cons (a, t) -> S.Cons (bind env a, bind env t)
+  | CS.ListRec
+      {mot = Binder {name = mot_name; body = mot_body};
+       nil;
+       cons = Binder3 {name1 = cons_name1; name2 = cons_name2; name3 = cons_name3; body = cons_body};
+       list} ->
+    S.ListRec
+      (bind (Term mot_name :: env) mot_body,
+       bind env nil,
+       bind (Term cons_name3 :: Term cons_name2 :: Term cons_name1 :: env) cons_body,
+       bind env list)
   | CS.Bool -> S.Bool
   | CS.True -> S.True
   | CS.False -> S.False

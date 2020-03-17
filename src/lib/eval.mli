@@ -8,6 +8,7 @@ val eval : Syntax.t -> Domain.env -> Domain.lvl -> Domain.t
 val do_ap : Domain.lvl -> Domain.t -> Domain.t -> Domain.t
 val do_bapp : Domain.lvl -> Domain.t -> Domain.dim -> Domain.t
 val do_rec : Domain.lvl -> Domain.clos -> Domain.t -> Domain.clos2 -> Domain.t -> Domain.t
+val do_list_rec : Domain.lvl -> Domain.clos -> Domain.t -> Domain.clos3 -> Domain.t -> Domain.t
 val do_if : Domain.lvl -> Domain.clos -> Domain.t -> Domain.t -> Domain.t -> Domain.t
 val do_fst : Domain.t -> Domain.t
 val do_snd : Domain.lvl -> Domain.t -> Domain.t
@@ -20,6 +21,7 @@ val do_pi_dom : Domain.t -> Domain.t
 val do_pi_cod : Domain.lvl -> Domain.t -> Domain.t -> Domain.t
 val do_sg_dom : Domain.t -> Domain.t
 val do_sg_cod : Domain.lvl -> Domain.t -> Domain.t -> Domain.t
+val do_list_tp : Domain.t -> Domain.t
 val do_id_left : Domain.t -> Domain.t
 val do_id_right : Domain.t -> Domain.t
 val do_id_tp : Domain.t -> Domain.t

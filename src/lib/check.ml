@@ -249,6 +249,26 @@ and check_inert ~mode ~env ~size ~term ~tp =
       | D.Uni _ -> ()
       | t -> tp_error (Expecting_universe t)
     end
+  | List term ->
+    begin
+      match tp with
+      | D.Uni _ -> check ~mode ~env ~size ~term ~tp
+      | t -> tp_error (Expecting_universe t)
+    end
+  | Nil ->
+    begin
+      match tp with
+      | D.List _ -> ()
+      | t -> tp_error (Expecting_of ("List", t))
+    end
+  | Cons (a, t) ->
+    begin
+      match tp with
+      | D.List tp ->
+        check ~mode ~env ~size ~term:a ~tp;
+        check ~mode ~env ~size ~term:t ~tp:(D.List tp)
+      | t -> tp_error (Expecting_of ("List", t))
+    end
   | Bool ->
     begin
       match tp with
@@ -473,6 +493,23 @@ and synth_quasi ~mode ~env ~size ~term =
     let suc_tp = E.eval mot (D.Tm (Suc nat_arg) :: sem_env) (size + 2) in
     check ~mode ~env:ih_env ~size:(size + 2) ~term:suc ~tp:suc_tp;
     E.eval mot (D.Tm (E.eval n sem_env size) :: sem_env) size
+  | ListRec (mot, nil, cons, l) ->
+    begin
+      match synth ~mode ~env ~size ~term:l with
+      | D.List tp' ->
+        let sem_env = env_to_sem_env env in
+        let (_, mot_env) = mk_var (D.List tp') env size in
+        check_tp ~mode ~env:mot_env ~size:(size + 1) ~term:mot;
+        check ~mode ~env ~size ~term:nil ~tp:(E.eval mot (D.Tm D.Nil :: sem_env) size);
+        let (cons_arg1, cons_env1) = mk_var tp' env size in
+        let (cons_arg2, cons_env2) = mk_var (D.List tp') cons_env1 (size + 1) in
+        let rec_mot = E.eval mot (D.Tm cons_arg2 :: sem_env) (size + 2) in
+        let (_, cons_env3) = mk_var rec_mot cons_env2 (size + 2) in
+        check ~mode ~env:cons_env3 ~size:(size + 3) ~term:cons
+          ~tp:(E.eval mot (D.Tm (D.Cons (cons_arg1, cons_arg2)) :: sem_env) (size + 3));
+        E.eval mot (D.Tm (E.eval l sem_env size) :: sem_env) size
+      | t -> tp_error (Expecting_of ("List", t))
+    end
   | If (mot, tt, ff, b) ->
     check ~mode ~env ~size ~term:b ~tp:Bool;
     let sem_env = env_to_sem_env env in
@@ -586,6 +623,7 @@ and check_tp ~mode ~env ~size ~term =
   match term with
   | Syn.Unit -> ()
   | Syn.Nat -> ()
+  | Syn.List term -> check_tp ~mode ~env ~size ~term
   | Syn.Bool -> ()
   | Uni _ -> ()
   | Bridge (term, ends) ->
