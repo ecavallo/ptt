@@ -44,11 +44,19 @@ let keywords =
     ("Gel", GEL);
     ("gel", ENGEL);
     ("ungel", UNGEL);
+    ("Codisc", CODISC);
+    ("codisc", ENCODISC);
+    ("uncodisc", UNCODISC);
+    ("Global", GLOBAL);
+    ("glob", ENGLOBE);
+    ("unglob", UNGLOBE);
     ("at", AT);
     ("of", OF);
     ("def", DEF);
     ("postulate", POSTULATE);
     ("normalize", NORMALIZE);
+    ("par", PAR);
+    ("pt", PT);
     ("quit", QUIT);
   ]
 }

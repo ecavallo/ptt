@@ -22,6 +22,8 @@ type t =
   | Extent of dim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS *) t list * (* BINDS n & BBINDS *) t
   | Gel of dim * t list * (* BINDS n *) t | Engel of idx * t list * t
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
+  | Codisc of t | Encodisc of t | Uncodisc of t
+  | Global of t | Englobe of t | Unglobe of t
   | Uni of uni_level
 [@@deriving eq]
 
@@ -82,6 +84,12 @@ let unsubst_bvar i t =
     | Engel (i, ts, t) -> Engel (go_dvar depth i, List.map (go depth) ts, go depth t)
     | Ungel (width, mot, gel, case) ->
       Ungel (width, go (depth + 1) mot, go (depth + 1) gel, go (depth + 1) case)
+    | Global t -> Global (go depth t)
+    | Englobe t -> Englobe (go depth t)
+    | Unglobe t -> Unglobe (go depth t)
+    | Codisc t -> Codisc (go depth t)
+    | Encodisc t -> Encodisc (go depth t)
+    | Uncodisc t -> Uncodisc (go depth t)
     | Uni j -> Uni j
   in
   try
@@ -178,6 +186,18 @@ let rec pp fmt =
     fprintf fmt "gel(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" pp_dim (DVar i) (pp_list pp) ts pp t;
   | Ungel (width, mot, gel, case) ->
     fprintf fmt "ungel(@[<hov>@[<hov>%d@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" width pp mot pp gel pp case
+  | Global t ->
+    fprintf fmt "Global(@[<hov>%a@])" pp t
+  | Englobe t ->
+    fprintf fmt "englobe(@[<hov>%a@])" pp t
+  | Unglobe t ->
+    fprintf fmt "unglobe(@[<hov>%a@])" pp t
+  | Codisc t ->
+    fprintf fmt "Codisc(@[<hov>%a@])" pp t
+  | Encodisc t ->
+    fprintf fmt "encodisc(@[<hov>%a@])" pp t
+  | Uncodisc t ->
+    fprintf fmt "uncodisc(@[<hov>%a@])" pp t
   | Uni i -> fprintf fmt "U<%d>" i
 
 let show t =
