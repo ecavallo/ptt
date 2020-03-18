@@ -13,6 +13,7 @@ type t =
   | List of t | Nil | Cons of t * t | ListRec of (* BINDS *) t * t * (* BINDS 3 *) t * t
   | Bool | True | False | If of (* BINDS *) t * t * t * t
   | Coprod of t * t | Inl of t | Inr of t | Case of (* BINDS *) t * (* BINDS *) t * (* BINDS *) t * t
+  | Void | Abort of (* BINDS *) t * t
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
   | Sg of t * (* BINDS *) t | Pair of t * t | Fst of t | Snd of t
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t

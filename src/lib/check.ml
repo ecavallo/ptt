@@ -295,6 +295,12 @@ and check_inert ~mode ~env ~size ~term ~tp =
       | D.Coprod (_, right) -> check ~mode ~env ~size ~term:b ~tp:right
       | t -> tp_error (Expecting_of ("Coprod", t))
     end
+  | Void ->
+    begin
+      match tp with
+      | D.Uni _ -> ()
+      | t -> tp_error (Expecting_universe t)
+    end
   | Id (tp', l, r) ->
     begin
       match tp with
@@ -448,7 +454,7 @@ and check_inert ~mode ~env ~size ~term ~tp =
       | Uni j when i < j -> ()
       | t ->
         let msg =
-          "Expecting universe over " ^ string_of_int i ^ " but found\n" ^ D.show t in
+          "Expecting universe over " ^ string_of_int i ^ " but found\n" ^ D.show t ^ "\n" in
         tp_error (Misc msg)
     end
   | term -> assert_subtype (env_to_quote_env env) size (synth ~mode ~env ~size ~term) tp
@@ -556,6 +562,12 @@ and synth_quasi ~mode ~env ~size ~term =
         E.eval mot (D.Tm (E.eval co sem_env size) :: sem_env) size
       | t -> tp_error (Expecting_of ("Coprod", t))
     end
+  | Abort (mot, vd) ->
+    check ~mode ~env ~size ~term:vd ~tp:Void;
+    let sem_env = env_to_sem_env env in
+    let (_, mot_env) = mk_var Void env size in
+    check_tp ~mode ~env:mot_env ~size:(size + 1) ~term:mot;
+    E.eval mot (D.Tm (E.eval vd sem_env size) :: sem_env) size
   | BApp (term, r) ->
     let restricted_env = restrict_env r env in
     begin
@@ -664,6 +676,7 @@ and check_tp ~mode ~env ~size ~term =
   | Syn.Coprod (left, right) ->
     check_tp ~mode ~env ~size ~term:left;
     check_tp ~mode ~env ~size ~term:right
+  | Syn.Void -> ()
   | Uni _ -> ()
   | Bridge (term, ends) ->
     let width = List.length ends in

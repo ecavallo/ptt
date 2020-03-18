@@ -110,6 +110,9 @@ let rec bind env = function
        bind (Term inl_name :: env) inl_body,
        bind (Term inr_name :: env) inr_body,
        bind env coprod)
+  | CS.Void -> S.Void
+  | CS.Abort {mot = Binder {name = mot_name; body = mot_body}; void} ->
+    S.Abort (bind (Term mot_name :: env) mot_body, bind env void)
   | CS.Lam (BinderN {names = []; body}) ->
     bind env body
   | CS.Lam (BinderN {names = x :: names; body}) ->

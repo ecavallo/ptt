@@ -33,6 +33,8 @@ let keywords =
     ("inl", INL);
     ("inr", INR);
     ("case", CASE);
+    ("void", VOID);
+    ("abort", ABORT);
     ("let", LET);
     ("in", IN);
     ("with", WITH);

@@ -11,6 +11,7 @@ val do_rec : Domain.lvl -> Domain.clos -> Domain.t -> Domain.clos2 -> Domain.t -
 val do_list_rec : Domain.lvl -> Domain.clos -> Domain.t -> Domain.clos3 -> Domain.t -> Domain.t
 val do_if : Domain.lvl -> Domain.clos -> Domain.t -> Domain.t -> Domain.t -> Domain.t
 val do_case : Domain.lvl -> Domain.clos -> Domain.clos -> Domain.clos -> Domain.t -> Domain.t
+val do_abort : Domain.lvl -> Domain.clos -> Domain.t -> Domain.t
 val do_fst : Domain.t -> Domain.t
 val do_snd : Domain.lvl -> Domain.t -> Domain.t
 val do_j : Domain.lvl -> Domain.clos3 -> Domain.clos -> Domain.t -> Domain.t

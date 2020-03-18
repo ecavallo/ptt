@@ -84,6 +84,13 @@ and do_case size mot inl inr co =
     D.Neutral {tp = final_tp; term = D.(Case (left, right, mot, inl, inr) @: term)}
   | _ -> raise (Eval_failed "Not a coproduct")
 
+and do_abort size mot vd =
+  match vd with
+  | D.Neutral {term; _} ->
+    let final_tp = do_clos size mot (D.Tm vd) in
+    D.Neutral {tp = final_tp; term = D.(Abort mot @: term)}
+  | _ -> raise (Eval_failed "Not a void")
+
 and do_fst p =
   match p with
   | D.Pair (p1, _) -> p1
@@ -338,6 +345,9 @@ and eval t (env : D.env) size =
       (Clos {term = inl; env})
       (Clos {term = inr; env})
       (eval co env size)
+  | Syn.Void -> D.Void
+  | Syn.Abort (mot, vd) ->
+    do_abort size (Clos {term = mot; env}) (eval vd env size)
   | Syn.Pi (src, dest) ->
     D.Pi (eval src env size, (Clos {term = dest; env}))
   | Syn.Lam t -> D.Lam (Clos {term = t; env})

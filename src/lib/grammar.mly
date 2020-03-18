@@ -18,6 +18,7 @@
 %token LIST NIL CONS LISTREC
 %token BOOL TRUE FALSE IF
 %token PLUS INL INR CASE
+%token VOID ABORT
 %token ID REFL MATCH
 %token UNIV
 %token QUIT NORMALIZE
@@ -89,6 +90,7 @@ atomic:
     { Uni i }
   | NAT { Nat }
   | BOOL { Bool }
+  | VOID { Void }
   | LANGLE left = term; COMMA; right = term; RANGLE
     { Pair (left, right) }
   | LBR; name = name; RBR; body = term; endpoints = endpoint_options
@@ -148,15 +150,17 @@ term:
   | left = atomic; PLUS; right = atomic { Coprod(left, right) }
   | INL; t = atomic { Inl t }
   | INR; t = atomic { Inr t }
-  | CASE; co = term; AT; mot_name = name; RIGHT_ARROW; mot = term; WITH;
+  | CASE; coprod = term; AT; mot_name = name; RIGHT_ARROW; mot = term; WITH;
     PIPE; INL; inl_name = name; RIGHT_ARROW; inl = term;
     PIPE; INR; inr_name = name; RIGHT_ARROW; inr = term
     { Case {
         mot = Binder {name = mot_name; body = mot};
         inl = Binder {name = inl_name; body = inl};
         inr = Binder {name = inr_name; body = inr};
-        coprod = co
+        coprod
     } }
+  | ABORT; void = term; AT; name = name; RIGHT_ARROW; body = term
+    { Abort {mot = Binder {name; body}; void} }
   | ID; tp = atomic; left = atomic; right = atomic
     { Id (tp, left, right) }
   | REFL; t = atomic

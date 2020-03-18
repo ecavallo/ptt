@@ -39,6 +39,7 @@ and t =
   | Coprod of t * t
   | Inl of t
   | Inr of t
+  | Void
   | Pi of t * clos
   | Sg of t * clos
   | Pair of t * t
@@ -69,6 +70,7 @@ and cell =
   | ListRec of t * clos * t * clos3
   | If of clos * t * t
   | Case of t * t * clos * clos * clos
+  | Abort of clos
   | J of clos3 * clos * t * t * t
   | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
   | Uncodisc
@@ -155,6 +157,7 @@ and instantiate r i = function
   | Coprod (t1, t2) -> Coprod (instantiate r i t1, instantiate r i t2)
   | Inl t -> Inl (instantiate r i t)
   | Inr t -> Inr (instantiate r i t)
+  | Void -> Void
   | Pi (src, dst) -> Pi (instantiate r i src, instantiate_clos r i dst)
   | Sg (src, dst) -> Sg (instantiate r i src, instantiate_clos r i dst)
   | Pair (t, u) -> Pair (instantiate r i t, instantiate r i u)
@@ -213,6 +216,9 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
          instantiate_clos r i mot,
          instantiate_clos r i inl,
          instantiate_clos r i inr)
+      @: go r i (h, s)
+    | Abort mot :: s ->
+      Abort (instantiate_clos r i mot)
       @: go r i (h, s)
     | J (mot, refl, tp, left, right) :: s ->
       J

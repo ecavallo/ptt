@@ -86,6 +86,7 @@ and reduce_extent env size es =
     | D.ListRec (_, mot, nil, cons) :: s -> E.do_list_rec size mot nil cons (go env size (e, s))
     | D.If (mot, tt, ff) :: s -> E.do_if size mot tt ff (go env size (e, s))
     | D.Case (_, _, mot, inl, inr) :: s -> E.do_case size mot inl inr (go env size (e, s))
+    | D.Abort mot :: s -> E.do_abort size mot (go env size (e, s))
     | D.Fst :: s -> E.do_fst (go env size (e, s))
     | D.Snd :: s -> E.do_snd size (go env size (e, s))
     | D.BApp r :: s -> E.do_bapp size (go env size (e, s)) r
@@ -202,6 +203,7 @@ and read_back_tp env size d =
   | D.List t -> Syn.List (read_back_tp env size t)
   | D.Bool -> Syn.Bool
   | D.Coprod (t1, t2) -> Syn.Coprod (read_back_tp env size t1, read_back_tp env size t2)
+  | D.Void -> Syn.Void
   | D.Pi (src, dest) ->
     let (arg, arg_env) = mk_var src env size in
     Syn.Pi
@@ -310,6 +312,11 @@ and read_back_ne env size (h, s) =
     let applied_inr = E.do_clos (size + 1) inr (D.Tm inr_arg) in
     let inr' = read_back_nf inr_env (size + 1) (D.Normal {tp = inr_mot; term = applied_inr}) in
     Syn.Case (mot', inl', inr', read_back_ne env size (h, s))
+  | D.Abort mot :: s ->
+    let (mot_arg, mot_env) = mk_var D.Void env size in
+    let applied_mot = E.do_clos (size + 1) mot (D.Tm mot_arg) in
+    let mot' = read_back_tp mot_env (size + 1) applied_mot in
+    Syn.Abort (mot', read_back_ne env size (h, s))
   | D.Fst :: s -> Syn.Fst (read_back_ne env size (h, s))
   | D.Snd :: s -> Syn.Snd (read_back_ne env size (h, s))
   | D.BApp r :: s ->
@@ -576,6 +583,12 @@ and check_ne env size (h1, s1) (h2, s2) =
       (D.Normal {tp = inr_mot; term = applied_inr1})
       (D.Normal {tp = inr_mot; term = applied_inr2}) &&
     check_ne env size (h1, s1) (h2, s2)
+  | D.Abort mot1 :: s1, D.Abort mot2 :: s2 ->
+    let (mot_arg, mot_env) = mk_var D.Void env size in
+    let applied_mot1 = E.do_clos (size + 1) mot1 (D.Tm mot_arg) in
+    let applied_mot2 = E.do_clos (size + 1) mot2 (D.Tm mot_arg) in
+    check_tp ~subtype:false mot_env (size + 1) applied_mot1 applied_mot2 &&
+    check_ne env size (h1, s1) (h2, s2)
   | D.Fst :: s1, D.Fst :: s2  -> check_ne env size (h1, s1) (h2, s2)
   | D.Snd :: s1, D.Snd :: s2 -> check_ne env size (h1, s1) (h2, s2)
   | D.BApp i1 :: s1, D.BApp i2 :: s2 ->
@@ -673,6 +686,7 @@ and check_tp ~subtype env size d1 d2 =
   | D.Coprod (a, b), D.Coprod (a', b') ->
     check_tp ~subtype env size a a' &&
     check_tp ~subtype env size b b'
+  | D.Void, D.Void -> true
   | D.Id (tp1, left1, right1), D.Id (tp2, left2, right2) ->
     check_tp ~subtype env size tp1 tp2 &&
     check_nf env size (D.Normal {tp = tp1; term = left1}) (D.Normal {tp = tp1; term = left2}) &&

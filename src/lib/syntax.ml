@@ -17,6 +17,7 @@ type t =
   | List of t | Nil | Cons of t * t | ListRec of (* BINDS *) t * t * (* BINDS 3 *) t * t
   | Bool | True | False | If of (* BINDS *) t * t * t * t
   | Coprod of t * t | Inl of t | Inr of t | Case of (* BINDS *) t * (* BINDS *) t * (* BINDS *) t * t
+  | Void | Abort of (* BINDS *) t * t
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
   | Sg of t * (* BINDS *) t | Pair of t * t | Fst of t | Snd of t
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
@@ -63,13 +64,15 @@ let unsubst_bvar i t =
     | Bool -> Bool
     | True -> True
     | False -> False
+    | If (mot, tt, ff, b) ->
+      If (go (depth + 1) mot, go depth tt, go depth ff, go depth b)
     | Coprod (t1, t2) -> Coprod (go depth t1, go depth t2)
     | Inl t -> Inl (go depth t)
     | Inr t -> Inr (go depth t)
     | Case (mot, inl, inr, co) ->
       Case (go (depth + 1) mot, go (depth + 1) inl, go (depth + 1) inr, go depth co)
-    | If (mot, tt, ff, b) ->
-      If (go (depth + 1) mot, go depth tt, go depth ff, go depth b)
+    | Void -> Void
+    | Abort (mot, vd) -> Abort (go (depth + 1) mot, go depth vd)
     | Pi (l, r) -> Pi (go depth l, go (depth + 1) r)
     | Lam body -> Lam (go (depth + 1) body)
     | Ap (l, r) -> Ap (go depth l, go depth r)
@@ -174,6 +177,9 @@ let rec pp fmt =
   | Case (mot, inl, inr, co) ->
     fprintf fmt "case(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
       pp mot pp inl pp inr pp co;
+  | Void -> fprintf fmt "void"
+  | Abort (mot, vd) ->
+    fprintf fmt "abort(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp mot pp vd;
   | Pi (l, r) ->
     fprintf fmt "Pi(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp l pp r;
   | Lam body ->

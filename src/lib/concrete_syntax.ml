@@ -33,6 +33,8 @@ and t =
   | Inl of t
   | Inr of t
   | Case of {mot : binder; inl : binder; inr : binder; coprod : t}
+  | Void
+  | Abort of {mot : binder; void : t}
   | Pi of cell list * t
   | Lam of bindern
   | Ap of t * spine list
