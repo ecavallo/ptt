@@ -20,16 +20,19 @@ let keywords =
   make_table 0 [
     ("unit", UNIT);
     ("triv", TRIV);
+    ("nat", NAT);
     ("zero", ZERO);
     ("suc", SUC);
-    ("nat", NAT);
-    ("tt", TRUE);
-    ("ff", FALSE);
     ("list", LIST);
     ("nil", NIL);
     ("cons", CONS);
     ("listrec", LISTREC);
     ("bool", BOOL);
+    ("tt", TRUE);
+    ("ff", FALSE);
+    ("inl", INL);
+    ("inr", INR);
+    ("case", CASE);
     ("let", LET);
     ("in", IN);
     ("with", WITH);
@@ -87,6 +90,8 @@ rule token = parse
     { TIMES }
   | "×"
     { TIMES }
+  | "+"
+    { PLUS }
   | ':'
     { COLON }
   | ';'

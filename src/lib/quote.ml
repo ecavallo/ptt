@@ -85,6 +85,7 @@ and reduce_extent env size es =
     | D.NRec (tp, zero, suc) :: s -> E.do_rec size tp zero suc (go env size (e, s))
     | D.ListRec (_, mot, nil, cons) :: s -> E.do_list_rec size mot nil cons (go env size (e, s))
     | D.If (mot, tt, ff) :: s -> E.do_if size mot tt ff (go env size (e, s))
+    | D.Case (_, _, mot, inl, inr) :: s -> E.do_case size mot inl inr (go env size (e, s))
     | D.Fst :: s -> E.do_fst (go env size (e, s))
     | D.Snd :: s -> E.do_snd size (go env size (e, s))
     | D.BApp r :: s -> E.do_bapp size (go env size (e, s)) r
@@ -102,6 +103,8 @@ and reduce_extent env size es =
         | D.SgDom -> E.do_sg_dom (go env size (e,s))
         | D.SgCod a -> E.do_sg_cod size (go env size (e,s)) a
         | D.ListTp -> E.do_list_tp (go env size (e,s))
+        | D.CoprodLeft -> E.do_coprod_left (go env size (e,s))
+        | D.CoprodRight -> E.do_coprod_right (go env size (e,s))
         | D.IdLeft -> E.do_id_left (go env size (e,s))
         | D.IdRight -> E.do_id_right (go env size (e,s))
         | D.IdTp -> E.do_id_tp (go env size (e,s))
@@ -150,6 +153,11 @@ and read_back_nf env size nf =
   (* Booleans *)
   | D.Normal {tp = D.Bool; term = D.True} -> Syn.True
   | D.Normal {tp = D.Bool; term = D.False} -> Syn.False
+  (* Coproducts *)
+  | D.Normal {tp = D.Coprod (tp, _); term = D.Inl term} ->
+    Syn.Inl (read_back_nf env size (D.Normal {tp; term}))
+  | D.Normal {tp = D.Coprod (_, tp); term = D.Inr term} ->
+    Syn.Inr (read_back_nf env size (D.Normal {tp; term}))
   (* Bridge *)
   | D.Normal {tp = D.Bridge (dest, _); term} ->
     let (arg, arg_env) = mk_bvar env size in
@@ -193,6 +201,7 @@ and read_back_tp env size d =
   | D.Nat -> Syn.Nat
   | D.List t -> Syn.List (read_back_tp env size t)
   | D.Bool -> Syn.Bool
+  | D.Coprod (t1, t2) -> Syn.Coprod (read_back_tp env size t1, read_back_tp env size t2)
   | D.Pi (src, dest) ->
     let (arg, arg_env) = mk_var src env size in
     Syn.Pi
@@ -288,6 +297,19 @@ and read_back_ne env size (h, s) =
     let ff_tp = E.do_clos size mot (D.Tm D.False) in
     let ff' = read_back_nf env size (D.Normal {tp = ff_tp; term = ff}) in
     Syn.If (mot', tt', ff', read_back_ne env size (h, s))
+  | D.Case (left, right, mot, inl, inr) :: s ->
+    let (mot_arg, mot_env) = mk_var (D.Coprod (left, right)) env size in
+    let applied_mot = E.do_clos (size + 1) mot (D.Tm mot_arg) in
+    let mot' = read_back_tp mot_env (size + 1) applied_mot in
+    let (inl_arg, inl_env) = mk_var left env size in
+    let inl_mot = E.do_clos (size + 1) mot (D.Tm (D.Inl inl_arg)) in
+    let applied_inl = E.do_clos (size + 1) inl (D.Tm inl_arg) in
+    let inl' = read_back_nf inl_env (size + 1) (D.Normal {tp = inl_mot; term = applied_inl}) in
+    let (inr_arg, inr_env) = mk_var right env size in
+    let inr_mot = E.do_clos (size + 1) mot (D.Tm (D.Inr inr_arg)) in
+    let applied_inr = E.do_clos (size + 1) inr (D.Tm inr_arg) in
+    let inr' = read_back_nf inr_env (size + 1) (D.Normal {tp = inr_mot; term = applied_inr}) in
+    Syn.Case (mot', inl', inr', read_back_ne env size (h, s))
   | D.Fst :: s -> Syn.Fst (read_back_ne env size (h, s))
   | D.Snd :: s -> Syn.Snd (read_back_ne env size (h, s))
   | D.BApp r :: s ->
@@ -398,6 +420,13 @@ let rec check_nf env size nf1 nf2 =
     D.Normal {tp = D.Bool; term = D.True} -> true
   | D.Normal {tp = D.Bool; term = D.False},
     D.Normal {tp = D.Bool; term = D.False} -> true
+  (* Coproducts *)
+  | D.Normal {tp = D.Coprod (tp, _); term = D.Inl term1},
+    D.Normal {tp = D.Coprod (_, _); term = D.Inl term2} ->
+    check_nf env size (D.Normal {tp; term = term1}) (D.Normal {tp; term = term2})
+  | D.Normal {tp = D.Coprod (_, tp); term = D.Inr term1},
+    D.Normal {tp = D.Coprod (_, _); term = D.Inr term2} ->
+    check_nf env size (D.Normal {tp; term = term1}) (D.Normal {tp; term = term2})
   (* Id *)
   | D.Normal {tp = D.Id (tp, _, _); term = D.Refl term1},
     D.Normal {tp = D.Id (_, _, _); term = D.Refl term2} ->
@@ -526,6 +555,27 @@ and check_ne env size (h1, s1) (h2, s2) =
     let ff_tp = E.do_clos size mot1 (D.Tm D.False) in
     check_nf env size (D.Normal {tp = ff_tp; term = ff1}) (D.Normal {tp = ff_tp; term = ff2}) &&
     check_ne env size (h1, s1) (h2, s2)
+  | D.Case (left, right, mot1, inl1, inr1) :: s1,
+    D.Case (_, _, mot2, inl2, inr2) :: s2 ->
+    let (mot_arg, mot_env) = mk_var (D.Coprod (left, right)) env size in
+    let applied_mot1 = E.do_clos (size + 1) mot1 (D.Tm mot_arg) in
+    let applied_mot2 = E.do_clos (size + 1) mot2 (D.Tm mot_arg) in
+    check_tp ~subtype:false mot_env (size + 1) applied_mot1 applied_mot2 &&
+    let (inl_arg, inl_env) = mk_var left env size in
+    let inl_mot = E.do_clos (size + 1) mot1 (D.Tm (D.Inl inl_arg)) in
+    let applied_inl1 = E.do_clos (size + 1) inl1 (D.Tm inl_arg) in
+    let applied_inl2 = E.do_clos (size + 1) inl2 (D.Tm inl_arg) in
+    check_nf inl_env (size + 1)
+      (D.Normal {tp = inl_mot; term = applied_inl1})
+      (D.Normal {tp = inl_mot; term = applied_inl2}) &&
+    let (inr_arg, inr_env) = mk_var right env size in
+    let inr_mot = E.do_clos (size + 1) mot1 (D.Tm (D.Inr inr_arg)) in
+    let applied_inr1 = E.do_clos (size + 1) inr1 (D.Tm inr_arg) in
+    let applied_inr2 = E.do_clos (size + 1) inr2 (D.Tm inr_arg) in
+    check_nf inr_env (size + 1)
+      (D.Normal {tp = inr_mot; term = applied_inr1})
+      (D.Normal {tp = inr_mot; term = applied_inr2}) &&
+    check_ne env size (h1, s1) (h2, s2)
   | D.Fst :: s1, D.Fst :: s2  -> check_ne env size (h1, s1) (h2, s2)
   | D.Snd :: s1, D.Snd :: s2 -> check_ne env size (h1, s1) (h2, s2)
   | D.BApp i1 :: s1, D.BApp i2 :: s2 ->
@@ -620,6 +670,9 @@ and check_tp ~subtype env size d1 d2 =
   | D.Nat, D.Nat -> true
   | D.List t, D.List t' -> check_tp ~subtype env size t t'
   | D.Bool, D.Bool -> true
+  | D.Coprod (a, b), D.Coprod (a', b') ->
+    check_tp ~subtype env size a a' &&
+    check_tp ~subtype env size b b'
   | D.Id (tp1, left1, right1), D.Id (tp2, left2, right2) ->
     check_tp ~subtype env size tp1 tp2 &&
     check_nf env size (D.Normal {tp = tp1; term = left1}) (D.Normal {tp = tp1; term = left2}) &&

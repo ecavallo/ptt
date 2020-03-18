@@ -73,6 +73,17 @@ and do_if size mot tt ff b =
     D.Neutral {tp = final_tp; term = D.(If (mot, tt, ff) @: term)}
   | _ -> raise (Eval_failed "Not a boolean")
 
+and do_case size mot inl inr co =
+  match co with
+  | D.Inl t -> do_clos size inl (D.Tm t)
+  | D.Inr t -> do_clos size inr (D.Tm t)
+  | D.Neutral {term; tp} ->
+    let left = do_coprod_left tp in
+    let right = do_coprod_right tp in
+    let final_tp = do_clos size mot (D.Tm co) in
+    D.Neutral {tp = final_tp; term = D.(Case (left, right, mot, inl, inr) @: term)}
+  | _ -> raise (Eval_failed "Not a coproduct")
+
 and do_fst p =
   match p with
   | D.Pair (p1, _) -> p1
@@ -158,6 +169,20 @@ and do_list_tp tp =
     D.Neutral {tp; term = D.(Quasi ListTp @: term)}
   | _ -> raise (Eval_failed "Not something that can become a list type")
 
+and do_coprod_left tp =
+  match tp with
+  | D.Coprod (t, _) -> t
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi CoprodLeft @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a coproduct type")
+
+and do_coprod_right tp =
+  match tp with
+  | D.Coprod (_, t) -> t
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi CoprodRight @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a coproduct type")
+
 and do_id_tp tp = 
   match tp with 
   | D.Id (tp, _, _) -> tp
@@ -179,7 +204,6 @@ and do_id_right tp =
   | D.Neutral {tp; term} ->
     D.Neutral {tp = D.(Neutral {tp; term = Quasi IdTp @: term}); term = D.(Quasi IdRight @: term)}
   | _ -> raise (Eval_failed "Not something that can become a identity type")
-
 
 and do_bridge_cod size tp s =
   match tp with
@@ -305,6 +329,15 @@ and eval t (env : D.env) size =
       (eval tt env size)
       (eval ff env size)
       (eval b env size)
+  | Syn.Coprod (t1, t2) -> D.Coprod (eval t1 env size, eval t2 env size)
+  | Syn.Inl t -> D.Inl (eval t env size)
+  | Syn.Inr t -> D.Inr (eval t env size)
+  | Syn.Case (mot, inl, inr, co) ->
+    do_case size
+      (Clos {term = mot; env})
+      (Clos {term = inl; env})
+      (Clos {term = inr; env})
+      (eval co env size)
   | Syn.Pi (src, dest) ->
     D.Pi (eval src env size, (Clos {term = dest; env}))
   | Syn.Lam t -> D.Lam (Clos {term = t; env})

@@ -97,6 +97,19 @@ let rec bind env = function
   | CS.False -> S.False
   | CS.If {mot = Binder {name = mot_name; body = mot_body}; tt; ff; bool} ->
     S.If (bind (Term mot_name :: env) mot_body, bind env tt, bind env ff, bind env bool)
+  | CS.Coprod (left, right) -> S.Coprod (bind env left, bind env right)
+  | CS.Inl t -> S.Inl (bind env t)
+  | CS.Inr t -> S.Inr (bind env t)
+  | CS.Case
+      {mot = Binder {name = mot_name; body = mot_body};
+       inl = Binder {name = inl_name; body = inl_body};
+       inr = Binder {name = inr_name; body = inr_body};
+       coprod} ->
+    S.Case
+      (bind (Term mot_name :: env) mot_body,
+       bind (Term inl_name :: env) inl_body,
+       bind (Term inr_name :: env) inr_body,
+       bind env coprod)
   | CS.Lam (BinderN {names = []; body}) ->
     bind env body
   | CS.Lam (BinderN {names = x :: names; body}) ->

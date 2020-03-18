@@ -275,6 +275,26 @@ and check_inert ~mode ~env ~size ~term ~tp =
       | D.Uni _ -> ()
       | t -> tp_error (Expecting_universe t)
     end
+  | Coprod (left, right) ->
+    begin
+      match tp with
+      | D.Uni _ ->
+        check ~mode ~env ~size ~term:left ~tp;
+        check ~mode ~env ~size ~term:right ~tp
+      | t -> tp_error (Expecting_universe t)
+    end
+  | Inl a ->
+    begin
+      match tp with
+      | D.Coprod (left, _) -> check ~mode ~env ~size ~term:a ~tp:left
+      | t -> tp_error (Expecting_of ("Coprod", t))
+    end
+  | Inr b ->
+    begin
+      match tp with
+      | D.Coprod (_, right) -> check ~mode ~env ~size ~term:b ~tp:right
+      | t -> tp_error (Expecting_of ("Coprod", t))
+    end
   | Id (tp', l, r) ->
     begin
       match tp with
@@ -520,6 +540,22 @@ and synth_quasi ~mode ~env ~size ~term =
     let ff_tp = E.eval mot (D.Tm D.False :: sem_env) size in
     check ~mode ~env ~size ~term:ff ~tp:ff_tp;
     E.eval mot (D.Tm (E.eval b sem_env size) :: sem_env) size
+  | Case (mot, inl, inr, co) ->
+    begin
+      match synth ~mode ~env ~size ~term:co with
+      | D.Coprod (left, right) ->
+        let sem_env = env_to_sem_env env in
+        let (_, mot_env) = mk_var (D.Coprod (left, right)) env size in
+        check_tp ~mode ~env:mot_env ~size:(size + 1) ~term:mot;
+        let (inl_arg, inl_env) = mk_var left env size in
+        check ~mode ~env:inl_env ~size:(size + 1) ~term:inl
+          ~tp:(E.eval mot (D.Tm (D.Inl inl_arg) :: sem_env) (size + 1));
+        let (inr_arg, inr_env) = mk_var right env size in
+        check ~mode ~env:inr_env ~size:(size + 1) ~term:inr
+          ~tp:(E.eval mot (D.Tm (D.Inr inr_arg) :: sem_env) (size + 1));
+        E.eval mot (D.Tm (E.eval co sem_env size) :: sem_env) size
+      | t -> tp_error (Expecting_of ("Coprod", t))
+    end
   | BApp (term, r) ->
     let restricted_env = restrict_env r env in
     begin
@@ -625,6 +661,9 @@ and check_tp ~mode ~env ~size ~term =
   | Syn.Nat -> ()
   | Syn.List term -> check_tp ~mode ~env ~size ~term
   | Syn.Bool -> ()
+  | Syn.Coprod (left, right) ->
+    check_tp ~mode ~env ~size ~term:left;
+    check_tp ~mode ~env ~size ~term:right
   | Uni _ -> ()
   | Bridge (term, ends) ->
     let width = List.length ends in

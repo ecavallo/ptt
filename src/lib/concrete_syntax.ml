@@ -29,6 +29,10 @@ and t =
   | True
   | False
   | If of {mot : binder; tt : t; ff : t; bool : t}
+  | Coprod of t * t
+  | Inl of t
+  | Inr of t
+  | Case of {mot : binder; inl : binder; inr : binder; coprod : t}
   | Pi of cell list * t
   | Lam of bindern
   | Ap of t * spine list

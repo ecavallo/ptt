@@ -16,6 +16,7 @@ type t =
   | Nat | Zero | Suc of t | NRec of (* BINDS *) t * t * (* BINDS 2 *) t * t
   | List of t | Nil | Cons of t * t | ListRec of (* BINDS *) t * t * (* BINDS 3 *) t * t
   | Bool | True | False | If of (* BINDS *) t * t * t * t
+  | Coprod of t * t | Inl of t | Inr of t | Case of (* BINDS *) t * (* BINDS *) t * (* BINDS *) t * t
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
   | Sg of t * (* BINDS *) t | Pair of t * t | Fst of t | Snd of t
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
@@ -62,6 +63,11 @@ let unsubst_bvar i t =
     | Bool -> Bool
     | True -> True
     | False -> False
+    | Coprod (t1, t2) -> Coprod (go depth t1, go depth t2)
+    | Inl t -> Inl (go depth t)
+    | Inr t -> Inr (go depth t)
+    | Case (mot, inl, inr, co) ->
+      Case (go (depth + 1) mot, go (depth + 1) inl, go (depth + 1) inr, go depth co)
     | If (mot, tt, ff, b) ->
       If (go (depth + 1) mot, go depth tt, go depth ff, go depth b)
     | Pi (l, r) -> Pi (go depth l, go (depth + 1) r)
@@ -162,6 +168,12 @@ let rec pp fmt =
   | If (mot, tt, ff, b) ->
     fprintf fmt "if(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
       pp mot pp tt pp ff pp b;
+  | Coprod (t1, t2) -> fprintf fmt "coprod(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp t1 pp t2
+  | Inl t -> fprintf fmt "inl(@[<hov>%a@])" pp t
+  | Inr t -> fprintf fmt "inr(@[<hov>%a@])" pp t
+  | Case (mot, inl, inr, co) ->
+    fprintf fmt "case(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
+      pp mot pp inl pp inr pp co;
   | Pi (l, r) ->
     fprintf fmt "Pi(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp l pp r;
   | Lam body ->

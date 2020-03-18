@@ -29,6 +29,9 @@ and t =
   | Bool
   | True
   | False
+  | Coprod of t * t
+  | Inl of t
+  | Inr of t
   | Pi of t * clos
   | Sg of t * clos
   | Pair of t * t
@@ -55,6 +58,7 @@ and cell =
   | NRec of clos * t * clos2
   | ListRec of t * clos * t * clos3
   | If of clos * t * t
+  | Case of t * t * clos * clos * clos
   | J of clos3 * clos * t * t * t
   | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
   | Uncodisc
@@ -66,6 +70,8 @@ and quasi_cell =
   | SgDom
   | SgCod of t
   | ListTp
+  | CoprodLeft
+  | CoprodRight
   | IdTp
   | IdLeft
   | IdRight
