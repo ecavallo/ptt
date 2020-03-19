@@ -30,9 +30,16 @@ and t =
   | Nat
   | Zero
   | Suc of t
+  | List of t
+  | Nil
+  | Cons of t * t
   | Bool
   | True
   | False
+  | Coprod of t * t
+  | Inl of t
+  | Inr of t
+  | Void
   | Pi of t * clos
   | Sg of t * clos
   | Pair of t * t
@@ -60,7 +67,10 @@ and cell =
   | Snd
   | BApp of dim
   | NRec of clos * t * clos2
+  | ListRec of t * clos * t * clos3
   | If of clos * t * t
+  | Case of t * t * clos * clos * clos
+  | Abort of clos
   | J of clos3 * clos * t * t * t
   | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
   | Uncodisc
@@ -72,6 +82,9 @@ and quasi_cell =
   | PiCod of t
   | SgDom
   | SgCod of t
+  | ListTp
+  | CoprodLeft
+  | CoprodRight
   | IdTp
   | IdLeft
   | IdRight
@@ -135,9 +148,16 @@ and instantiate r i = function
   | Nat -> Nat
   | Zero -> Zero
   | Suc t -> Suc (instantiate r i t)
+  | List t -> List (instantiate r i t)
+  | Nil -> Nil
+  | Cons (a, t) -> Cons (instantiate r i a, instantiate r i t)
   | Bool -> Bool
   | True -> True
   | False -> False
+  | Coprod (t1, t2) -> Coprod (instantiate r i t1, instantiate r i t2)
+  | Inl t -> Inl (instantiate r i t)
+  | Inr t -> Inr (instantiate r i t)
+  | Void -> Void
   | Pi (src, dst) -> Pi (instantiate r i src, instantiate_clos r i dst)
   | Sg (src, dst) -> Sg (instantiate r i src, instantiate_clos r i dst)
   | Pair (t, u) -> Pair (instantiate r i t, instantiate r i u)
@@ -176,11 +196,29 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
          instantiate r i zero,
          instantiate_clos2 r i suc)
       @: go r i (h, s)
+    | ListRec (tp, mot, nil, cons) :: s ->
+      ListRec
+        (instantiate r i tp,
+         instantiate_clos r i mot,
+         instantiate r i nil,
+         instantiate_clos3 r i cons)
+      @: go r i (h, s)
     | If (mot, tt, ff) :: s ->
       If
         (instantiate_clos r i mot,
          instantiate r i tt,
          instantiate r i ff)
+      @: go r i (h, s)
+    | Case (left, right, mot, inl, inr) :: s ->
+      Case
+        (instantiate r i left,
+         instantiate r i right,
+         instantiate_clos r i mot,
+         instantiate_clos r i inl,
+         instantiate_clos r i inr)
+      @: go r i (h, s)
+    | Abort mot :: s ->
+      Abort (instantiate_clos r i mot)
       @: go r i (h, s)
     | J (mot, refl, tp, left, right) :: s ->
       J
@@ -214,6 +252,9 @@ and instantiate_quasi_cell r i =
   | PiCod v -> PiCod (instantiate r i v)
   | SgDom -> SgDom 
   | SgCod v -> SgCod (instantiate r i v)
+  | ListTp -> ListTp
+  | CoprodLeft -> CoprodLeft
+  | CoprodRight -> CoprodRight
   | IdLeft -> IdLeft
   | IdRight -> IdRight
   | IdTp -> IdTp

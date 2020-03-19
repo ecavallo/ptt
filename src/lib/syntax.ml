@@ -14,7 +14,10 @@ type t =
   | Let of t * (* BINDS *) t | Check of t * t
   | Unit | Triv
   | Nat | Zero | Suc of t | NRec of (* BINDS *) t * t * (* BINDS 2 *) t * t
+  | List of t | Nil | Cons of t * t | ListRec of (* BINDS *) t * t * (* BINDS 3 *) t * t
   | Bool | True | False | If of (* BINDS *) t * t * t * t
+  | Coprod of t * t | Inl of t | Inr of t | Case of (* BINDS *) t * (* BINDS *) t * (* BINDS *) t * t
+  | Void | Abort of (* BINDS *) t * t
   | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
   | Sg of t * (* BINDS *) t | Pair of t * t | Fst of t | Snd of t
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
@@ -53,11 +56,23 @@ let unsubst_bvar i t =
     | Suc t -> Suc (go depth t)
     | NRec (mot, zero, suc, n) ->
       NRec (go (depth + 1) mot, go depth zero, go (depth + 2) suc, go depth n)
+    | List t -> List (go depth t)
+    | Nil -> Nil
+    | Cons (a, t) -> Cons (go depth a, go depth t)
+    | ListRec (mot, nil, cons, l) ->
+      ListRec (go (depth + 1) mot, go depth nil, go (depth + 3) cons, go depth l)
     | Bool -> Bool
     | True -> True
     | False -> False
     | If (mot, tt, ff, b) ->
       If (go (depth + 1) mot, go depth tt, go depth ff, go depth b)
+    | Coprod (t1, t2) -> Coprod (go depth t1, go depth t2)
+    | Inl t -> Inl (go depth t)
+    | Inr t -> Inr (go depth t)
+    | Case (mot, inl, inr, co) ->
+      Case (go (depth + 1) mot, go (depth + 1) inl, go (depth + 1) inr, go depth co)
+    | Void -> Void
+    | Abort (mot, vd) -> Abort (go (depth + 1) mot, go depth vd)
     | Pi (l, r) -> Pi (go depth l, go (depth + 1) r)
     | Lam body -> Lam (go (depth + 1) body)
     | Ap (l, r) -> Ap (go depth l, go depth r)
@@ -144,12 +159,27 @@ let rec pp fmt =
   | NRec (mot, zero, suc, n) ->
     fprintf fmt "rec(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
       pp mot pp zero pp suc pp n;
+  | List t -> fprintf fmt "list(@[<hov>%a@])" pp t
+  | Nil -> fprintf fmt "nil"
+  | Cons (a, t) -> fprintf fmt "cons(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp a pp t
+  | ListRec (mot, nil, cons, l) ->
+    fprintf fmt "listrec(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
+      pp mot pp nil pp cons pp l;
   | Bool -> fprintf fmt "bool"
   | True -> fprintf fmt "true"
   | False -> fprintf fmt "false"
   | If (mot, tt, ff, b) ->
     fprintf fmt "if(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
       pp mot pp tt pp ff pp b;
+  | Coprod (t1, t2) -> fprintf fmt "coprod(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp t1 pp t2
+  | Inl t -> fprintf fmt "inl(@[<hov>%a@])" pp t
+  | Inr t -> fprintf fmt "inr(@[<hov>%a@])" pp t
+  | Case (mot, inl, inr, co) ->
+    fprintf fmt "case(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
+      pp mot pp inl pp inr pp co;
+  | Void -> fprintf fmt "void"
+  | Abort (mot, vd) ->
+    fprintf fmt "abort(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp mot pp vd;
   | Pi (l, r) ->
     fprintf fmt "Pi(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp l pp r;
   | Lam body ->

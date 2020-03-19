@@ -21,10 +21,20 @@ and t =
   | Suc of t
   | Lit of int
   | NRec of {mot : binder; zero : t; suc : binder2; nat : t}
+  | List of t
+  | Nil
+  | Cons of t * t
+  | ListRec of {mot : binder; nil : t; cons : binder3; list : t}
   | Bool
   | True
   | False
   | If of {mot : binder; tt : t; ff : t; bool : t}
+  | Coprod of t * t
+  | Inl of t
+  | Inr of t
+  | Case of {mot : binder; inl : binder; inr : binder; coprod : t}
+  | Void
+  | Abort of {mot : binder; void : t}
   | Pi of cell list * t
   | Lam of bindern
   | Ap of t * spine list

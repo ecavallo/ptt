@@ -14,11 +14,14 @@
 %token GLOBAL ENGLOBE UNGLOBE
 %token CODISC ENCODISC UNCODISC
 %token UNIT TRIV
-%token REC SUC NAT ZERO
-%token IF TRUE FALSE BOOL
+%token NAT ZERO SUC REC
+%token LIST NIL CONS LISTREC
+%token BOOL TRUE FALSE IF
+%token PLUS INL INR CASE
+%token VOID ABORT
+%token ID REFL MATCH
 %token UNIV
 %token QUIT NORMALIZE
-%token ID REFL MATCH
 %token PAR PT
 %token EOF
 
@@ -75,6 +78,8 @@ atomic:
     { Triv }
   | ZERO
     { Lit 0 }
+  | NIL
+    { Nil }
   | TRUE
     { True }
   | FALSE
@@ -85,6 +90,7 @@ atomic:
     { Uni i }
   | NAT { Nat }
   | BOOL { Bool }
+  | VOID { Void }
   | LANGLE left = term; COMMA; right = term; RANGLE
     { Pair (left, right) }
   | LBR; name = name; RBR; body = term; endpoints = endpoint_options
@@ -120,7 +126,18 @@ term:
         zero = zero_case;
         suc = Binder2 {name1 = suc_var; name2 = ih_var; body = suc_case};
         nat = n
-      } }
+    } }
+  | LIST; t = atomic { List t }
+  | CONS; a = atomic; t = atomic { Cons (a, t) }
+  | LISTREC; l = term; AT; mot_name = name; RIGHT_ARROW; mot = term; WITH;
+    PIPE; NIL; RIGHT_ARROW; nil_case = term;
+    PIPE; CONS; a_var = name; t_var = name; COMMA; ih_var = name; RIGHT_ARROW; cons_case = term
+    { ListRec {
+        mot = Binder {name = mot_name; body = mot};
+        nil = nil_case;
+        cons = Binder3 {name1 = a_var; name2 = t_var; name3 = ih_var; body = cons_case};
+        list = l
+    } }
   | IF; b = term; AT; mot_name = name; RIGHT_ARROW; mot = term; WITH;
     PIPE; TRUE; RIGHT_ARROW; true_case = term;
     PIPE; FALSE; RIGHT_ARROW; false_case = term;
@@ -129,7 +146,21 @@ term:
         tt = true_case;
         ff = false_case;
         bool = b
-      } }
+    } }
+  | left = atomic; PLUS; right = atomic { Coprod(left, right) }
+  | INL; t = atomic { Inl t }
+  | INR; t = atomic { Inr t }
+  | CASE; coprod = term; AT; mot_name = name; RIGHT_ARROW; mot = term; WITH;
+    PIPE; INL; inl_name = name; RIGHT_ARROW; inl = term;
+    PIPE; INR; inr_name = name; RIGHT_ARROW; inr = term
+    { Case {
+        mot = Binder {name = mot_name; body = mot};
+        inl = Binder {name = inl_name; body = inl};
+        inr = Binder {name = inr_name; body = inr};
+        coprod
+    } }
+  | ABORT; void = term; AT; name = name; RIGHT_ARROW; body = term
+    { Abort {mot = Binder {name; body}; void} }
   | ID; tp = atomic; left = atomic; right = atomic
     { Id (tp, left, right) }
   | REFL; t = atomic

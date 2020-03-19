@@ -23,9 +23,16 @@ and t =
   | Nat
   | Zero
   | Suc of t
+  | List of t
+  | Nil
+  | Cons of t * t
   | Bool
   | True
   | False
+  | Coprod of t * t
+  | Inl of t
+  | Inr of t
+  | Void
   | Pi of t * clos
   | Sg of t * clos
   | Pair of t * t
@@ -50,7 +57,10 @@ and cell =
   | Snd
   | BApp of dim
   | NRec of clos * t * clos2
+  | ListRec of t * clos * t * clos3
   | If of clos * t * t
+  | Case of t * t * clos * clos * clos
+  | Abort of clos
   | J of clos3 * clos * t * t * t
   | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
   | Uncodisc
@@ -61,6 +71,9 @@ and quasi_cell =
   | PiCod of t
   | SgDom
   | SgCod of t
+  | ListTp
+  | CoprodLeft
+  | CoprodRight
   | IdTp
   | IdLeft
   | IdRight

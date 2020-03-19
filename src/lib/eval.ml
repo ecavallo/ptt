@@ -53,6 +53,17 @@ and do_rec size tp zero suc n =
     D.Neutral {tp = final_tp; term = D.(NRec (tp, zero, suc) @: term)}
   | _ -> raise (Eval_failed "Not a number")
 
+and do_list_rec size mot nil cons l =
+  match l with
+  | D.Nil -> nil
+  | D.Cons (a, l) ->
+    do_clos3 size cons a l (do_list_rec size mot nil cons l)
+  | D.Neutral {term; tp} ->
+    let dom = do_list_tp tp in
+    let final_tp = do_clos size mot (D.Tm l) in
+    D.Neutral {tp = final_tp; term = D.(ListRec (dom, mot, nil, cons) @: term)}
+  | _ -> raise (Eval_failed "Not a list")
+
 and do_if size mot tt ff b =
   match b with
   | D.True -> tt
@@ -60,7 +71,25 @@ and do_if size mot tt ff b =
   | D.Neutral {term; _} ->
     let final_tp = do_clos size mot (D.Tm b) in
     D.Neutral {tp = final_tp; term = D.(If (mot, tt, ff) @: term)}
-  | _ -> raise (Eval_failed "Not a number")
+  | _ -> raise (Eval_failed "Not a boolean")
+
+and do_case size mot inl inr co =
+  match co with
+  | D.Inl t -> do_clos size inl (D.Tm t)
+  | D.Inr t -> do_clos size inr (D.Tm t)
+  | D.Neutral {term; tp} ->
+    let left = do_coprod_left tp in
+    let right = do_coprod_right tp in
+    let final_tp = do_clos size mot (D.Tm co) in
+    D.Neutral {tp = final_tp; term = D.(Case (left, right, mot, inl, inr) @: term)}
+  | _ -> raise (Eval_failed "Not a coproduct")
+
+and do_abort size mot vd =
+  match vd with
+  | D.Neutral {term; _} ->
+    let final_tp = do_clos size mot (D.Tm vd) in
+    D.Neutral {tp = final_tp; term = D.(Abort mot @: term)}
+  | _ -> raise (Eval_failed "Not a void")
 
 and do_fst p =
   match p with
@@ -140,6 +169,27 @@ and do_unglobe t =
     D.Neutral {tp = do_global_tp tp; term = D.(Unglobe @: term)}
   | _ -> raise (Eval_failed "Couldn't unglobe argument in do_unglobe")
 
+and do_list_tp tp =
+  match tp with
+  | D.List tp -> tp
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi ListTp @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a list type")
+
+and do_coprod_left tp =
+  match tp with
+  | D.Coprod (t, _) -> t
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi CoprodLeft @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a coproduct type")
+
+and do_coprod_right tp =
+  match tp with
+  | D.Coprod (_, t) -> t
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi CoprodRight @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a coproduct type")
+
 and do_id_tp tp = 
   match tp with 
   | D.Id (tp, _, _) -> tp
@@ -161,7 +211,6 @@ and do_id_right tp =
   | D.Neutral {tp; term} ->
     D.Neutral {tp = D.(Neutral {tp; term = Quasi IdTp @: term}); term = D.(Quasi IdRight @: term)}
   | _ -> raise (Eval_failed "Not something that can become a identity type")
-
 
 and do_bridge_cod size tp s =
   match tp with
@@ -261,6 +310,7 @@ and eval t (env : D.env) size =
   | Syn.Unit -> D.Unit
   | Syn.Triv -> D.Triv
   | Syn.Nat -> D.Nat
+  | Syn.List t -> D.List (eval t env size)
   | Syn.Zero -> D.Zero
   | Syn.Suc t -> D.Suc (eval t env size)
   | Syn.NRec (tp, zero, suc, n) ->
@@ -269,6 +319,14 @@ and eval t (env : D.env) size =
       (eval zero env size)
       (Clos2 {term = suc; env})
       (eval n env size)
+  | Syn.Nil -> D.Nil
+  | Syn.Cons (a, t) -> D.Cons (eval a env size, eval t env size)
+  | Syn.ListRec (mot, nil, cons, l) ->
+    do_list_rec size
+      (Clos {term = mot; env})
+      (eval nil env size)
+      (Clos3 {term = cons; env})
+      (eval l env size)
   | Syn.Bool -> D.Bool
   | Syn.True -> D.True
   | Syn.False -> D.False
@@ -278,6 +336,18 @@ and eval t (env : D.env) size =
       (eval tt env size)
       (eval ff env size)
       (eval b env size)
+  | Syn.Coprod (t1, t2) -> D.Coprod (eval t1 env size, eval t2 env size)
+  | Syn.Inl t -> D.Inl (eval t env size)
+  | Syn.Inr t -> D.Inr (eval t env size)
+  | Syn.Case (mot, inl, inr, co) ->
+    do_case size
+      (Clos {term = mot; env})
+      (Clos {term = inl; env})
+      (Clos {term = inr; env})
+      (eval co env size)
+  | Syn.Void -> D.Void
+  | Syn.Abort (mot, vd) ->
+    do_abort size (Clos {term = mot; env}) (eval vd env size)
   | Syn.Pi (src, dest) ->
     D.Pi (eval src env size, (Clos {term = dest; env}))
   | Syn.Lam t -> D.Lam (Clos {term = t; env})

@@ -83,7 +83,10 @@ and reduce_extent env size es =
     | [] -> reduce_extent_head env size e
     | D.Ap (Normal {term; _}) :: s -> E.do_ap size (go env size (e, s)) term
     | D.NRec (tp, zero, suc) :: s -> E.do_rec size tp zero suc (go env size (e, s))
+    | D.ListRec (_, mot, nil, cons) :: s -> E.do_list_rec size mot nil cons (go env size (e, s))
     | D.If (mot, tt, ff) :: s -> E.do_if size mot tt ff (go env size (e, s))
+    | D.Case (_, _, mot, inl, inr) :: s -> E.do_case size mot inl inr (go env size (e, s))
+    | D.Abort mot :: s -> E.do_abort size mot (go env size (e, s))
     | D.Fst :: s -> E.do_fst (go env size (e, s))
     | D.Snd :: s -> E.do_snd size (go env size (e, s))
     | D.BApp r :: s -> E.do_bapp size (go env size (e, s)) r
@@ -100,6 +103,9 @@ and reduce_extent env size es =
         | D.PiCod a -> E.do_pi_cod size (go env size (e,s)) a
         | D.SgDom -> E.do_sg_dom (go env size (e,s))
         | D.SgCod a -> E.do_sg_cod size (go env size (e,s)) a
+        | D.ListTp -> E.do_list_tp (go env size (e,s))
+        | D.CoprodLeft -> E.do_coprod_left (go env size (e,s))
+        | D.CoprodRight -> E.do_coprod_right (go env size (e,s))
         | D.IdLeft -> E.do_id_left (go env size (e,s))
         | D.IdRight -> E.do_id_right (go env size (e,s))
         | D.IdTp -> E.do_id_tp (go env size (e,s))
@@ -139,9 +145,20 @@ and read_back_nf env size nf =
   | D.Normal {tp = D.Nat; term = D.Zero} -> Syn.Zero
   | D.Normal {tp = D.Nat; term = D.Suc nf} ->
     Syn.Suc (read_back_nf env size (D.Normal {tp = D.Nat; term = nf}))
+  (* Lists *)
+  | D.Normal {tp = D.List _; term = D.Nil} -> Syn.Nil
+  | D.Normal {tp = D.List tp; term = D.Cons (a, t)} ->
+    Syn.Cons
+      (read_back_nf env size (D.Normal {tp; term = a}),
+       read_back_nf env size (D.Normal {tp = D.List tp; term = t}))
   (* Booleans *)
   | D.Normal {tp = D.Bool; term = D.True} -> Syn.True
   | D.Normal {tp = D.Bool; term = D.False} -> Syn.False
+  (* Coproducts *)
+  | D.Normal {tp = D.Coprod (tp, _); term = D.Inl term} ->
+    Syn.Inl (read_back_nf env size (D.Normal {tp; term}))
+  | D.Normal {tp = D.Coprod (_, tp); term = D.Inr term} ->
+    Syn.Inr (read_back_nf env size (D.Normal {tp; term}))
   (* Bridge *)
   | D.Normal {tp = D.Bridge (dest, _); term} ->
     let (arg, arg_env) = mk_bvar env size in
@@ -183,7 +200,10 @@ and read_back_tp env size d =
   match d with
   | D.Unit -> Syn.Unit
   | D.Nat -> Syn.Nat
+  | D.List t -> Syn.List (read_back_tp env size t)
   | D.Bool -> Syn.Bool
+  | D.Coprod (t1, t2) -> Syn.Coprod (read_back_tp env size t1, read_back_tp env size t2)
+  | D.Void -> Syn.Void
   | D.Pi (src, dest) ->
     let (arg, arg_env) = mk_var src env size in
     Syn.Pi
@@ -245,7 +265,6 @@ and read_back_ne env size (h, s) =
     end
   | D.Ap arg :: s ->
     Syn.Ap (read_back_ne env size (h, s), read_back_nf env size arg)
-
   | D.NRec (tp, zero, suc) :: s ->
     let (nat_arg, nat_env) = mk_var D.Nat env size in
     let applied_tp = E.do_clos (size + 1) tp (D.Tm nat_arg) in
@@ -257,6 +276,20 @@ and read_back_ne env size (h, s) =
     let applied_suc = E.do_clos2 (size + 2) suc (D.Tm nat_arg) (D.Tm suc_arg) in
     let suc' = read_back_nf suc_env (size + 2) (D.Normal {tp = applied_suc_tp; term = applied_suc}) in
     Syn.NRec (tp', zero', suc', read_back_ne env size (h, s))
+  | D.ListRec (tp, mot, nil, cons) :: s ->
+    let (list_arg, list_env) = mk_var (D.List tp) env size in
+    let applied_mot = E.do_clos (size + 1) mot (D.Tm list_arg) in
+    let mot' = read_back_tp list_env (size + 1) applied_mot in
+    let nil_mot = E.do_clos size mot (D.Tm D.Nil) in
+    let nil' = read_back_nf env size (D.Normal {tp = nil_mot; term = nil}) in
+    let (cons_arg1, cons_env1) = mk_var tp env size in
+    let (cons_arg2, cons_env2) = mk_var (D.List tp) cons_env1 (size + 1) in
+    let rec_mot = E.do_clos (size + 2) mot (D.Tm cons_arg2) in
+    let (cons_arg3, cons_env3) = mk_var rec_mot cons_env2 (size + 2) in
+    let cons_mot = E.do_clos (size + 3) mot (D.Tm (D.Cons (cons_arg1, cons_arg2))) in
+    let applied_cons = E.do_clos3 (size + 3) cons cons_arg1 cons_arg2 cons_arg3 in
+    let cons' = read_back_nf cons_env3 (size + 3) (D.Normal {tp = cons_mot; term = applied_cons}) in
+    Syn.ListRec (mot', nil', cons', read_back_ne env size (h, s))
   | D.If (mot, tt, ff) :: s ->
     let (bool_arg, bool_env) = mk_var D.Bool env size in
     let applied_mot = E.do_clos (size + 1) mot (D.Tm bool_arg) in
@@ -266,6 +299,24 @@ and read_back_ne env size (h, s) =
     let ff_tp = E.do_clos size mot (D.Tm D.False) in
     let ff' = read_back_nf env size (D.Normal {tp = ff_tp; term = ff}) in
     Syn.If (mot', tt', ff', read_back_ne env size (h, s))
+  | D.Case (left, right, mot, inl, inr) :: s ->
+    let (mot_arg, mot_env) = mk_var (D.Coprod (left, right)) env size in
+    let applied_mot = E.do_clos (size + 1) mot (D.Tm mot_arg) in
+    let mot' = read_back_tp mot_env (size + 1) applied_mot in
+    let (inl_arg, inl_env) = mk_var left env size in
+    let inl_mot = E.do_clos (size + 1) mot (D.Tm (D.Inl inl_arg)) in
+    let applied_inl = E.do_clos (size + 1) inl (D.Tm inl_arg) in
+    let inl' = read_back_nf inl_env (size + 1) (D.Normal {tp = inl_mot; term = applied_inl}) in
+    let (inr_arg, inr_env) = mk_var right env size in
+    let inr_mot = E.do_clos (size + 1) mot (D.Tm (D.Inr inr_arg)) in
+    let applied_inr = E.do_clos (size + 1) inr (D.Tm inr_arg) in
+    let inr' = read_back_nf inr_env (size + 1) (D.Normal {tp = inr_mot; term = applied_inr}) in
+    Syn.Case (mot', inl', inr', read_back_ne env size (h, s))
+  | D.Abort mot :: s ->
+    let (mot_arg, mot_env) = mk_var D.Void env size in
+    let applied_mot = E.do_clos (size + 1) mot (D.Tm mot_arg) in
+    let mot' = read_back_tp mot_env (size + 1) applied_mot in
+    Syn.Abort (mot', read_back_ne env size (h, s))
   | D.Fst :: s -> Syn.Fst (read_back_ne env size (h, s))
   | D.Snd :: s -> Syn.Snd (read_back_ne env size (h, s))
   | D.BApp r :: s ->
@@ -364,11 +415,25 @@ let rec check_nf env size nf1 nf2 =
   | D.Normal {tp = D.Nat; term = D.Suc nf1},
     D.Normal {tp = D.Nat; term = D.Suc nf2} ->
     check_nf env size (D.Normal {tp = D.Nat; term = nf1}) (D.Normal {tp = D.Nat; term = nf2})
+  (* Lists *)
+  | D.Normal {tp = D.List _; term = D.Nil},
+    D.Normal {tp = D.List _; term = D.Nil} -> true
+  | D.Normal {tp = D.List tp; term = D.Cons (a1, t1)},
+    D.Normal {tp = D.List _; term = D.Cons (a2, t2)} ->
+    check_nf env size (D.Normal {tp; term = a1}) (D.Normal {tp; term = a2}) &&
+    check_nf env size (D.Normal {tp = D.List tp; term = t1}) (D.Normal {tp = D.List tp; term = t2})
   (* Booleans *)
   | D.Normal {tp = D.Bool; term = D.True},
     D.Normal {tp = D.Bool; term = D.True} -> true
   | D.Normal {tp = D.Bool; term = D.False},
     D.Normal {tp = D.Bool; term = D.False} -> true
+  (* Coproducts *)
+  | D.Normal {tp = D.Coprod (tp, _); term = D.Inl term1},
+    D.Normal {tp = D.Coprod (_, _); term = D.Inl term2} ->
+    check_nf env size (D.Normal {tp; term = term1}) (D.Normal {tp; term = term2})
+  | D.Normal {tp = D.Coprod (_, tp); term = D.Inr term1},
+    D.Normal {tp = D.Coprod (_, _); term = D.Inr term2} ->
+    check_nf env size (D.Normal {tp; term = term1}) (D.Normal {tp; term = term2})
   (* Id *)
   | D.Normal {tp = D.Id (tp, _, _); term = D.Refl term1},
     D.Normal {tp = D.Id (_, _, _); term = D.Refl term2} ->
@@ -469,6 +534,24 @@ and check_ne env size (h1, s1) (h2, s2) =
       (D.Normal {tp = applied_suc_tp; term = applied_suc1})
       (D.Normal {tp = applied_suc_tp; term = applied_suc2}) &&
     check_ne env size (h1, s1) (h2, s2)
+  | D.ListRec (tp, mot1, nil1, cons1) :: s1, D.ListRec (_, mot2, nil2, cons2) :: s2 ->
+    let (list_arg, list_env) = mk_var (D.List tp) env size in
+    let applied_mot1 = E.do_clos (size + 1) mot1 (D.Tm list_arg) in
+    let applied_mot2 = E.do_clos (size + 1) mot2 (D.Tm list_arg) in
+    check_tp ~subtype:false list_env (size + 1) applied_mot1 applied_mot2 &&
+    let nil_mot = E.do_clos size mot1 (D.Tm D.Nil) in
+    check_nf env size (D.Normal {tp = nil_mot; term = nil1}) (D.Normal {tp = nil_mot; term = nil2}) &&
+    let (cons_arg1, cons_env1) = mk_var tp env size in
+    let (cons_arg2, cons_env2) = mk_var (D.List tp) cons_env1 (size + 1) in
+    let rec_mot = E.do_clos (size + 2) mot1 (D.Tm cons_arg2) in
+    let (cons_arg3, cons_env3) = mk_var rec_mot cons_env2 (size + 2) in
+    let cons_mot = E.do_clos (size + 3) mot1 (D.Tm (D.Cons (cons_arg1, cons_arg2))) in
+    let applied_cons1 = E.do_clos3 (size + 3) cons1 cons_arg1 cons_arg2 cons_arg3 in
+    let applied_cons2 = E.do_clos3 (size + 3) cons2 cons_arg1 cons_arg2 cons_arg3 in
+    check_nf cons_env3 (size + 3)
+      (D.Normal {tp = cons_mot; term = applied_cons1})
+      (D.Normal {tp = cons_mot; term = applied_cons2}) &&
+    check_ne env size (h1, s1) (h2, s2)
   | D.If (mot1, tt1, ff1) :: s1, D.If (mot2, tt2, ff2) :: s2 ->
     let (bool_arg, bool_env) = mk_var D.Bool env size in
     let applied_mot1 = E.do_clos (size + 1) mot1 (D.Tm bool_arg) in
@@ -478,6 +561,33 @@ and check_ne env size (h1, s1) (h2, s2) =
     check_nf env size (D.Normal {tp = tt_tp; term = tt1}) (D.Normal {tp = tt_tp; term = tt2}) &&
     let ff_tp = E.do_clos size mot1 (D.Tm D.False) in
     check_nf env size (D.Normal {tp = ff_tp; term = ff1}) (D.Normal {tp = ff_tp; term = ff2}) &&
+    check_ne env size (h1, s1) (h2, s2)
+  | D.Case (left, right, mot1, inl1, inr1) :: s1,
+    D.Case (_, _, mot2, inl2, inr2) :: s2 ->
+    let (mot_arg, mot_env) = mk_var (D.Coprod (left, right)) env size in
+    let applied_mot1 = E.do_clos (size + 1) mot1 (D.Tm mot_arg) in
+    let applied_mot2 = E.do_clos (size + 1) mot2 (D.Tm mot_arg) in
+    check_tp ~subtype:false mot_env (size + 1) applied_mot1 applied_mot2 &&
+    let (inl_arg, inl_env) = mk_var left env size in
+    let inl_mot = E.do_clos (size + 1) mot1 (D.Tm (D.Inl inl_arg)) in
+    let applied_inl1 = E.do_clos (size + 1) inl1 (D.Tm inl_arg) in
+    let applied_inl2 = E.do_clos (size + 1) inl2 (D.Tm inl_arg) in
+    check_nf inl_env (size + 1)
+      (D.Normal {tp = inl_mot; term = applied_inl1})
+      (D.Normal {tp = inl_mot; term = applied_inl2}) &&
+    let (inr_arg, inr_env) = mk_var right env size in
+    let inr_mot = E.do_clos (size + 1) mot1 (D.Tm (D.Inr inr_arg)) in
+    let applied_inr1 = E.do_clos (size + 1) inr1 (D.Tm inr_arg) in
+    let applied_inr2 = E.do_clos (size + 1) inr2 (D.Tm inr_arg) in
+    check_nf inr_env (size + 1)
+      (D.Normal {tp = inr_mot; term = applied_inr1})
+      (D.Normal {tp = inr_mot; term = applied_inr2}) &&
+    check_ne env size (h1, s1) (h2, s2)
+  | D.Abort mot1 :: s1, D.Abort mot2 :: s2 ->
+    let (mot_arg, mot_env) = mk_var D.Void env size in
+    let applied_mot1 = E.do_clos (size + 1) mot1 (D.Tm mot_arg) in
+    let applied_mot2 = E.do_clos (size + 1) mot2 (D.Tm mot_arg) in
+    check_tp ~subtype:false mot_env (size + 1) applied_mot1 applied_mot2 &&
     check_ne env size (h1, s1) (h2, s2)
   | D.Fst :: s1, D.Fst :: s2  -> check_ne env size (h1, s1) (h2, s2)
   | D.Snd :: s1, D.Snd :: s2 -> check_ne env size (h1, s1) (h2, s2)
@@ -571,7 +681,12 @@ and check_tp ~subtype env size d1 d2 =
   match d1, d2 with
   | D.Unit, D.Unit -> true
   | D.Nat, D.Nat -> true
+  | D.List t, D.List t' -> check_tp ~subtype env size t t'
   | D.Bool, D.Bool -> true
+  | D.Coprod (a, b), D.Coprod (a', b') ->
+    check_tp ~subtype env size a a' &&
+    check_tp ~subtype env size b b'
+  | D.Void, D.Void -> true
   | D.Id (tp1, left1, right1), D.Id (tp2, left2, right2) ->
     check_tp ~subtype env size tp1 tp2 &&
     check_nf env size (D.Normal {tp = tp1; term = left1}) (D.Normal {tp = tp1; term = left2}) &&

@@ -79,11 +79,40 @@ let rec bind env = function
        bind env zero,
        bind (Term suc_name2 :: Term suc_name1 :: env) suc_body,
        bind env nat)
+  | CS.List t -> S.List (bind env t)
+  | CS.Nil -> S.Nil
+  | CS.Cons (a, t) -> S.Cons (bind env a, bind env t)
+  | CS.ListRec
+      {mot = Binder {name = mot_name; body = mot_body};
+       nil;
+       cons = Binder3 {name1 = cons_name1; name2 = cons_name2; name3 = cons_name3; body = cons_body};
+       list} ->
+    S.ListRec
+      (bind (Term mot_name :: env) mot_body,
+       bind env nil,
+       bind (Term cons_name3 :: Term cons_name2 :: Term cons_name1 :: env) cons_body,
+       bind env list)
   | CS.Bool -> S.Bool
   | CS.True -> S.True
   | CS.False -> S.False
   | CS.If {mot = Binder {name = mot_name; body = mot_body}; tt; ff; bool} ->
     S.If (bind (Term mot_name :: env) mot_body, bind env tt, bind env ff, bind env bool)
+  | CS.Coprod (left, right) -> S.Coprod (bind env left, bind env right)
+  | CS.Inl t -> S.Inl (bind env t)
+  | CS.Inr t -> S.Inr (bind env t)
+  | CS.Case
+      {mot = Binder {name = mot_name; body = mot_body};
+       inl = Binder {name = inl_name; body = inl_body};
+       inr = Binder {name = inr_name; body = inr_body};
+       coprod} ->
+    S.Case
+      (bind (Term mot_name :: env) mot_body,
+       bind (Term inl_name :: env) inl_body,
+       bind (Term inr_name :: env) inr_body,
+       bind env coprod)
+  | CS.Void -> S.Void
+  | CS.Abort {mot = Binder {name = mot_name; body = mot_body}; void} ->
+    S.Abort (bind (Term mot_name :: env) mot_body, bind env void)
   | CS.Lam (BinderN {names = []; body}) ->
     bind env body
   | CS.Lam (BinderN {names = x :: names; body}) ->

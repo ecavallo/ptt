@@ -249,7 +249,53 @@ and check_inert ~mode ~env ~size ~term ~tp =
       | D.Uni _ -> ()
       | t -> tp_error (Expecting_universe t)
     end
+  | List term ->
+    begin
+      match tp with
+      | D.Uni _ -> check ~mode ~env ~size ~term ~tp
+      | t -> tp_error (Expecting_universe t)
+    end
+  | Nil ->
+    begin
+      match tp with
+      | D.List _ -> ()
+      | t -> tp_error (Expecting_of ("List", t))
+    end
+  | Cons (a, t) ->
+    begin
+      match tp with
+      | D.List tp ->
+        check ~mode ~env ~size ~term:a ~tp;
+        check ~mode ~env ~size ~term:t ~tp:(D.List tp)
+      | t -> tp_error (Expecting_of ("List", t))
+    end
   | Bool ->
+    begin
+      match tp with
+      | D.Uni _ -> ()
+      | t -> tp_error (Expecting_universe t)
+    end
+  | Coprod (left, right) ->
+    begin
+      match tp with
+      | D.Uni _ ->
+        check ~mode ~env ~size ~term:left ~tp;
+        check ~mode ~env ~size ~term:right ~tp
+      | t -> tp_error (Expecting_universe t)
+    end
+  | Inl a ->
+    begin
+      match tp with
+      | D.Coprod (left, _) -> check ~mode ~env ~size ~term:a ~tp:left
+      | t -> tp_error (Expecting_of ("Coprod", t))
+    end
+  | Inr b ->
+    begin
+      match tp with
+      | D.Coprod (_, right) -> check ~mode ~env ~size ~term:b ~tp:right
+      | t -> tp_error (Expecting_of ("Coprod", t))
+    end
+  | Void ->
     begin
       match tp with
       | D.Uni _ -> ()
@@ -408,7 +454,7 @@ and check_inert ~mode ~env ~size ~term ~tp =
       | Uni j when i < j -> ()
       | t ->
         let msg =
-          "Expecting universe over " ^ string_of_int i ^ " but found\n" ^ D.show t in
+          "Expecting universe over " ^ string_of_int i ^ " but found\n" ^ D.show t ^ "\n" in
         tp_error (Misc msg)
     end
   | term -> assert_subtype (env_to_quote_env env) size (synth ~mode ~env ~size ~term) tp
@@ -473,6 +519,23 @@ and synth_quasi ~mode ~env ~size ~term =
     let suc_tp = E.eval mot (D.Tm (Suc nat_arg) :: sem_env) (size + 2) in
     check ~mode ~env:ih_env ~size:(size + 2) ~term:suc ~tp:suc_tp;
     E.eval mot (D.Tm (E.eval n sem_env size) :: sem_env) size
+  | ListRec (mot, nil, cons, l) ->
+    begin
+      match synth ~mode ~env ~size ~term:l with
+      | D.List tp' ->
+        let sem_env = env_to_sem_env env in
+        let (_, mot_env) = mk_var (D.List tp') env size in
+        check_tp ~mode ~env:mot_env ~size:(size + 1) ~term:mot;
+        check ~mode ~env ~size ~term:nil ~tp:(E.eval mot (D.Tm D.Nil :: sem_env) size);
+        let (cons_arg1, cons_env1) = mk_var tp' env size in
+        let (cons_arg2, cons_env2) = mk_var (D.List tp') cons_env1 (size + 1) in
+        let rec_mot = E.eval mot (D.Tm cons_arg2 :: sem_env) (size + 2) in
+        let (_, cons_env3) = mk_var rec_mot cons_env2 (size + 2) in
+        check ~mode ~env:cons_env3 ~size:(size + 3) ~term:cons
+          ~tp:(E.eval mot (D.Tm (D.Cons (cons_arg1, cons_arg2)) :: sem_env) (size + 3));
+        E.eval mot (D.Tm (E.eval l sem_env size) :: sem_env) size
+      | t -> tp_error (Expecting_of ("List", t))
+    end
   | If (mot, tt, ff, b) ->
     check ~mode ~env ~size ~term:b ~tp:Bool;
     let sem_env = env_to_sem_env env in
@@ -483,6 +546,28 @@ and synth_quasi ~mode ~env ~size ~term =
     let ff_tp = E.eval mot (D.Tm D.False :: sem_env) size in
     check ~mode ~env ~size ~term:ff ~tp:ff_tp;
     E.eval mot (D.Tm (E.eval b sem_env size) :: sem_env) size
+  | Case (mot, inl, inr, co) ->
+    begin
+      match synth ~mode ~env ~size ~term:co with
+      | D.Coprod (left, right) ->
+        let sem_env = env_to_sem_env env in
+        let (_, mot_env) = mk_var (D.Coprod (left, right)) env size in
+        check_tp ~mode ~env:mot_env ~size:(size + 1) ~term:mot;
+        let (inl_arg, inl_env) = mk_var left env size in
+        check ~mode ~env:inl_env ~size:(size + 1) ~term:inl
+          ~tp:(E.eval mot (D.Tm (D.Inl inl_arg) :: sem_env) (size + 1));
+        let (inr_arg, inr_env) = mk_var right env size in
+        check ~mode ~env:inr_env ~size:(size + 1) ~term:inr
+          ~tp:(E.eval mot (D.Tm (D.Inr inr_arg) :: sem_env) (size + 1));
+        E.eval mot (D.Tm (E.eval co sem_env size) :: sem_env) size
+      | t -> tp_error (Expecting_of ("Coprod", t))
+    end
+  | Abort (mot, vd) ->
+    check ~mode ~env ~size ~term:vd ~tp:Void;
+    let sem_env = env_to_sem_env env in
+    let (_, mot_env) = mk_var Void env size in
+    check_tp ~mode ~env:mot_env ~size:(size + 1) ~term:mot;
+    E.eval mot (D.Tm (E.eval vd sem_env size) :: sem_env) size
   | BApp (term, r) ->
     let restricted_env = restrict_env r env in
     begin
@@ -586,7 +671,12 @@ and check_tp ~mode ~env ~size ~term =
   match term with
   | Syn.Unit -> ()
   | Syn.Nat -> ()
+  | Syn.List term -> check_tp ~mode ~env ~size ~term
   | Syn.Bool -> ()
+  | Syn.Coprod (left, right) ->
+    check_tp ~mode ~env ~size ~term:left;
+    check_tp ~mode ~env ~size ~term:right
+  | Syn.Void -> ()
   | Uni _ -> ()
   | Bridge (term, ends) ->
     let width = List.length ends in
