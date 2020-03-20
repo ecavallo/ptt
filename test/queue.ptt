@@ -1,0 +1,401 @@
+--------------------------------------------------------------------------------
+-- Establishing a bridge between two implementations of a queue
+
+-- See also a similar result using univalence, where the relation is made into
+-- an equivalence by quotienting one implementation
+-- https://github.com/agda/cubical/blob/master/Cubical/Data/Queue/Base.agda
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- Prelude
+--------------------------------------------------------------------------------
+
+let symm : (A : U<0>) (a : A) (b : A) -> (Id A a b) -> Id A b a =
+  fun A a b eq ->
+  match eq at a0 a1 _ -> Id A a1 a0 with
+  | refl a -> refl a
+
+let trans : (A : U<0>) (a : A) (b : A) (c : A) -> (Id A a b) -> (Id A b c) -> Id A a c =
+  fun A a b c eq0 ->
+  match eq0 at x y _ -> (Id A y c) -> Id A x c with
+  | refl z -> fun eq1 -> eq1
+
+let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
+  -> (Id A a0 a1) -> Id B (f a0) (f a1)
+  =
+  fun A B f a0 a1 eq ->
+  match eq at a0 a1 _ -> Id B (f a0) (f a1) with
+  | refl z -> refl (f z)
+
+let based1_J : (A : U<0>) (a1 : A)
+  (B : (a0 : A) (eq : Id A a0 a1) -> U<0>) (b : B a1 (refl a1))
+  (a0 : A) (eq : Id A a0 a1) -> B a0 eq
+  =
+  fun A a1 B b a0 eq ->
+  (match eq at a0 a1 eq ->
+     (B : (a0 : A) (eq : Id A a0 a1) -> U<0>) (b : B a1 (refl a1)) -> B a0 eq
+   with
+   | refl _ -> fun B b -> b)
+  B b
+
+let gelproj : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
+  (p : [x] Gel x {A; B} (a b -> R a b) {*; *}) -> R (p @ 0) (p @ 1)
+  =
+  fun A B R p ->
+  ungel x : 2 -> p @ x at _ -> R (p @ 0) (p @ 1) with | gel r -> r
+
+let Graph : (A : U<0>) (B : U<0>) (f : A -> B) -> [_] U<0> {A; B} =
+  fun A B f -> bri x ->
+  Gel x {A; B} (a b -> Id B (f a) b)
+
+let RevGraph : (A : U<0>) (B : U<0>) (g : B -> A) -> [_] U<0> {A; B} =
+  fun A B g -> bri x ->
+  Gel x {A; B} (a b -> Id A a (g b))
+
+let IdRel : (A : U<0>) -> A -> A -> U<0> =
+  fun A a a' -> Id A a a'
+
+let IdGel : (A : U<0>) -> [_] U<0> {A; A} =
+  fun A -> bri x -> Gel x {A; A} (a a' -> Id A a a')
+
+--------------------------------------------------------------------------------
+-- Bridge-discreteness of bool (one direction)
+--------------------------------------------------------------------------------
+
+let shannon : bool -> bool =
+  fun b ->
+  if b at _ -> bool with | tt -> tt | ff -> ff
+
+let bool_eta : (b : bool) -> Id bool (shannon b) b =
+  fun b ->
+  if b at b -> Id bool (shannon b) b with
+  | tt -> refl tt
+  | ff -> refl ff
+
+let bridge_to_id : (b0 : bool) (b1 : bool) -> [_] bool {b0; b1} -> Id bool b0 b1 =
+  fun b0 b1 p ->
+  let lemma : Id bool (shannon b0) (shannon b1) =
+    gelproj bool bool (fun c d -> Id bool c d) (shannon b0) (shannon b1)
+      (bri x ->
+       if (p @ x) at _ -> Gel x {bool; bool} (c d -> Id bool c d) with
+       | tt -> gel x {tt; tt} (refl tt)
+       | ff -> gel x {ff; ff} (refl ff))
+  in
+  trans bool b0 (shannon b1) b1
+    (trans bool b0 (shannon b0) (shannon b1)
+      (symm bool (shannon b0) b0 (bool_eta b0))
+      lemma)
+    (bool_eta b1)
+
+--------------------------------------------------------------------------------
+-- Options
+--------------------------------------------------------------------------------
+
+let option : U<0> -> U<0> = fun A -> unit + A
+
+let map_option : (A : U<0>) (B : U<0>) -> (A -> B) -> (option A) -> option B =
+  fun A B f op ->
+  case op at _ -> option B with
+  | inl _ -> inl triv
+  | inr a -> inr (f a)
+
+--------------------------------------------------------------------------------
+-- Lists
+--------------------------------------------------------------------------------
+
+let map_list : (A : U<0>) (B : U<0>) -> (A -> B) -> (list A) -> list B =
+  fun A B f l ->
+  listrec l at _ -> list B with
+  | nil -> nil
+  | cons a as, bs -> cons (f a) bs
+
+let split : (A : U<0>) -> (list A) -> option (A * list A) =
+  fun A as ->
+  listrec as at _ -> option (A * list A) with
+  | nil -> inl triv
+  | cons a as, _ -> inr <a, as>
+
+let snoc : (A : U<0>) -> (list A) -> A -> list A =
+  fun A bs a ->
+  listrec bs at _ -> list A with
+  | nil -> cons a nil
+  | cons b bs, bs' -> cons b bs'
+
+let rev : (A : U<0>) -> (list A) -> list A =
+  fun A as ->
+  listrec as at _ -> list A with
+  | nil -> nil
+  | cons a as, as' -> snoc A as' a
+
+let append : (A : U<0>) -> (list A) -> (list A) -> list A =
+  fun A as bs ->
+  listrec as at _ -> list A with
+  | nil -> bs
+  | cons a as, cs -> cons a cs
+
+let append_nil : (A : U<0>) (as : list A) ->
+  Id (list A) as (append A as nil)
+  =
+  fun A as ->
+  listrec as at as -> Id (list A) as (append A as nil) with
+  | nil -> refl nil
+  | cons a as, eq ->
+    cong (list A) (list A) (fun t -> cons a t) as (append A as nil) eq
+
+let snoc_append : (A : U<0>)
+  (as : list A) (bs : list A) (b : A)
+  -> Id (list A) (snoc A (append A as bs) b) (append A as (snoc A bs b))
+  =
+  fun A as bs b ->
+  listrec as at as -> Id (list A) (snoc A (append A as bs) b) (append A as (snoc A bs b)) with
+  | nil -> refl (snoc A bs b)
+  | cons a as, eq ->
+    cong (list A) (list A) (fun t -> cons a t)
+      (snoc A (append A as bs) b)
+      (append A as (snoc A bs b))
+      eq
+
+let snoc_rev : (A : U<0>) (as : list A) (b : A)
+  -> Id (list A) (snoc A (rev A as) b) (rev A (cons b as))
+  =
+  fun A as b -> refl (rev A (cons b as))
+
+--------------------------------------------------------------------------------
+-- Lemmas about the result type of "pop"
+--------------------------------------------------------------------------------
+
+let pop_result_map : (A : U<0>) (B : U<0>) (C : U<0>) (f : B -> C)
+  -> (option (A * B)) -> option (A * C)
+  =
+  fun A B C f ->
+  map_option (A * B) (A * C) (fun a_b -> <fst a_b, f (snd a_b)>)
+
+let pop_result_map_conc : (A : U<0>) (B : U<0>) (C : U<0>) (D : U<0>)
+  (g : C -> D) (f : B -> C) (r : option (A * B))
+  -> Id (option (A * D))
+     (pop_result_map A B D (fun b -> g (f b)) r)
+     (pop_result_map A C D g (pop_result_map A B C f r))
+  =
+  fun A B C D g f r ->
+  case r at r ->
+    Id (option (A * D))
+      (pop_result_map A B D (fun b -> g (f b)) r)
+      (pop_result_map A C D g (pop_result_map A B C f r))
+  with
+  | inl _ -> refl (inl triv)
+  | inr a_b -> refl (inr <fst a_b, g (f (snd a_b))>)
+
+let pop_result_revgraph : (A : U<0>) (B : U<0>) (C : U<0>) (g : C -> B)
+  (rb : option (A * B)) (rc : option (A * C))
+  -> (Id (option (A * B)) rb (pop_result_map A C B g rc))
+  -> [x] option ((IdGel A @ x) * RevGraph B C g @ x) {rb; rc}
+  =
+  fun A B C g rb rc eq ->
+  based1_J (option (A * B)) (pop_result_map A C B g rc)
+    (fun rb _ -> [x] option ((IdGel A @ x) * RevGraph B C g @ x) {rb; rc})
+    (case rc at rc ->
+        [x] option ((IdGel A @ x) * RevGraph B C g @ x) {pop_result_map A C B g rc; rc}
+      with
+      | inl _ -> bri x -> inl triv
+      | inr a_c -> bri x ->
+        inr
+          < gel x {fst a_c; fst a_c} (refl (fst a_c))
+          , gel x {g (snd a_c); snd a_c} (refl (g (snd a_c)))
+          >)
+    rb
+    eq
+
+-- annoying formulation thanks to lack of funext ;)
+let pop_result_map_id : (A : U<0>) (B : U<0>)
+  (f : B -> B) (eq : (b : B) -> Id B b (f b)) (r : option (A * B))
+  -> Id (option (A * B)) r (pop_result_map A B B f r)
+  =
+  fun A B f eq r ->
+  case r at r -> Id (option (A * B)) r (pop_result_map A B B f r) with
+  | inl _ -> refl (inl triv)
+  | inr a_b ->
+    cong B (option (A * B)) (fun b -> inr <fst a_b, b>)
+      (snd a_b)
+      (f (snd a_b))
+      (eq (snd a_b))
+
+--------------------------------------------------------------------------------
+-- Queue implementation with a single list
+--------------------------------------------------------------------------------
+
+let queue1 : U<0> -> U<0> =
+  fun A -> list A
+
+let empty1 : (A : U<0>) -> queue1 A =
+  fun A -> nil
+
+let push1 : (A : U<0>) -> A -> (queue1 A) -> queue1 A =
+  fun A a as -> snoc A as a
+
+let pop1 : (A : U<0>) -> (queue1 A) -> option (A * queue1 A) =
+  split
+
+--------------------------------------------------------------------------------
+-- Queue implementation with a pair of lists
+--------------------------------------------------------------------------------
+
+let queue2 : U<0> -> U<0> =
+  fun A -> (list A) * list A
+
+let empty2 : (A : U<0>) -> queue2 A =
+  fun A -> <nil, nil>
+
+let push2 : (A : U<0>) -> A -> (queue2 A) -> queue2 A =
+  fun A a q ->
+  <cons a (fst q), snd q>
+
+let pop2 : (A : U<0>) -> (queue2 A) -> option (A * queue2 A) =
+  fun A q ->
+  listrec (snd q) at _ -> option (A * queue2 A) with
+  | nil ->
+    pop_result_map A (list A) (queue2 A)
+      (fun as -> <nil, as>)
+      (split A (rev A (fst q)))
+  | cons a as, _ -> inr <a, <fst q, as>>
+
+--------------------------------------------------------------------------------
+-- Homomorphism between the two implementations
+--------------------------------------------------------------------------------
+
+let flatten : (A : U<0>) -> (queue2 A) -> list A =
+   fun A q -> append A (snd q) (rev A (fst q))
+
+let flatten_push : (A : U<0>) (a : A) (q : queue2 A)
+  -> Id (list A) (push1 A a (flatten A q)) (flatten A (push2 A a q))
+  =
+  fun A a q ->
+  trans (list A)
+    (snoc A (append A (snd q) (rev A (fst q))) a)
+    (append A (snd q) (snoc A (rev A (fst q)) a))
+    (append A (snd q) (rev A (cons a (fst q))))
+    (snoc_append A (snd q) (rev A (fst q)) a)
+    (cong (list A) (list A) (fun t -> append A (snd q) t)
+      (snoc A (rev A (fst q)) a)
+      (rev A (cons a (fst q)))
+      (snoc_rev A (fst q) a))
+
+let flatten_pop_lemma : (A : U<0>) (as : list A)
+  -> Id (option (A * list A))
+     (pop1 A (flatten A <as,nil>))
+     (pop_result_map A (queue2 A) (list A) (flatten A) (pop2 A <as,nil>))
+  =
+  fun A as ->
+  trans (option (A * list A))
+    (pop1 A (flatten A <as,nil>))
+    (pop_result_map A (list A) (list A) (fun as -> flatten A <nil,as>) (split A (rev A as)))
+    (pop_result_map A (queue2 A) (list A) (flatten A) (pop2 A <as,nil>))
+    (pop_result_map_id A (list A) (fun as -> append A as nil) (append_nil A) (split A (rev A as)))
+    (pop_result_map_conc A (list A) (queue2 A) (list A)
+      (flatten A) (fun as -> <nil,as>)
+      (split A (rev A as)))
+
+let flatten_pop : (A : U<0>) (q : queue2 A)
+  -> Id (option (A * list A))
+     (pop1 A (flatten A q))
+     (pop_result_map A (queue2 A) (list A) (flatten A) (pop2 A q))
+  =
+  fun A q ->
+  let lem : (bs : list A) (as : list A)
+    -> Id (option (A * list A))
+       (pop1 A (flatten A <as,bs>))
+       (pop_result_map A (queue2 A) (list A) (flatten A) (pop2 A <as,bs>))
+    =
+    fun bs ->
+    listrec bs at bs ->
+      (as : list A)
+      -> Id (option (A * list A))
+         (pop1 A (flatten A <as,bs>))
+         (pop_result_map A (queue2 A) (list A) (flatten A) (pop2 A <as,bs>))
+    with
+    | nil -> flatten_pop_lemma A
+    | cons b bs, _ -> fun as -> refl (inr <b, flatten A <as,bs>>)
+  in
+  lem (snd q) (fst q)
+
+--------------------------------------------------------------------------------
+-- Type of queues
+--------------------------------------------------------------------------------
+
+let QUEUE : (A : U<0>) -> U<1> =
+  fun A ->
+  (Q : U<0>)
+  * Q
+  * (A -> Q -> Q)
+  * (Q -> option (A * Q))
+
+--------------------------------------------------------------------------------
+-- The two implementations are connected by a bridge in QUEUE
+--------------------------------------------------------------------------------
+
+let queue_struct1 : (A : U<0>) -> QUEUE A =
+  fun A -> <queue1 A, <empty1 A, <push1 A, pop1 A>>>
+
+let queue_struct2 : (A : U<0>) -> QUEUE A =
+  fun A -> <queue2 A, <empty2 A, <push2 A, pop2 A>>>
+
+let queue_bridge : (A : U<0>)
+  -> [x] (QUEUE (IdGel A @ x)) {queue_struct1 A; queue_struct2 A}
+  =
+  fun A ->
+  let Q : [_] U<0> {queue1 A; queue2 A} =
+    RevGraph (queue1 A) (queue2 A) (flatten A)
+  in
+  bri x ->
+  < Q @ x
+  , < gel x {empty1 A; empty2 A} (refl nil)
+    , < fun a q ->
+        extent x of <a,q> in x -> (IdGel A @ x) * Q @ x at x _ -> Q @ x with
+        | aq0 -> push1 A (fst aq0) (snd aq0)
+        | aq1 -> push2 A (fst aq1) (snd aq1)
+        | aq0 aq1 aqx x ->
+          gel x {push1 A (fst aq0) (snd aq0); push2 A (fst aq1) (snd aq1)}
+            (let a0 : A = fst aq0 in
+             let a1 : A = fst aq1 in
+             let eqa : Id A a0 a1 =
+               gelproj A A (IdRel A) (bri x -> fst (aqx @ x))
+             in
+             let q0 : queue1 A = snd aq0 in
+             let q1 : queue2 A = snd aq1 in
+             let relq : Id (list A) q0 (flatten A q1) =
+               gelproj (queue1 A) (queue2 A)
+                 (fun q q' -> Id (list A) q (flatten A q'))
+                 (bri x -> snd (aqx @ x))
+             in
+             trans (list A)
+               (push1 A a0 q0)
+               (push1 A a1 q0)
+               (flatten A (push2 A a1 q1))
+               (cong A (list A) (fun a -> push1 A a q0) a0 a1 eqa)
+               (trans (list A)
+                 (push1 A a1 q0)
+                 (push1 A a1 (flatten A q1))
+                 (flatten A (push2 A a1 q1))
+                 (cong (list A) (list A) (push1 A a1) q0 (flatten A q1) relq)
+                 (flatten_push A a1 q1)))
+      , fun q ->
+        extent x of q in x -> Q @ x at x _ -> option ((IdGel A @ x) * Q @ x) with
+        | q0 -> pop1 A q0
+        | q1 -> pop2 A q1
+        | q0 q1 qx x ->
+          pop_result_revgraph A (queue1 A) (queue2 A) (flatten A)
+            (pop1 A q0)
+            (pop2 A q1)
+            (trans (option (A * list A))
+              (pop1 A q0)
+              (pop1 A (flatten A q1))
+              (pop_result_map A (queue2 A) (queue1 A) (flatten A) (pop2 A q1))
+              (cong (list A) (option (A * list A)) (pop1 A) q0 (flatten A q1)
+                (gelproj (queue1 A) (queue2 A)
+                  (fun q q' -> Id (list A) q (flatten A q'))
+                  qx))
+              (flatten_pop A q1))
+            @ x
+      >
+    >
+  >
+
