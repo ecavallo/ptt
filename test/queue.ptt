@@ -75,7 +75,7 @@ let bool_eta : (b : bool) -> Id bool (shannon b) b =
 let bridge_to_id : (b0 : bool) (b1 : bool) -> [_] bool {b0; b1} -> Id bool b0 b1 =
   fun b0 b1 p ->
   let lemma : Id bool (shannon b0) (shannon b1) =
-    gelproj bool bool (fun c d -> Id bool c d) (shannon b0) (shannon b1)
+    gelproj bool bool (fun c d -> Id bool c d)
       (bri x ->
        if (p @ x) at _ -> Gel x {bool; bool} (c d -> Id bool c d) with
        | tt -> gel x {tt; tt} (refl tt)
@@ -398,4 +398,3 @@ let queue_bridge : (A : U<0>)
       >
     >
   >
-
