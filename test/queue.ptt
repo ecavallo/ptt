@@ -27,6 +27,21 @@ let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
   match eq at a0 a1 _ -> Id B (f a0) (f a1) with
   | refl z -> refl (f z)
 
+let subst : (A : U<0>) (B : A -> U<0>)
+  (a0 : A) (a1 : A) (eq : Id A a0 a1)
+  -> (B a0) -> B a1
+  =
+  fun A B a0 a1 eq ->
+  match eq at a0 a1 _ -> (B a0) -> B a1 with
+  | refl _ -> fun b -> b
+
+let substinv : (A : U<0>) (B : A -> U<0>)
+  (a0 : A) (a1 : A) (eq : Id A a0 a1)
+  -> (B a1) -> B a0
+  =
+  fun A B a0 a1 eq ->
+  subst A B a1 a0 (symm A a0 a1 eq)
+
 let based1_J : (A : U<0>) (a1 : A)
   (B : (a0 : A) (eq : Id A a0 a1) -> U<0>) (b : B a1 (refl a1))
   (a0 : A) (eq : Id A a0 a1) -> B a0 eq
@@ -47,16 +62,35 @@ let gelproj : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
   fun A B R p ->
   ungel x : 2 -> p @ x at _ -> R (p @ 0) (p @ 1) with | gel r -> r
 
-let IdRel : (A : U<0>) -> A -> A -> U<0> =
-  fun A a a' -> Id A a a'
-
 let IdGel : (A : U<0>) -> [_] U<0> {A; A} =
   fun A -> bri x -> Gel x {A; A} (a a' -> Id A a a')
+
+--------------------------------------------------------------------------------
+-- Operations on relations
+--------------------------------------------------------------------------------
 
 let cospan_to_rel : (A : U<0>) (B : U<0>) (C : U<0>) (f : A -> C) (g : B -> C)
  -> A -> B -> U<0>
  =
  fun A B C f g a b -> Id C (f a) (g b)
+
+let rel_id : (A : U<0>) -> A -> A -> U<0> =
+  fun A a a' -> Id A a a'
+
+let rel_compose : (A : U<0>) (B : U<0>) (C : U<0>)
+  -> (A -> B -> U<0>)
+  -> (B -> C -> U<0>)
+  -> (A -> C -> U<0>)
+  =
+  fun A B C R S a c ->
+  (b : B) * (R a b) * S b c
+
+let rel_unitl : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
+  (a : A) (b : B)
+  -> (rel_compose A A B (rel_id A) R a b) -> R a b
+  =
+  fun A B R a b r ->
+  substinv A (fun t -> R t b) a (fst r) (fst (snd r)) (snd (snd r))
 
 --------------------------------------------------------------------------------
 -- Bridge-discreteness of bool (one direction)
@@ -126,12 +160,12 @@ let option_rel : (A0 : U<0>) (A1 : U<0>) (A : A0 -> A1 -> U<0>)
     | inr a1 -> A a0 a1
 
 let option_encode : (A : U<0>) (op0 : option A) (op1 : option A)
-  -> (Id (option A) op0 op1) -> option_rel A A (IdRel A) op0 op1
+  -> (Id (option A) op0 op1) -> option_rel A A (rel_id A) op0 op1
   =
   fun A op0 op1 eq ->
-  match eq at op0 op1 _ -> option_rel A A (IdRel A) op0 op1 with
+  match eq at op0 op1 _ -> option_rel A A (rel_id A) op0 op1 with
   | refl op ->
-    case op at op -> option_rel A A (IdRel A) op op with
+    case op at op -> option_rel A A (rel_id A) op op with
     | inl _ -> triv
     | inr a -> refl a
 
@@ -309,13 +343,13 @@ let pop_result_bridge : (A : [_] U<0> {*; *}) (B : [_] U<0> {*; *})
 let pop_result_revgraph : (A : U<0>) (B : U<0>) (C : U<0>) (g : C -> B)
   (rb : option (A * B)) (rc : option (A * C))
   -> (Id (option (A * B)) rb (pop_result_map A C B g rc))
-  -> pop_result_rel A A (IdRel A) B C (cospan_to_rel B C B (fun b -> b) g) rb rc
+  -> pop_result_rel A A (rel_id A) B C (cospan_to_rel B C B (fun b -> b) g) rb rc
   =
   fun A B C g rb rc eq ->
   based1_J (option (A * B)) (pop_result_map A C B g rc)
-    (fun rb _ -> pop_result_rel A A (IdRel A) B C (cospan_to_rel B C B (fun b -> b) g) rb rc)
+    (fun rb _ -> pop_result_rel A A (rel_id A) B C (cospan_to_rel B C B (fun b -> b) g) rb rc)
     (case rc at rc ->
-        pop_result_rel A A (IdRel A) B C (cospan_to_rel B C B (fun b -> b) g) (pop_result_map A C B g rc) rc
+        pop_result_rel A A (rel_id A) B C (cospan_to_rel B C B (fun b -> b) g) (pop_result_map A C B g rc) rc
       with
       | inl _ -> triv
       | inr a_c -> <refl (fst a_c), refl (g (snd a_c))>)
@@ -431,6 +465,9 @@ let QUEUE : (A : U<0>) -> U<1> =
   * (A -> Q -> Q)
   * (Q -> option (A * Q))
 
+let QUEUE' : U<1> =
+  (A : U<0>) * QUEUE A
+
 let ty : (A : U<0>) -> (QUEUE A) -> U<0> =
   fun A Q -> fst Q
 
@@ -442,6 +479,19 @@ let push : (A : U<0>) (Q : QUEUE A) -> A -> (ty A Q) -> ty A Q =
 
 let pop : (A : U<0>) (Q : QUEUE A) -> (ty A Q) -> option (A * ty A Q) =
   fun A Q -> snd (snd (snd Q))
+
+let QUEUE_REL : (A0 : U<0>) (A1 : U<0>) (A : A0 -> A1 -> U<0>)
+  -> (QUEUE A0) -> (QUEUE A1) -> U<1>
+  =
+  fun A0 A1 A Q0 Q1 ->
+  (R : (ty A0 Q0) -> (ty A1 Q1) -> U<0>)
+  * (Remp : R (empty A0 Q0) (empty A1 Q1))
+  * (Rpush : (a0 : A0) (a1 : A1) (a : A a0 a1) (q0 : ty A0 Q0) (q1 : ty A1 Q1)
+      -> (R q0 q1) -> R (push A0 Q0 a0 q0) (push A1 Q1 a1 q1))
+  * ((q0 : ty A0 Q0) (q1 : ty A1 Q1)
+      -> (R q0 q1)
+      -> pop_result_rel A0 A1 A (ty A0 Q0) (ty A1 Q1) R
+           (pop A0 Q0 q0) (pop A1 Q1 q1))
 
 let QUEUE_Gel : (A : [_] U<0> {*; *}) (Q0 : QUEUE (A@0)) (Q1 : QUEUE (A@1))
   (R : (ty (A@0) Q0) -> (ty (A@1) Q1) -> U<0>)
@@ -458,14 +508,14 @@ let QUEUE_Gel : (A : [_] U<0> {*; *}) (Q0 : QUEUE (A@0)) (Q1 : QUEUE (A@1))
   let Q : [_] U<0> {ty (A@0) Q0; ty (A@1) Q1} =
     bri x -> Gel x {ty (A@0) Q0; ty (A@1) Q1} (q0 q1 -> R q0 q1)
   in
-  let ty0 : U<0> = ty (A@0) Q0 in
-  let ty1 : U<0> = ty (A@1) Q1 in
-  let empty0 : ty0 = empty (A@0) Q0 in
-  let empty1 : ty1 = empty (A@1) Q1 in
-  let push0 : (A@0) -> ty0 -> ty0 = push (A@0) Q0 in
-  let push1 : (A@1) -> ty1 -> ty1 = push (A@1) Q1 in
-  let pop0 : ty0 -> option ((A@0) * ty0) = pop (A@0) Q0 in
-  let pop1 : ty1 -> option ((A@1) * ty1) = pop (A@1) Q1 in
+  let ty0 = ty (A@0) Q0 in
+  let ty1 = ty (A@1) Q1 in
+  let empty0 = empty (A@0) Q0 in
+  let empty1 = empty (A@1) Q1 in
+  let push0 = push (A@0) Q0 in
+  let push1 = push (A@1) Q1 in
+  let pop0 = pop (A@0) Q0 in
+  let pop1 = pop (A@1) Q1 in
   bri x ->
   < Q @ x
   , < gel x {empty (A@0) Q0; empty (A@1) Q1} Remp
@@ -497,18 +547,14 @@ let QUEUE_Gel : (A : [_] U<0> {*; *}) (Q0 : QUEUE (A@0)) (Q1 : QUEUE (A@1))
   >
 
 let QUEUE_Gel' : (A0 : U<0>) (A1 : U<0>) (A : A0 -> A1 -> U<0>)
-  (Q0 : QUEUE A0) (Q1 : QUEUE A1)
-  (R : (ty A0 Q0) -> (ty A1 Q1) -> U<0>)
-  (Remp : R (empty A0 Q0) (empty A1 Q1))
-  (Rpush : (a0 : A0) (a1 : A1) (a : A a0 a1) (q0 : ty A0 Q0) (q1 : ty A1 Q1)
-    -> (R q0 q1) -> R (push A0 Q0 a0 q0) (push A1 Q1 a1 q1))
-  (Rpop : (q0 : ty A0 Q0) (q1 : ty A1 Q1)
-    -> (R q0 q1)
-    -> pop_result_rel A0 A1 A (ty A0 Q0) (ty A1 Q1) R
-       (pop A0 Q0 q0) (pop A1 Q1 q1))
+  (Q0 : QUEUE A0) (Q1 : QUEUE A1) (Q : QUEUE_REL A0 A1 A Q0 Q1)
   -> [x] QUEUE (Gel x {A0; A1} (a0 a1 -> A a0 a1)) {Q0; Q1}
   =
-  fun A0 A1 A Q0 Q1 R Remp Rpush Rpop ->
+  fun A0 A1 A Q0 Q1 Q ->
+  let R = fst Q in
+  let Remp = fst (snd Q) in
+  let Rpush = fst (snd (snd Q)) in
+  let Rpop = snd (snd (snd Q)) in
   QUEUE_Gel
     (bri x -> Gel x {A0; A1} (a0 a1 -> A a0 a1))
     Q0 Q1 R
@@ -535,35 +581,41 @@ let queue_struct1 : (A : U<0>) -> QUEUE A =
 let queue_struct2 : (A : U<0>) -> QUEUE A =
   fun A -> <queue2 A, <empty2 A, <push2 A, pop2 A>>>
 
+let queue12_rel : (A : U<0>)
+  -> QUEUE_REL A A (rel_id A) (queue_struct1 A) (queue_struct2 A)
+  =
+  fun A ->
+  < fun q1 q2 -> Id (list A) q1 (flatten A q2)
+  , < refl nil
+    , < fun a1 a2 eqa q1 q2 relq ->
+        trans (list A)
+          (push1 A a1 q1)
+          (push1 A a2 q1)
+          (flatten A (push2 A a2 q2))
+          (cong A (list A) (fun a -> push1 A a q1) a1 a2 eqa)
+          (trans (list A)
+            (push1 A a2 q1)
+            (push1 A a2 (flatten A q2))
+            (flatten A (push2 A a2 q2))
+            (cong (list A) (list A) (push1 A a2) q1 (flatten A q2) relq)
+            (flatten_push A a2 q2))
+      , fun q1 q2 relq ->
+        pop_result_revgraph A (queue1 A) (queue2 A) (flatten A)
+          (pop1 A q1)
+          (pop2 A q2)
+          (trans (option (A * list A))
+            (pop1 A q1)
+            (pop1 A (flatten A q2))
+            (pop_result_map A (queue2 A) (queue1 A) (flatten A) (pop2 A q2))
+            (cong (list A) (option (A * list A)) (pop1 A) q1 (flatten A q2) relq)
+            (flatten_pop A q2))
+      >
+    >
+  >
+
 -- TODO for this to be useful, we should replace IdGel A with an arbitrary bridge
 let queue12_bridge : (A : U<0>)
   -> [x] (QUEUE (IdGel A @ x)) {queue_struct1 A; queue_struct2 A}
   =
   fun A ->
-  QUEUE_Gel'
-    A A (IdRel A)
-    (queue_struct1 A) (queue_struct2 A)
-    (fun q1 q2 -> Id (list A) q1 (flatten A q2))
-    (refl nil)
-    (fun a1 a2 eqa q1 q2 relq ->
-      trans (list A)
-        (push1 A a1 q1)
-        (push1 A a2 q1)
-        (flatten A (push2 A a2 q2))
-        (cong A (list A) (fun a -> push1 A a q1) a1 a2 eqa)
-        (trans (list A)
-          (push1 A a2 q1)
-          (push1 A a2 (flatten A q2))
-          (flatten A (push2 A a2 q2))
-          (cong (list A) (list A) (push1 A a2) q1 (flatten A q2) relq)
-          (flatten_push A a2 q2)))
-    (fun q1 q2 relq ->
-      pop_result_revgraph A (queue1 A) (queue2 A) (flatten A)
-        (pop1 A q1)
-        (pop2 A q2)
-        (trans (option (A * list A))
-          (pop1 A q1)
-          (pop1 A (flatten A q2))
-          (pop_result_map A (queue2 A) (queue1 A) (flatten A) (pop2 A q2))
-          (cong (list A) (option (A * list A)) (pop1 A) q1 (flatten A q2) relq)
-          (flatten_pop A q2)))
+  QUEUE_Gel' A A (rel_id A) (queue_struct1 A) (queue_struct2 A) (queue12_rel A)
