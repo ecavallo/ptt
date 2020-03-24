@@ -8,7 +8,7 @@
 %token LPR RPR LANGLE RANGLE LBR RBR LCU RCU
 %token EQUALS
 %token TIMES FST SND
-%token LAM LET IN END WITH OF DEF POSTULATE
+%token LAM LET IN WITH OF DEF POSTULATE
 %token BRI ATSIGN EXTENT
 %token GEL ENGEL UNGEL
 %token GLOBAL ENGLOBE UNGLOBE
@@ -113,7 +113,7 @@ term:
     { Ap (f, args) }
   | LET; name = name; COLON; tp = term; EQUALS; def = term; IN; body = term
     { Let (Check {term = def; tp}, Binder {name; body}) }
-  | LET; name = name; EQUALS; def = term; IN; body = term; END
+  | LET; name = name; EQUALS; def = term; IN; body = term
     { Let (def, Binder {name; body}) }
   | LPR t = term; AT; tp = term RPR
     { Check {term = t; tp} }
