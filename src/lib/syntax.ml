@@ -27,6 +27,7 @@ type t =
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
   | Codisc of t | Encodisc of t | Uncodisc of t
   | Global of t | Englobe of t | Unglobe of t
+  | Disc of t | Endisc of t | Letdisc of Mode.modality * (* BINDS *) t * (* BINDS *) t * t
   | Uni of uni_level
 [@@deriving eq]
 
@@ -105,6 +106,9 @@ let unsubst_bvar i t =
     | Codisc t -> Codisc (go depth t)
     | Encodisc t -> Encodisc (go depth t)
     | Uncodisc t -> Uncodisc (go depth t)
+    | Disc t -> Disc (go depth t)
+    | Endisc t -> Endisc (go depth t)
+    | Letdisc (m, mot, case, d) -> Letdisc (m, go (depth + 1) mot, go (depth + 1) case, go depth d)
     | Uni j -> Uni j
   in
   try
@@ -228,6 +232,13 @@ let rec pp fmt =
     fprintf fmt "encodisc(@[<hov>%a@])" pp t
   | Uncodisc t ->
     fprintf fmt "uncodisc(@[<hov>%a@])" pp t
+  | Disc t ->
+    fprintf fmt "Disc(@[<hov>%a@])" pp t
+  | Endisc t ->
+    fprintf fmt "endisc(@[<hov>%a@])" pp t
+  | Letdisc (m, mot, case, d) ->
+    fprintf fmt "letdisc(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
+      Mode.pp_modality m pp mot pp case pp d
   | Uni i -> fprintf fmt "U<%d>" i
 
 let show t =

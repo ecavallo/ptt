@@ -35,9 +35,9 @@ name:
     { "_" }
 
 mode:
-  | { Check.Parametric }
-  | PAR { Check.Parametric }
-  | PT { Check.Pointwise }
+  | { Mode.Parametric }
+  | PAR { Mode.Parametric }
+  | PT { Mode.Pointwise }
     
 decl:
   | LET; mode = mode; nm = name; COLON; tp = term; EQUALS; body = term

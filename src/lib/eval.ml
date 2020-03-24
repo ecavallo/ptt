@@ -169,6 +169,14 @@ and do_unglobe t =
     D.Neutral {tp = do_global_tp tp; term = D.(Unglobe @: term)}
   | _ -> raise (Eval_failed "Couldn't unglobe argument in do_unglobe")
 
+and do_letdisc size m mot case d =
+  match d with
+  | D.Endisc t -> do_clos size case (D.Tm t)
+  | D.Neutral {tp; term} ->
+    let inner_tp = do_disc_tp tp in
+    D.Neutral {tp = do_clos size mot (D.Tm d); term = D.(Letdisc (m, inner_tp, mot, case) @: term)}
+  | _ -> raise (Eval_failed "Not an endisc or neutral in do_letdisc")
+
 and do_list_tp tp =
   match tp with
   | D.List tp -> tp
@@ -296,6 +304,13 @@ and do_global_tp f =
     D.Neutral {tp; term = D.(Quasi GlobalTp @: term)}
   | _ -> raise (Eval_failed "Not something that can become a global type")
 
+and do_disc_tp f =
+  match f with
+  | D.Disc tp -> tp
+  | D.Neutral {tp; term} ->
+    D.Neutral {tp; term = D.(Quasi DiscTp @: term)}
+  | _ -> raise (Eval_failed "Not something that can become a discrete type")
+
 and eval t (env : D.env) size =
   match t with
   | Syn.Var i ->
@@ -414,3 +429,12 @@ and eval t (env : D.env) size =
   | Syn.Global t -> D.Global (eval t env size)
   | Syn.Englobe t -> D.Englobe (eval t env size)
   | Syn.Unglobe t -> do_unglobe (eval t env size)
+  | Syn.Disc t -> D.Disc (eval t env size)
+  | Syn.Endisc t -> D.Endisc (eval t env size)
+  | Syn.Letdisc (m, mot, case, d) ->
+    do_letdisc
+      size
+      m
+      (D.Clos {term = mot; env})
+      (D.Clos {term = case; env})
+      (eval d env size)

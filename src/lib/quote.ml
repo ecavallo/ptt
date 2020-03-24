@@ -96,6 +96,7 @@ and reduce_extent env size es =
       E.do_ungel size end_tms mot (go (DVar size :: env) (size + 1) es') case
     | D.Uncodisc :: s -> E.do_uncodisc (go env size (e, s))
     | D.Unglobe :: s -> E.do_unglobe (go env size (e, s))
+    | D.Letdisc (m, _, mot, case) :: s -> E.do_letdisc size m mot case (go env size (e, s))
     | D.Quasi q :: s ->
       begin
         match q with 
@@ -115,6 +116,7 @@ and reduce_extent env size es =
         | D.GelBridge ts -> E.do_gel_bridge size (go env size (e,s)) ts
         | D.GlobalTp -> E.do_global_tp (go env size (e,s))
         | D.CodiscTp -> E.do_codisc_tp (go env size (e,s))
+        | D.DiscTp -> E.do_disc_tp (go env size (e,s))
       end
   in
   try
@@ -185,6 +187,9 @@ and read_back_nf env size nf =
   | D.Normal {tp = D.Global tp; term = t} ->
     let t' = E.do_unglobe t in
     Syn.Englobe (read_back_nf env size (D.Normal {tp; term = t'}))
+  (* Disc *)
+  | D.Normal {tp = D.Disc tp; term = D.Endisc term} ->
+    Syn.Disc (read_back_nf env size (D.Normal {tp; term}))
   (* Types *)
   | D.Normal {tp = D.Uni _; term = t} -> read_back_tp env size t
   (* Extent type *)
@@ -238,6 +243,7 @@ and read_back_tp env size d =
        read_back_tp rel_env rel_size (E.do_closN rel_size rel rel_args))
   | D.Codisc tp -> Syn.Codisc (read_back_tp env size tp)
   | D.Global tp -> Syn.Global (read_back_tp env size tp)
+  | D.Disc tp -> Syn.Disc (read_back_tp env size tp)
   | D.Uni k -> Syn.Uni k
   | _ -> read_back_quasi_ne env size d
 
@@ -352,6 +358,16 @@ and read_back_ne env size (h, s) =
     Syn.Ungel (List.length end_tms, mot', read_back_ne (DVar size :: env) (size + 1) ne', case')
   | D.Uncodisc :: s -> Syn.Uncodisc (read_back_ne env size (h, s))
   | D.Unglobe :: s -> Syn.Unglobe (read_back_ne env size (h, s))
+  | D.Letdisc (m, tp, mot, case) :: s ->
+    let (mot_arg, mot_env) = mk_var (D.Disc tp) env size in
+    let mot' = read_back_tp mot_env (size + 1) (E.do_clos (size + 1) mot (D.Tm mot_arg)) in
+    let (case_arg, case_env) = mk_var tp env size in
+    let case' =
+      read_back_nf case_env (size + 1)
+        (D.Normal
+           {term = E.do_clos (size + 1) case (D.Tm case_arg);
+            tp = E.do_clos (size + 1) mot (D.Tm (D.Endisc case_arg))}) in
+    Syn.Letdisc (m, mot', case', read_back_ne env size (h, s))
   | D.Quasi _ :: _ ->
     failwith "Invariant: this can never happen"
 
@@ -462,6 +478,9 @@ let rec check_nf env size nf1 nf2 =
   | D.Normal {tp = D.Global tp1; term = t1}, D.Normal {tp = D.Global tp2; term = t2} ->
     let t1',t2' = E.do_unglobe t1, E.do_unglobe t2 in
     check_nf env size (D.Normal {tp = tp1; term = t1'}) (D.Normal {tp = tp2; term = t2'})
+  (* Disc *)
+  | D.Normal {tp = D.Disc tp1; term = D.Endisc t1}, D.Normal {tp = D.Disc tp2; term = D.Endisc t2} ->
+    check_nf env size (D.Normal {tp = tp1; term = t1}) (D.Normal {tp = tp2; term = t2})
   (* Types *)
   | D.Normal {tp = D.Uni _; term = t1}, D.Normal {tp = D.Uni _; term = t2} ->
     check_tp ~subtype:false env size t1 t2
@@ -635,6 +654,20 @@ and check_ne env size (h1, s1) (h2, s2) =
     check_ne (DVar size :: env) (size + 1) ne1' ne2'
   | D.Uncodisc :: s1, D.Uncodisc :: s2 -> check_ne env size (h1, s1) (h2, s2)
   | D.Unglobe :: s1, D.Unglobe :: s2 -> check_ne env size (h1, s1) (h2, s2)
+  | D.Letdisc (_, tp, mot1, case1) :: s1, D.Letdisc (_, _, mot2, case2) :: s2 ->
+    let (mot_arg, mot_env) = mk_var (D.Disc tp) env size in
+    check_tp ~subtype:false mot_env (size + 1)
+      (E.do_clos (size + 1) mot1 (D.Tm mot_arg))
+      (E.do_clos (size + 1) mot2 (D.Tm mot_arg)) &&
+    let (case_arg, case_env) = mk_var tp env size in
+    check_nf case_env (size + 1)
+      (D.Normal
+        {term = E.do_clos (size + 1) case1 (D.Tm case_arg);
+         tp = E.do_clos (size + 1) mot1 (D.Tm (D.Endisc case_arg))})
+      (D.Normal
+        {term = E.do_clos (size + 1) case2 (D.Tm case_arg);
+         tp = E.do_clos (size + 1) mot2 (D.Tm (D.Endisc case_arg))}) &&
+    check_ne env size (h1, s1) (h2, s2)
   | _ -> false
 
 and check_extent_head env size
@@ -733,5 +766,6 @@ and check_tp ~subtype env size d1 d2 =
       (E.do_closN rel_size rel' rel_args)
   | D.Codisc tp, D.Codisc tp' -> check_tp ~subtype env size tp tp'
   | D.Global tp, D.Global tp' -> check_tp ~subtype env size tp tp'
+  | D.Disc tp, D.Disc tp' -> check_tp ~subtype env size tp tp'
   | D.Uni k, D.Uni j -> if subtype then k <= j else k = j
   | _ -> check_quasi_ne env size d1 d2
