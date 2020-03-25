@@ -53,6 +53,8 @@ and t =
   | Encodisc of t
   | Global of t
   | Englobe of t
+  | Disc of t
+  | Endisc of t
   | Uni of Syntax.uni_level
 [@@deriving show, eq]
 and extent_head = {var : lvl; dom : clos; mot : clos2; ctx : t; endcase : clos list; varcase : closN}
@@ -75,6 +77,7 @@ and cell =
   | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
   | Uncodisc
   | Unglobe
+  | Letdisc of Mode.modality * t * clos * clos
   | Quasi of quasi_cell
 [@@deriving show, eq]
 and quasi_cell = 
@@ -94,6 +97,7 @@ and quasi_cell =
   | GelBridge of t list
   | CodiscTp
   | GlobalTp
+  | DiscTp
 [@@deriving show, eq]
 and spine = cell list
 [@@deriving show, eq]
@@ -171,6 +175,8 @@ and instantiate r i = function
   | Encodisc t -> Encodisc (instantiate r i t)
   | Global t -> Global (instantiate r i t)
   | Englobe t -> Englobe (instantiate r i t)
+  | Disc t -> Disc (instantiate r i t)
+  | Endisc t -> Endisc (instantiate r i t)
   | Uni i -> Uni i
 
 and instantiate_extent_head r i {var; dom; mot; ctx; endcase; varcase} =
@@ -243,6 +249,13 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
     | Quasi q :: s -> Quasi (instantiate_quasi_cell r i q) @: go r i (h, s)
     | Unglobe :: s -> Unglobe @: go r i (h, s)
     | Uncodisc :: s -> Uncodisc @: go r i (h, s)
+    | Letdisc (m, tp, mot, case) :: s ->
+      Letdisc
+        (m,
+         instantiate r i tp,
+         instantiate_clos r i mot,
+         instantiate_clos r i case)
+      @: go r i (h, s)
   in
   go
 
@@ -264,6 +277,7 @@ and instantiate_quasi_cell r i =
   | GelBridge ts -> GelBridge (List.map (instantiate r i) ts)
   | CodiscTp -> CodiscTp
   | GlobalTp -> GlobalTp
+  | DiscTp -> DiscTp
 
 and instantiate_ne r i ne =
   let headf r i = function

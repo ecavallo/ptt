@@ -18,6 +18,7 @@ val do_j : Domain.lvl -> Domain.clos3 -> Domain.clos -> Domain.t -> Domain.t
 val do_ungel : Domain.lvl -> Domain.t list -> Domain.clos -> Domain.t -> Domain.clos -> Domain.t
 val do_uncodisc : Domain.t -> Domain.t
 val do_unglobe : Domain.t -> Domain.t
+val do_letdisc : Domain.lvl -> Mode.modality -> Domain.clos -> Domain.clos -> Domain.t -> Domain.t
 
 val do_pi_dom : Domain.t -> Domain.t
 val do_pi_cod : Domain.lvl -> Domain.t -> Domain.t -> Domain.t
@@ -35,6 +36,7 @@ val do_gel_rel : Domain.lvl -> Domain.t -> Domain.t list -> Domain.t
 val do_gel_bridge : Domain.lvl -> Domain.t -> Domain.t list -> Domain.t
 val do_codisc_tp : Domain.t -> Domain.t
 val do_global_tp : Domain.t -> Domain.t
+val do_disc_tp : Domain.t -> Domain.t
 
 val do_clos : Domain.lvl -> Domain.clos -> Domain.env_entry -> Domain.t
 val do_clos2 : Domain.lvl -> Domain.clos2 -> Domain.env_entry -> Domain.env_entry -> Domain.t

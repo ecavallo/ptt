@@ -46,6 +46,8 @@ and t =
   | Encodisc of t
   | Global of t
   | Englobe of t
+  | Disc of t
+  | Endisc of t
   | Uni of Syntax.uni_level
 and extent_head = {var : lvl; dom : clos; mot : clos2; ctx : t; endcase : clos list; varcase : closN}
 and head =
@@ -65,6 +67,7 @@ and cell =
   | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
   | Uncodisc
   | Unglobe
+  | Letdisc of Mode.modality * t * clos * clos
   | Quasi of quasi_cell
 and quasi_cell = 
   | PiDom
@@ -83,6 +86,7 @@ and quasi_cell =
   | GelBridge of t list
   | CodiscTp
   | GlobalTp
+  | DiscTp
 and spine = cell list
 and ne = head * spine
 and nf =

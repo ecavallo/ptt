@@ -186,6 +186,18 @@ let rec bind env = function
   | CS.Global t -> S.Global (bind env t)
   | CS.Englobe t -> S.Englobe (bind env t)
   | CS.Unglobe t -> S.Unglobe (bind env t)
+  | CS.Disc t -> S.Disc (bind env t)
+  | CS.Endisc t -> S.Endisc (bind env t)
+  | CS.Letdisc
+      {modality;
+       mot = Binder {name = mot_name; body = mot_body};
+       case = Binder {name = case_name; body = case_body};
+       disc} ->
+    S.Letdisc
+      (modality,
+       bind (Term mot_name :: env) mot_body,
+       bind (Term case_name :: env) case_body,
+       bind env disc)
   | CS.Uni i -> S.Uni i
 
 and bind_spine env = function

@@ -1,0 +1,146 @@
+--------------------------------------------------------------------------------
+-- Discrete modality tests
+--------------------------------------------------------------------------------
+
+let par _ : Disc unit = disc triv
+
+let pt into : (A : U<0>) -> A -> Global (Disc A) =
+  fun A a -> glob (disc a)
+
+let pt out : (A : U<0>) -> (Global (Disc A)) -> A =
+  fun A g ->
+  undisc{dsc} (unglob g) at _ -> A with | disc a -> a
+
+let pt out_into : (A : U<0>) (a : A) -> Id A (out A (into A a)) a =
+  fun A a -> refl a
+
+let pt into_out : (A : U<0>) (g : Global (Disc A))
+  -> Id (Global (Disc A)) (into A (out A g)) g
+  =
+  fun A g ->
+  undisc{dsc} (unglob g) at d ->
+    Id (Global (Disc A)) (glob (disc (undisc{dsc} d at _ -> A with | disc a -> a))) (glob d)
+  with
+  | disc a -> refl (glob (disc a))
+
+let par _ : (Disc U<0>) -> Codisc U<0> =
+  fun d ->
+  codisc (undisc{dsc} d at _ -> U<0> with | disc a -> a)
+
+--------------------------------------------------------------------------------
+-- Booleans
+-- Example of colimits commuting with Disc (unlike Codisc)
+--------------------------------------------------------------------------------
+
+let pt into_global : bool -> Global bool =
+  fun b ->
+  if b at _ -> Global bool with
+  | tt -> glob tt
+  | ff -> glob ff
+
+let into_disc : bool -> Disc bool =
+  fun b ->
+  if b at _ -> Disc bool with
+  | tt -> disc tt
+  | ff -> disc ff
+
+let out_disc : (Disc bool) -> bool =
+  fun d ->
+  undisc{par} d at _ -> bool with | disc b -> unglob (into_global b)
+
+let out_into_disc : (b : bool) -> Id bool (out_disc (into_disc b)) b =
+  fun b ->
+  if b at b -> Id bool (out_disc (into_disc b)) b with
+  | tt -> refl tt
+  | ff -> refl ff
+
+let into_out_disc : (d : Disc bool) -> Id (Disc bool) (into_disc (out_disc d)) d =
+  fun d ->
+  undisc{par} d at d -> Id (Disc bool) (into_disc (out_disc d)) d with
+  | disc b ->
+    unglob
+      (if b at b -> Global (Id (Disc bool) (into_disc (unglob (into_global b))) (disc b)) with
+        | tt -> glob (refl (disc tt))
+        | ff -> glob (refl (disc ff)))
+
+--------------------------------------------------------------------------------
+-- Identity types in Disc
+--------------------------------------------------------------------------------
+
+let pt Code : (A : U<0>) -> Global ((Disc A) -> (Disc A) -> U<0>) =
+  fun A ->
+    glob
+      (fun d0 ->
+        undisc{par} d0 at _ -> (Disc A) -> U<0> with
+        | disc a0 -> fun d1 ->
+          undisc{par} d1 at _ -> U<0> with
+          | disc a1 -> Disc (Id A a0 a1))
+
+let pt encode_refl : (A : U<0>)
+  -> Global ((d : Disc A) -> (unglob (Code A)) d d)
+  =
+  fun A ->
+    glob
+      (fun d ->
+        undisc{par} d at d -> (unglob (Code A)) d d with
+        | disc a -> disc (refl a))
+
+let pt encode : (A : U<0>)
+  -> Global ((d0 : Disc A) (d1 : Disc A) -> (Id (Disc A) d0 d1) -> (unglob (Code A)) d0 d1)
+  =
+  fun A ->
+    glob
+      (fun d0 d1 eq ->
+        match eq at d0 d1 _ -> (unglob (Code A)) d0 d1 with
+        | refl d -> (unglob (encode_refl A)) d)
+
+let pt disc_injective : (A : U<0>) (a0 : A) (a1 : A)
+  -> (Global (Id (Disc A) (disc a0) (disc a1)))
+  -> Id A a0 a1
+  =
+  fun A a0 a1 g ->
+  undisc{dsc} ((unglob (encode A)) (disc a0) (disc a1) (unglob g)) at _ -> Id A a0 a1 with
+  | disc eq -> eq
+
+-- TODO prove without using Codisc
+let pt cong_undisc : (A : U<0>)
+  (gd0 : Global (Disc A)) (gd1 : Global (Disc A))
+  (eq : Global (Id (Disc A) (unglob gd0) (unglob gd1)))
+  -> Id A (out A gd0) (out A gd1)
+  =
+  fun A d0 d1 eq ->
+  uncodisc
+    (match (unglob eq) at d0 d1 _ ->
+        Codisc
+          (Id A
+            (undisc{dsc} d0 at _ -> A with | disc a -> a)
+            (undisc{dsc} d1 at _ -> A with | disc a -> a))
+      with
+      | refl d -> codisc (refl (undisc{dsc} d at _ -> A with | disc a -> a)))
+
+--------------------------------------------------------------------------------
+-- Polymorphic endofunction
+--------------------------------------------------------------------------------
+
+let pt readOff : (Global ((A : U<0>) -> A -> A)) -> (A : U<0>) -> A -> A =
+  fun F A a -> undisc{dsc} ((unglob F) (Disc A) (disc a)) at _ -> A with | disc a -> a
+
+normalize def readOff
+
+let gelproj : (A : U<0>) (P : A -> U<0>) (a : A) -> [x] Gel x {A} (a -> P a) {a} -> P a =
+  fun A P a p ->
+  ungel x : 1 -> p @ x at _ -> P a with | gel r -> r
+
+let id_param1 : (F : (A : U<0>) -> A -> A) -> (A : U<0>) (a : A) -> Id A (F A a) a =
+  fun F A a ->
+  let P : A -> U<0> = fun b -> Id A b a in
+  gelproj A (fun b -> P b) (F A a) (bri x -> F (Gel x {A} (b -> P b)) (gel x {a} (refl a)))
+
+let pt id_param_global : (F : Global ((A : U<0>) -> A -> A)) (A : U<0>) (a : A)
+  -> Id A (readOff F A a) a
+  =
+  fun F A a ->
+  cong_undisc A
+    (glob ((unglob F) (Disc A) (disc a)))
+    (glob (disc a))
+    (glob (id_param1 (unglob F) (Disc A) (disc a)))

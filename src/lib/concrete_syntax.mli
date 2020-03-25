@@ -57,13 +57,16 @@ and t =
   | Global of t
   | Englobe of t
   | Unglobe of t
+  | Disc of t
+  | Endisc of t
+  | Letdisc of {modality : Mode.modality; mot : binder; case : binder; disc : t}
   | Uni of uni_level
 
 type decl =
-    Def of {name : ident; mode : Check.mode; def : t; tp : t}
-  | Postulate of {name : ident; mode : Check.mode; tp : t}
+    Def of {name : ident; mode : Mode.mode; def : t; tp : t}
+  | Postulate of {name : ident; mode : Mode.mode; tp : t}
   | NormalizeDef of ident
-  | NormalizeTerm of {term : t; mode : Check.mode; tp : t}
+  | NormalizeTerm of {term : t; mode : Mode.mode; tp : t}
   | Quit
 
 type signature = decl list

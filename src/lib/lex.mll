@@ -59,6 +59,9 @@ let keywords =
     ("Global", GLOBAL);
     ("glob", ENGLOBE);
     ("unglob", UNGLOBE);
+    ("Disc", DISC);
+    ("disc", ENDISC);
+    ("undisc", UNDISC);
     ("at", AT);
     ("of", OF);
     ("def", DEF);
@@ -66,6 +69,9 @@ let keywords =
     ("normalize", NORMALIZE);
     ("par", PAR);
     ("pt", PT);
+    ("cmp", CMP);
+    ("glb", GLB);
+    ("dsc", DSC);
     ("quit", QUIT);
   ]
 }
@@ -86,6 +92,8 @@ rule token = parse
     { RPR }
   | '|'
     { PIPE }
+  | '.'
+    { DOT }
   | ','
     { COMMA }
   | '*'
