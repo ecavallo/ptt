@@ -57,6 +57,9 @@ and t =
   | Global of t
   | Englobe of t
   | Unglobe of t
+  | Disc of t
+  | Endisc of t
+  | Letdisc of {modality : Mode.modality; mot : binder; case : binder; disc : t}
   | Uni of uni_level
 
 type decl =

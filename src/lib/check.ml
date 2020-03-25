@@ -98,7 +98,7 @@ let assert_mode_equal m1 m2 =
 let assert_modality_leq m1 m2 =
   if M.leq m1 m2
   then ()
-  else tp_error (Misc "Tried to use variable behind modality\n")
+  else tp_error (Misc ("Tried to use variable behind modality: " ^ Mode.show_modality m1 ^ " ≰ " ^ Mode.show_modality m2 ^ "\n"))
 
 let synth_var ~mode env x =
   let rec go synth_mod env x =
@@ -646,12 +646,12 @@ and synth_quasi ~mode ~env ~size ~term =
   | Letdisc (m, mot, case, d) ->
     assert_mode_equal mode (M.src m);
     begin
-      match synth ~mode:(M.dst m) ~env:(Lock m :: env) ~size ~term with
+      match synth ~mode:(M.dst m) ~env:(Lock m :: env) ~size ~term:d with
       | Disc tp ->
         let sem_env = env_to_sem_env env in
         let (_, mot_env) = mk_modal_var m (D.Disc tp) env size in
         check_tp ~mode ~env:mot_env ~size:(size + 1) ~term:mot;
-        let (case_arg, case_env) = mk_modal_var (M.compose M.Discrete m) tp env size in
+        let (case_arg, case_env) = mk_modal_var (M.compose M.Components m) tp env size in
         check ~mode ~env:case_env ~size:(size + 1) ~term:case
           ~tp:(E.eval mot (D.Tm (D.Endisc case_arg) :: sem_env) (size + 1));
         E.eval mot (D.Tm (E.eval d sem_env size) :: sem_env) size
@@ -711,6 +711,9 @@ and check_tp ~mode ~env ~size ~term =
   | Global tp ->
     assert_mode_equal mode Pointwise;
     check_tp ~mode:Parametric ~env:(Lock M.Discrete :: env) ~size ~term:tp
+  | Disc tp ->
+    assert_mode_equal mode Parametric;
+    check_tp ~mode:Pointwise ~env:(Lock M.Components :: env) ~size ~term:tp
   | term ->
     begin
       match synth ~mode ~env ~size ~term with

@@ -4,7 +4,7 @@
 
 %token <int> NUMERAL
 %token <string> ATOM
-%token COLON SEMI PIPE AT COMMA RIGHT_ARROW UNDERSCORE
+%token COLON SEMI PIPE AT DOT COMMA RIGHT_ARROW UNDERSCORE
 %token LPR RPR LANGLE RANGLE LBR RBR LCU RCU
 %token EQUALS
 %token TIMES FST SND
@@ -13,6 +13,7 @@
 %token GEL ENGEL UNGEL
 %token GLOBAL ENGLOBE UNGLOBE
 %token CODISC ENCODISC UNCODISC
+%token DISC ENDISC UNDISC
 %token UNIT TRIV
 %token NAT ZERO SUC REC
 %token LIST NIL CONS LISTREC
@@ -23,6 +24,7 @@
 %token UNIV
 %token QUIT NORMALIZE
 %token PAR PT
+%token CMP GLB DSC
 %token EOF
 
 %start <Concrete_syntax.signature> sign
@@ -56,6 +58,15 @@ sign:
 dim:
   | r = name { DVar r }
   | n = NUMERAL { Const n };
+
+modality:
+  | PAR { Mode.IdParametric }
+  | PT  { Mode.IdPointwise }
+  | CMP { Mode.Components }
+  | GLB { Mode.Global }
+  | DSC { Mode.Discrete }
+  | CMP DOT DSC { Mode.DiscreteComponents }
+  | GLB DOT DSC { Mode.DiscreteGlobal }
 
 endpoints:
   | LCU; endpoints = separated_list(SEMI, term); RCU { endpoints };
@@ -215,6 +226,15 @@ term:
   | GLOBAL; t = atomic { Global t }
   | ENGLOBE; t = atomic { Englobe t }
   | UNGLOBE; t = atomic { Unglobe t }
+  | DISC; t = atomic { Disc t }
+  | ENDISC; t = atomic { Endisc t }
+  | UNDISC; LCU; modality = modality; RCU; disc = atomic; AT; mot_name = name; RIGHT_ARROW; mot_body = term; WITH;
+    PIPE; ENDISC; case_name = name; RIGHT_ARROW; case_body = term
+    { Letdisc
+        {modality;
+         mot = Binder {name = mot_name; body = mot_body};
+         case = Binder {name = case_name; body = case_body};
+         disc} }
   
 tele_cell:
   | LPR name = name; COLON ty = term; RPR

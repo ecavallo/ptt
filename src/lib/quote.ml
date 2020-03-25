@@ -189,7 +189,7 @@ and read_back_nf env size nf =
     Syn.Englobe (read_back_nf env size (D.Normal {tp; term = t'}))
   (* Disc *)
   | D.Normal {tp = D.Disc tp; term = D.Endisc term} ->
-    Syn.Disc (read_back_nf env size (D.Normal {tp; term}))
+    Syn.Endisc (read_back_nf env size (D.Normal {tp; term}))
   (* Types *)
   | D.Normal {tp = D.Uni _; term = t} -> read_back_tp env size t
   (* Extent type *)
