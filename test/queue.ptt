@@ -1053,11 +1053,23 @@ let bridge_to_id : (b0 : bool) (b1 : bool) -> [_] bool {b0; b1} -> Id bool b0 b1
       lemma)
     (bool_eta b1)
 
-let example : (A : U<0>) (f : (QUEUE A) -> bool)
+let example1 : (A : U<0>) (f : (QUEUE A) -> bool)
   -> Id bool (f (queue_struct1 A)) (f (queue_struct2 A))
   =
   fun A f ->
-  bridge_to_id
-    (f (queue_struct1 A))
-    (f (queue_struct2 A))
+  bridge_to_id (f (queue_struct1 A)) (f (queue_struct2 A))
     (bri x -> f (queue12 (bri _ -> A) @ x))
+
+let example2 : (f : ((A : U<0>) -> (QUEUE A)) -> bool)
+  -> Id bool (f queue_struct1) (f queue_struct2)
+  =
+  fun f ->
+  bridge_to_id (f queue_struct1) (f queue_struct2)
+    (bri x ->
+      f
+        (fun A ->
+          extent x of A in _ -> U<0> at _ A -> QUEUE A with
+          | A0 -> queue_struct1 A0
+          | A1 -> queue_struct2 A1
+          | _ _ A x -> queue12 A @ x))
+
