@@ -7,8 +7,8 @@
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
--- We postulate these consequences of univalence for convenience, although
--- they should not be necessary
+-- Postulate some consequences of univalence. These should not be necessary to
+-- obtain our final result but they are very convenient.
 --------------------------------------------------------------------------------
 
 let Iso : (A : U<0>) (B : U<0>) -> U<0> =
@@ -18,8 +18,23 @@ let Iso : (A : U<0>) (B : U<0>) -> U<0> =
   * ((a : A) -> Id A (g (f a)) a)
   * ((b : B) -> Id B (f (g b)) b)
 
-postulate respects_iso : (F : U<0> -> U<0>) (A : U<0>) (B : U<0>)
- -> (Iso A B) -> Iso (F A) (F B)
+let iso_id : (A : U<0>) -> Iso A A =
+  fun A ->
+  <fun a -> a, <fun a -> a, <fun a -> refl a, fun a -> refl a>>>
+
+postulate ua : (A : U<0>) (B : U<0>) -> (Iso A B) -> Id U<0> A B
+
+postulate ua_id : (A : U<0>) -> Id (Id U<0> A A) (ua A A (iso_id A)) (refl A)
+
+postulate funext : (A : U<1>) (B : A -> U<1>)
+  (f0 : (a : A) -> B a) (f1 : (a : A) -> B a)
+  -> ((a : A) -> Id (B a) (f0 a) (f1 a))
+  -> Id ((a : A) -> B a) f0 f1
+
+postulate bridgeext : (A : [_] U<1> {*; *}) (a0 : A @ 0) (a1 : A @ 1)
+  (p0 : [x] A @ x {a0; a1}) (p1 : [x] A @ x {a0; a1})
+  -> [x] Id (A @ x) (p0 @ x) (p1 @ x) {refl a0; refl a1}
+  -> Id ([x] A @ x {a0; a1}) p0 p1
 
 --------------------------------------------------------------------------------
 -- Prelude
@@ -42,7 +57,7 @@ let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
   match eq at a0 a1 _ -> Id B (f a0) (f a1) with
   | refl z -> refl (f z)
 
-let subst : (A : U<0>) (B : A -> U<0>)
+let subst : (A : U<1>) (B : A -> U<1>)
   (a0 : A) (a1 : A) (eq : Id A a0 a1)
   -> (B a0) -> B a1
   =
@@ -50,7 +65,15 @@ let subst : (A : U<0>) (B : A -> U<0>)
   match eq at a0 a1 _ -> (B a0) -> B a1 with
   | refl _ -> fun b -> b
 
-let subst2 : (A : U<0>) (B : U<0>) (C : A -> B -> U<0>)
+let subst : (A : U<1>) (B : A -> U<1>)
+  (a0 : A) (a1 : A) (eq : Id A a0 a1)
+  -> (B a0) -> B a1
+  =
+  fun A B a0 a1 eq ->
+  match eq at a0 a1 _ -> (B a0) -> B a1 with
+  | refl _ -> fun b -> b
+
+let subst2 : (A : U<1>) (B : U<1>) (C : A -> B -> U<1>)
   (a0 : A) (a1 : A) (eqA : Id A a0 a1)
   (b0 : B) (b1 : B) (eqB : Id B b0 b1)
   -> (C a0 b0) -> C a1 b1
@@ -59,7 +82,7 @@ let subst2 : (A : U<0>) (B : U<0>) (C : A -> B -> U<0>)
   match eq at a0 a1 _ -> (b0 : B) (b1 : B) -> (Id B b0 b1) -> (C a0 b0) -> C a1 b1 with
   | refl a -> subst B (C a)
 
-let subst_ends : (A : [x] U<0> {*; *}) (p : [x] A @ x {*; *})
+let subst_ends : (A : [x] U<1> {*; *}) (p : [x] A @ x {*; *})
   (a0 : A @ 0) (eq0 : Id (A @ 0) (p @ 0) a0)
   (a1 : A @ 1) (eq1 : Id (A @ 1) (p @ 1) a1)
   -> [x] A @ x {a0; a1}
@@ -80,18 +103,6 @@ let based1_J : (A : U<0>) (a1 : A)
    with
    | refl _ -> fun B b -> b)
   B b
-
-let Bridge : (A : [_] U<0> {*; *}) -> (A @ 0) -> (A @ 1) -> U<0> =
-  fun A a0 a1 -> [x] (A @ x) {a0; a1}
-
-let gelproj : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
-  (p : [x] Gel x {A; B} (a b -> R a b) {*; *}) -> R (p @ 0) (p @ 1)
-  =
-  fun A B R p ->
-  ungel x : 2 -> p @ x at _ -> R (p @ 0) (p @ 1) with | gel r -> r
-
-let IdGel : (A : U<0>) -> [_] U<0> {A; A} =
-  fun A -> bri x -> Gel x {A; A} (a a' -> Id A a a')
 
 --------------------------------------------------------------------------------
 -- Operations on relations
@@ -114,59 +125,144 @@ let rel_comp : (A : U<0>) (B : U<0>) (C : U<0>)
   (b : B) * (R a b) * S b c
 
 let rel_unitr : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
-  (a : A) (b : B) -> Iso (rel_comp A B B R (rel_id B) a b) (R a b)
+  -> Id (A -> B -> U<0>) (rel_comp A B B R (rel_id B)) R
   =
-  fun A B R a b ->
-  let fwd : (b : B) -> (rel_comp A B B R (rel_id B) a b) -> R a b =
-    fun b p -> subst B (R a) (fst p) b (snd (snd p)) (fst (snd p))
-  in
-  let bwd : (b : B) -> (R a b) -> rel_comp A B B R (rel_id B) a b =
-    fun b r -> <b, <r, refl b>>
-  in
-  < fwd b
-  , < bwd b
-    , < fun p ->
-        let ind =
-          match (snd (snd p)) at c b eq ->
-              (r : R a c) ->
-              Id (rel_comp A B B R (rel_id B) a b) (bwd b (fwd b <c, <r, eq>>)) <c, <r, eq>>
-            with
-            | refl b -> fun r -> refl <b, <r, refl b>>
+  fun A B R ->
+  funext A (fun _ -> B -> U<0>)
+    (rel_comp A B B R (rel_id B)) R
+    (fun a ->
+      funext B (fun _ -> U<0>)
+      (rel_comp A B B R (rel_id B) a) (R a)
+      (fun b ->
+        let fwd : (b : B) -> (rel_comp A B B R (rel_id B) a b) -> R a b =
+          fun b p -> subst B (R a) (fst p) b (snd (snd p)) (fst (snd p))
         in
-        ind (fst (snd p))
-      , fun r -> refl r
-      >
-    >
-  >
+        let bwd : (b : B) -> (R a b) -> rel_comp A B B R (rel_id B) a b =
+          fun b r -> <b, <r, refl b>>
+        in
+        ua
+          (rel_comp A B B R (rel_id B) a b)
+          (R a b)
+          < fwd b
+          , < bwd b
+            , < fun p ->
+                (match (snd (snd p)) at c b eq ->
+                    (r : R a c) ->
+                    Id (rel_comp A B B R (rel_id B) a b) (bwd b (fwd b <c, <r, eq>>)) <c, <r, eq>>
+                  with
+                  | refl b -> fun r -> refl <b, <r, refl b>>)
+                (fst (snd p))
+              , fun r -> refl r
+              >
+            >
+          >))
 
 --------------------------------------------------------------------------------
--- Bridge-discreteness of bool (one direction)
+-- Bridges, Gel, and relativity
 --------------------------------------------------------------------------------
 
-let shannon : bool -> bool =
-  fun b ->
-  if b at _ -> bool with | tt -> tt | ff -> ff
+let Bridge : (A : [_] U<0> {*; *}) -> (A @ 0) -> (A @ 1) -> U<0> =
+  fun A a0 a1 -> [x] (A @ x) {a0; a1}
 
-let bool_eta : (b : bool) -> Id bool (shannon b) b =
-  fun b ->
-  if b at b -> Id bool (shannon b) b with
-  | tt -> refl tt
-  | ff -> refl ff
+let gelproj : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
+  (p : [x] Gel x {A; B} (a b -> R a b) {*; *}) -> R (p @ 0) (p @ 1)
+  =
+  fun A B R p ->
+  ungel x : 2 -> p @ x at _ -> R (p @ 0) (p @ 1) with | gel r -> r
 
-let bridge_to_id : (b0 : bool) (b1 : bool) -> [_] bool {b0; b1} -> Id bool b0 b1 =
-  fun b0 b1 p ->
-  let lemma : Id bool (shannon b0) (shannon b1) =
-    gelproj bool bool (fun c d -> Id bool c d)
-      (bri x ->
-       if (p @ x) at _ -> Gel x {bool; bool} (c d -> Id bool c d) with
-       | tt -> gel x {tt; tt} (refl tt)
-       | ff -> gel x {ff; ff} (refl ff))
-  in
-  trans bool b0 (shannon b1) b1
-    (trans bool b0 (shannon b0) (shannon b1)
-      (symm bool (shannon b0) b0 (bool_eta b0))
-      lemma)
-    (bool_eta b1)
+let cong_gel : (A : U<0>) (B : U<0>)
+  (R : A -> B -> U<0>) (a : A) (b : B)
+  (r0 : R a b) (r1 : R a b) (eq : Id (R a b) r0 r1)
+  -> [x] (Id (Gel x {A; B} (a b -> R a b)) (gel x {a; b} r0) (gel x {a; b} r1)) {refl a; refl b}
+  =
+  fun A B R a b r0 r1 eq ->
+  match eq at r0 r1 eq ->
+    [x] (Id (Gel x {A; B} (a b -> R a b)) (gel x {a; b} r0) (gel x {a; b} r1)) {refl a; refl b}
+  with
+  | refl r -> bri x -> refl (gel x {a; b} r)
+
+let gel_eta : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
+  (p : [x] Gel x {A; B} (a b -> R a b) {*; *})
+  -> [x] Id (Gel x {A; B} (a b -> R a b)) (p @ x) (gel x {p @ 0; p @ 1} (gelproj A B R p)) {*; *}
+  =
+  fun A B R p ->
+  ungel x : 2 -> p @ x at q ->
+    [x] Id (Gel x {A; B} (a b -> R a b)) (q @ x) (gel x {p @ 0; p @ 1} (gelproj A B R q)) {*; *}
+  with
+  | gel r -> bri x -> refl (gel x {p @ 0; p @ 1} r)
+
+let ra : (A : U<0>) (B : U<0>) -> (A -> B -> U<0>) -> [_] U<0> {A; B} =
+  fun A B R -> bri x -> Gel x {A; B} (a b -> R a b)
+
+let IdGel : (A : U<0>) -> [_] U<0> {A; A} =
+  fun A -> ra A A (rel_id A)
+
+let ra_eta_fwd : (A : U<0>) (B : U<0>) (C : [_] U<0> {A; B})
+  -> [x] (ra A B (Bridge C) @ x) -> C @ x {fun a -> a; fun b -> b}
+  =
+  fun A B C -> bri x -> fun g ->
+  extent x of g in x -> ra A B (Bridge C) @ x at x _ -> C @ x with
+  | a -> a
+  | b -> b
+  | a b q x -> gelproj A B (Bridge C) q @ x
+  
+let ra_eta_bwd : (A : U<0>) (B : U<0>) (C : [_] U<0> {A; B})
+  -> [x] (C @ x) -> ra A B (Bridge C) @ x {fun a -> a; fun b -> b}
+  =
+  fun A B C -> bri x -> fun c ->
+  extent x of c in x -> C @ x at x _ -> ra A B (Bridge C) @ x with
+  | a -> a
+  | b -> b
+  | a b p x -> gel x {a; b} p
+
+let ra_eta_fwd_bwd : (A : U<0>) (B : U<0>) (C : [_] U<0> {A; B})
+  -> [x] (c : C @ x) -> Id (C @ x) (ra_eta_fwd A B C @ x (ra_eta_bwd A B C @ x c)) c
+     {fun b -> refl b; fun b -> refl b}
+  =
+  fun A B C -> bri x -> fun c ->
+  extent x of c in x -> C @ x at x c ->
+    Id (C @ x) (ra_eta_fwd A B C @ x (ra_eta_bwd A B C @ x c)) c
+  with
+  | a -> refl a
+  | b -> refl b
+  | a b p x -> refl (p @ x)
+
+let ra_eta_bwd_fwd : (A : U<0>) (B : U<0>) (C : [_] U<0> {A; B})
+  -> [x] (g : ra A B (Bridge C) @ x)
+       -> Id (ra A B (Bridge C) @ x) (ra_eta_bwd A B C @ x (ra_eta_fwd A B C @ x g)) g
+     {fun a -> refl a; fun b -> refl b}
+  =
+  fun A B C -> bri x -> fun g ->
+  extent x of g in x -> ra A B (Bridge C) @ x at x g ->
+    Id (ra A B (Bridge C) @ x) (ra_eta_bwd A B C @ x (ra_eta_fwd A B C @ x g)) g
+  with
+  | a -> refl a
+  | b -> refl b
+  | a b q x ->
+    (ungel x : 2 -> q @ x at q ->
+        [x] Id (ra A B (Bridge C) @ x) (ra_eta_bwd A B C @ x (ra_eta_fwd A B C @ x (q @ x))) (q @ x)
+        {refl a; refl b}
+      with
+      | gel c -> bri x -> refl (gel x {a; b} c))
+    @ x
+
+let ra_eta : (A : U<0>) (B : U<0>) (C : [_] U<0> {A; B})
+  -> Id ([_] U<0> {A; B}) (ra A B (Bridge C)) C
+  =
+  fun A B C ->
+  bridgeext (bri _ -> U<0>) A B (ra A B (Bridge C)) C
+    (subst_ends
+      (bri x -> Id U<0> (ra A B (Bridge C) @ x) (C @ x))
+      (bri x -> ua (ra A B (Bridge C) @ x) (C @ x)
+        < ra_eta_fwd A B C @ x
+        , < ra_eta_bwd A B C @ x
+          , < ra_eta_bwd_fwd A B C @ x
+            , ra_eta_fwd_bwd A B C @ x
+            >
+          >
+        >)
+      (refl A) (ua_id A)
+      (refl B) (ua_id B))
 
 --------------------------------------------------------------------------------
 -- Products
@@ -392,9 +488,7 @@ let option_bridge_to_rel : (A : [_] U<0> {*; *})
   =
   fun A op0 op1 p ->
   let G : [x] U<0> {*; *} =
-    bri x ->
-    Gel x {option (A @ 0); option (A @ 1)}
-      (op0 op1 -> option_rel (A @ 0) (A @ 1) (Bridge A) op0 op1)
+    ra (option (A @ 0)) (option (A @ 1)) (option_rel (A @ 0) (A @ 1) (Bridge A))
   in
   let t : [x] G @ x {option_id (A @ 0) op0; option_id (A @ 1) op1} =
     bri x ->
@@ -687,7 +781,7 @@ let queue_rel_comp :
 
 let queue_rel_to_bridge : (A0 : U<0>) (A1 : U<0>) (A : A0 -> A1 -> U<0>)
   (Q0 : QUEUE A0) (Q1 : QUEUE A1) (Q : queue_rel A0 A1 A Q0 Q1)
-  -> [x] QUEUE (Gel x {A0; A1} (a0 a1 -> A a0 a1)) {Q0; Q1}
+  -> [x] QUEUE (ra A0 A1 A @ x) {Q0; Q1}
   =
   fun A0 A1 A Q0 Q1 Q ->
   let ty0 = ty A0 Q0 in
@@ -696,8 +790,8 @@ let queue_rel_to_bridge : (A0 : U<0>) (A1 : U<0>) (A : A0 -> A1 -> U<0>)
   let Remp = fst (snd Q) in
   let Rpush = fst (snd (snd Q)) in
   let Rpop = snd (snd (snd Q)) in
-  let AG : [_] U<0> {A0; A1} = bri x -> Gel x {A0; A1} (a0 a1 -> A a0 a1) in
-  let QG : [_] U<0> {ty0; ty1} = bri x -> Gel x {ty0; ty1} (q0 q1 -> R q0 q1) in
+  let AG : [_] U<0> {A0; A1} = ra A0 A1 A in
+  let QG : [_] U<0> {ty0; ty1} = ra ty0 ty1 R in
   bri x ->
   < QG @ x
   , < gel x {empty A0 Q0; empty A1 Q1} Remp
@@ -746,6 +840,18 @@ let queue_bridge_to_rel : (A : [_] U<0> {*; *}) (Q : [x] QUEUE (A @ x) {*; *})
       >
     >
   >
+
+-- let queue_base_iso_to_map : (A : U<0>) (B : U<0>)
+--   -> (Iso A B) -> (QUEUE A) -> QUEUE B
+--   =
+--   fun A B iso Q ->
+--   < fst Q
+--   , < fst (snd Q)
+--     , < fun b q -> fst (snd (snd Q)) (fst (snd iso) b) q
+--       , fun q -> pop_result_map
+--       >
+--     >
+--   >
 
 --------------------------------------------------------------------------------
 -- Queue implementation with a single list
@@ -887,8 +993,71 @@ let queue12_rel : (A : U<0>)
     >
   >
 
-let queue12_bridge : (A : U<0>)
-  -> [x] (QUEUE (IdGel A @ x)) {queue_struct1 A; queue_struct2 A}
+let queue12 : (A : [_] U<0> {*; *})
+  -> [x] (QUEUE (A @ x)) {queue_struct1 (A @ 0); queue_struct2 (A @ 1)}
   =
   fun A ->
-  queue_rel_to_bridge A A (rel_id A) (queue_struct1 A) (queue_struct2 A) (queue12_rel A)
+  let rel : queue_rel (A @ 0) (A @ 1) (Bridge A) (queue_struct1 (A @ 0)) (queue_struct2 (A @ 1)) =
+    subst
+      ((A @ 0) -> (A @ 1) -> U<0>)
+      (fun R -> queue_rel (A @ 0) (A @ 1) R (queue_struct1 (A @ 0)) (queue_struct2 (A @ 1)))
+      (rel_comp (A @ 0) (A @ 1) (A @ 1) (Bridge A) (rel_id (A @ 1)))
+      (Bridge A)
+      (rel_unitr (A @ 0) (A @ 1) (Bridge A))
+      (queue_rel_comp
+        (A @ 0) (A @ 1) (A @ 1) (Bridge A) (rel_id (A @ 1))
+        (queue_struct1 (A @ 0))
+        (queue_struct1 (A @ 1))
+        (queue_struct2 (A @ 1))
+        (queue_bridge_to_rel A (bri x -> queue_struct1 (A @ x)))
+        (queue12_rel (A @ 1)))
+  in
+  subst
+    ([_] U<0> {A @ 0; A @ 1})
+    (fun T -> [x] (QUEUE (T @ x)) {queue_struct1 (A @ 0); queue_struct2 (A @ 1)})
+    (ra (A @ 0) (A @ 1) (Bridge A))
+    (bri x -> A @ x)
+    (ra_eta (A @ 0) (A @ 1) (bri x -> A @ x))
+    (queue_rel_to_bridge
+      (A @ 0) (A @ 1) (Bridge A)
+      (queue_struct1 (A @ 0))
+      (queue_struct2 (A @ 1))
+      rel)
+      
+--------------------------------------------------------------------------------
+-- Bridge-discreteness of bool (one direction)
+--------------------------------------------------------------------------------
+
+let shannon : bool -> bool =
+  fun b ->
+  if b at _ -> bool with | tt -> tt | ff -> ff
+
+let bool_eta : (b : bool) -> Id bool (shannon b) b =
+  fun b ->
+  if b at b -> Id bool (shannon b) b with
+  | tt -> refl tt
+  | ff -> refl ff
+
+let bridge_to_id : (b0 : bool) (b1 : bool) -> [_] bool {b0; b1} -> Id bool b0 b1 =
+  fun b0 b1 p ->
+  let lemma : Id bool (shannon b0) (shannon b1) =
+    gelproj bool bool (fun c d -> Id bool c d)
+      (bri x ->
+       if (p @ x) at _ -> ra bool bool (rel_id bool) @ x with
+       | tt -> gel x {tt; tt} (refl tt)
+       | ff -> gel x {ff; ff} (refl ff))
+  in
+  trans bool b0 (shannon b1) b1
+    (trans bool b0 (shannon b0) (shannon b1)
+      (symm bool (shannon b0) b0 (bool_eta b0))
+      lemma)
+    (bool_eta b1)
+
+let example : (A : U<0>) (f : (QUEUE A) -> bool)
+  -> Id bool (f (queue_struct1 A)) (f (queue_struct2 A))
+  =
+  fun A f ->
+  bridge_to_id
+    (f (queue_struct1 A))
+    (f (queue_struct2 A))
+    (bri x -> f (queue12 (bri _ -> A) @ x))
