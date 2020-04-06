@@ -841,18 +841,6 @@ let queue_bridge_to_rel : (A : [_] U<0> {*; *}) (Q : [x] QUEUE (A @ x) {*; *})
     >
   >
 
--- let queue_base_iso_to_map : (A : U<0>) (B : U<0>)
---   -> (Iso A B) -> (QUEUE A) -> QUEUE B
---   =
---   fun A B iso Q ->
---   < fst Q
---   , < fst (snd Q)
---     , < fun b q -> fst (snd (snd Q)) (fst (snd iso) b) q
---       , fun q -> pop_result_map
---       >
---     >
---   >
-
 --------------------------------------------------------------------------------
 -- Queue implementation with a single list
 --------------------------------------------------------------------------------
