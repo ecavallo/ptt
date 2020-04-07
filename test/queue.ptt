@@ -1,0 +1,1063 @@
+-------------------------------------------------------------------------------
+-- Establishing a bridge between two implementations of a queue
+
+-- See also a similar result using univalence, where the relation is made into
+-- an equivalence by quotienting one implementation
+-- https://github.com/agda/cubical/blob/master/Cubical/Data/Queue/Base.agda
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+-- Postulate some consequences of univalence. These should not be necessary to
+-- obtain our final result but they are very convenient.
+--------------------------------------------------------------------------------
+
+let Iso : (A : U<0>) (B : U<0>) -> U<0> =
+  fun A B ->
+  (f : A -> B)
+  * (g : B -> A)
+  * ((a : A) -> Id A (g (f a)) a)
+  * ((b : B) -> Id B (f (g b)) b)
+
+let iso_id : (A : U<0>) -> Iso A A =
+  fun A ->
+  <fun a -> a, <fun a -> a, <fun a -> refl a, fun a -> refl a>>>
+
+postulate ua : (A : U<0>) (B : U<0>) -> (Iso A B) -> Id U<0> A B
+
+postulate ua_id : (A : U<0>) -> Id (Id U<0> A A) (ua A A (iso_id A)) (refl A)
+
+postulate funext : (A : U<1>) (B : A -> U<1>)
+  (f0 : (a : A) -> B a) (f1 : (a : A) -> B a)
+  -> ((a : A) -> Id (B a) (f0 a) (f1 a))
+  -> Id ((a : A) -> B a) f0 f1
+
+postulate bridgeext : (A : [_] U<1> {*; *}) (a0 : A @ 0) (a1 : A @ 1)
+  (p0 : [x] A @ x {a0; a1}) (p1 : [x] A @ x {a0; a1})
+  -> [x] Id (A @ x) (p0 @ x) (p1 @ x) {refl a0; refl a1}
+  -> Id ([x] A @ x {a0; a1}) p0 p1
+
+--------------------------------------------------------------------------------
+-- Prelude
+--------------------------------------------------------------------------------
+
+let symm : (A : U<0>) (a : A) (b : A) -> (Id A a b) -> Id A b a =
+  fun A a b eq ->
+  match eq at a0 a1 _ -> Id A a1 a0 with
+  | refl a -> refl a
+
+let trans : (A : U<0>) (a : A) (b : A) (c : A) -> (Id A a b) -> (Id A b c) -> Id A a c =
+  fun A a b c eq0 ->
+  match eq0 at x y _ -> (Id A y c) -> Id A x c with
+  | refl z -> fun eq1 -> eq1
+
+let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
+  -> (Id A a0 a1) -> Id B (f a0) (f a1)
+  =
+  fun A B f a0 a1 eq ->
+  match eq at a0 a1 _ -> Id B (f a0) (f a1) with
+  | refl z -> refl (f z)
+
+let subst : (A : U<1>) (B : A -> U<1>)
+  (a0 : A) (a1 : A) (eq : Id A a0 a1)
+  -> (B a0) -> B a1
+  =
+  fun A B a0 a1 eq ->
+  match eq at a0 a1 _ -> (B a0) -> B a1 with
+  | refl _ -> fun b -> b
+
+let subst : (A : U<1>) (B : A -> U<1>)
+  (a0 : A) (a1 : A) (eq : Id A a0 a1)
+  -> (B a0) -> B a1
+  =
+  fun A B a0 a1 eq ->
+  match eq at a0 a1 _ -> (B a0) -> B a1 with
+  | refl _ -> fun b -> b
+
+let subst2 : (A : U<1>) (B : U<1>) (C : A -> B -> U<1>)
+  (a0 : A) (a1 : A) (eqA : Id A a0 a1)
+  (b0 : B) (b1 : B) (eqB : Id B b0 b1)
+  -> (C a0 b0) -> C a1 b1
+  =
+  fun A B C a0 a1 eq ->
+  match eq at a0 a1 _ -> (b0 : B) (b1 : B) -> (Id B b0 b1) -> (C a0 b0) -> C a1 b1 with
+  | refl a -> subst B (C a)
+
+let subst_ends : (A : [x] U<1> {*; *}) (p : [x] A @ x {*; *})
+  (a0 : A @ 0) (eq0 : Id (A @ 0) (p @ 0) a0)
+  (a1 : A @ 1) (eq1 : Id (A @ 1) (p @ 1) a1)
+  -> [x] A @ x {a0; a1}
+  =
+  fun A p a0 eq0 a1 eq1 ->
+  subst2 (A @ 0) (A @ 1) (fun t0 t1 -> [x] A @ x {t0; t1})
+    (p @ 0) a0 eq0
+    (p @ 1) a1 eq1
+    (bri x -> p @ x)
+
+let based1_J : (A : U<0>) (a1 : A)
+  (B : (a0 : A) (eq : Id A a0 a1) -> U<0>) (b : B a1 (refl a1))
+  (a0 : A) (eq : Id A a0 a1) -> B a0 eq
+  =
+  fun A a1 B b a0 eq ->
+  (match eq at a0 a1 eq ->
+     (B : (a0 : A) (eq : Id A a0 a1) -> U<0>) (b : B a1 (refl a1)) -> B a0 eq
+   with
+   | refl _ -> fun B b -> b)
+  B b
+
+--------------------------------------------------------------------------------
+-- Operations on relations
+--------------------------------------------------------------------------------
+
+let cospan_to_rel : (A : U<0>) (B : U<0>) (C : U<0>) (f : A -> C) (g : B -> C)
+ -> A -> B -> U<0>
+ =
+ fun A B C f g a b -> Id C (f a) (g b)
+
+let rel_id : (A : U<0>) -> A -> A -> U<0> =
+  fun A a a' -> Id A a a'
+
+let rel_comp : (A : U<0>) (B : U<0>) (C : U<0>)
+  -> (A -> B -> U<0>)
+  -> (B -> C -> U<0>)
+  -> (A -> C -> U<0>)
+  =
+  fun A B C R S a c ->
+  (b : B) * (R a b) * S b c
+
+let rel_unitr : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
+  -> Id (A -> B -> U<0>) (rel_comp A B B R (rel_id B)) R
+  =
+  fun A B R ->
+  funext A (fun _ -> B -> U<0>)
+    (rel_comp A B B R (rel_id B)) R
+    (fun a ->
+      funext B (fun _ -> U<0>)
+      (rel_comp A B B R (rel_id B) a) (R a)
+      (fun b ->
+        let fwd : (b : B) -> (rel_comp A B B R (rel_id B) a b) -> R a b =
+          fun b p -> subst B (R a) (fst p) b (snd (snd p)) (fst (snd p))
+        in
+        let bwd : (b : B) -> (R a b) -> rel_comp A B B R (rel_id B) a b =
+          fun b r -> <b, <r, refl b>>
+        in
+        ua
+          (rel_comp A B B R (rel_id B) a b)
+          (R a b)
+          < fwd b
+          , < bwd b
+            , < fun p ->
+                (match (snd (snd p)) at c b eq ->
+                    (r : R a c) ->
+                    Id (rel_comp A B B R (rel_id B) a b) (bwd b (fwd b <c, <r, eq>>)) <c, <r, eq>>
+                  with
+                  | refl b -> fun r -> refl <b, <r, refl b>>)
+                (fst (snd p))
+              , fun r -> refl r
+              >
+            >
+          >))
+
+--------------------------------------------------------------------------------
+-- Bridges, Gel, and relativity
+--------------------------------------------------------------------------------
+
+let Bridge : (A : [_] U<0> {*; *}) -> (A @ 0) -> (A @ 1) -> U<0> =
+  fun A a0 a1 -> [x] (A @ x) {a0; a1}
+
+let gelproj : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
+  (p : [x] Gel x {A; B} (a b -> R a b) {*; *}) -> R (p @ 0) (p @ 1)
+  =
+  fun A B R p ->
+  ungel x : 2 -> p @ x at _ -> R (p @ 0) (p @ 1) with | gel r -> r
+
+let cong_gel : (A : U<0>) (B : U<0>)
+  (R : A -> B -> U<0>) (a : A) (b : B)
+  (r0 : R a b) (r1 : R a b) (eq : Id (R a b) r0 r1)
+  -> [x] (Id (Gel x {A; B} (a b -> R a b)) (gel x {a; b} r0) (gel x {a; b} r1)) {refl a; refl b}
+  =
+  fun A B R a b r0 r1 eq ->
+  match eq at r0 r1 eq ->
+    [x] (Id (Gel x {A; B} (a b -> R a b)) (gel x {a; b} r0) (gel x {a; b} r1)) {refl a; refl b}
+  with
+  | refl r -> bri x -> refl (gel x {a; b} r)
+
+let gel_eta : (A : U<0>) (B : U<0>) (R : A -> B -> U<0>)
+  (p : [x] Gel x {A; B} (a b -> R a b) {*; *})
+  -> [x] Id (Gel x {A; B} (a b -> R a b)) (p @ x) (gel x {p @ 0; p @ 1} (gelproj A B R p)) {*; *}
+  =
+  fun A B R p ->
+  ungel x : 2 -> p @ x at q ->
+    [x] Id (Gel x {A; B} (a b -> R a b)) (q @ x) (gel x {p @ 0; p @ 1} (gelproj A B R q)) {*; *}
+  with
+  | gel r -> bri x -> refl (gel x {p @ 0; p @ 1} r)
+
+let ra : (A : U<0>) (B : U<0>) -> (A -> B -> U<0>) -> [_] U<0> {A; B} =
+  fun A B R -> bri x -> Gel x {A; B} (a b -> R a b)
+
+let IdGel : (A : U<0>) -> [_] U<0> {A; A} =
+  fun A -> ra A A (rel_id A)
+
+let ra_eta_fwd : (A : U<0>) (B : U<0>) (C : [_] U<0> {A; B})
+  -> [x] (ra A B (Bridge C) @ x) -> C @ x {fun a -> a; fun b -> b}
+  =
+  fun A B C -> bri x -> fun g ->
+  extent x of g in x -> ra A B (Bridge C) @ x at x _ -> C @ x with
+  | a -> a
+  | b -> b
+  | a b q x -> gelproj A B (Bridge C) q @ x
+  
+let ra_eta_bwd : (A : U<0>) (B : U<0>) (C : [_] U<0> {A; B})
+  -> [x] (C @ x) -> ra A B (Bridge C) @ x {fun a -> a; fun b -> b}
+  =
+  fun A B C -> bri x -> fun c ->
+  extent x of c in x -> C @ x at x _ -> ra A B (Bridge C) @ x with
+  | a -> a
+  | b -> b
+  | a b p x -> gel x {a; b} p
+
+let ra_eta_fwd_bwd : (A : U<0>) (B : U<0>) (C : [_] U<0> {A; B})
+  -> [x] (c : C @ x) -> Id (C @ x) (ra_eta_fwd A B C @ x (ra_eta_bwd A B C @ x c)) c
+     {fun b -> refl b; fun b -> refl b}
+  =
+  fun A B C -> bri x -> fun c ->
+  extent x of c in x -> C @ x at x c ->
+    Id (C @ x) (ra_eta_fwd A B C @ x (ra_eta_bwd A B C @ x c)) c
+  with
+  | a -> refl a
+  | b -> refl b
+  | a b p x -> refl (p @ x)
+
+let ra_eta_bwd_fwd : (A : U<0>) (B : U<0>) (C : [_] U<0> {A; B})
+  -> [x] (g : ra A B (Bridge C) @ x)
+       -> Id (ra A B (Bridge C) @ x) (ra_eta_bwd A B C @ x (ra_eta_fwd A B C @ x g)) g
+     {fun a -> refl a; fun b -> refl b}
+  =
+  fun A B C -> bri x -> fun g ->
+  extent x of g in x -> ra A B (Bridge C) @ x at x g ->
+    Id (ra A B (Bridge C) @ x) (ra_eta_bwd A B C @ x (ra_eta_fwd A B C @ x g)) g
+  with
+  | a -> refl a
+  | b -> refl b
+  | a b q x ->
+    (ungel x : 2 -> q @ x at q ->
+        [x] Id (ra A B (Bridge C) @ x) (ra_eta_bwd A B C @ x (ra_eta_fwd A B C @ x (q @ x))) (q @ x)
+        {refl a; refl b}
+      with
+      | gel c -> bri x -> refl (gel x {a; b} c))
+    @ x
+
+let ra_eta : (A : U<0>) (B : U<0>) (C : [_] U<0> {A; B})
+  -> Id ([_] U<0> {A; B}) (ra A B (Bridge C)) C
+  =
+  fun A B C ->
+  bridgeext (bri _ -> U<0>) A B (ra A B (Bridge C)) C
+    (subst_ends
+      (bri x -> Id U<0> (ra A B (Bridge C) @ x) (C @ x))
+      (bri x -> ua (ra A B (Bridge C) @ x) (C @ x)
+        < ra_eta_fwd A B C @ x
+        , < ra_eta_bwd A B C @ x
+          , < ra_eta_bwd_fwd A B C @ x
+            , ra_eta_fwd_bwd A B C @ x
+            >
+          >
+        >)
+      (refl A) (ua_id A)
+      (refl B) (ua_id B))
+
+--------------------------------------------------------------------------------
+-- Products
+--------------------------------------------------------------------------------
+
+let product_rel :
+  (A0 : U<0>) (A1 : U<0>) (A : A0 -> A1 -> U<0>)
+  (B0 : U<0>) (B1 : U<0>) (B : B0 -> B1 -> U<0>)
+  -> (A0 * B0) -> (A1 * B1) -> U<0>
+  =
+  fun A0 A1 A B0 B1 B ab0 ab1 ->
+  (A (fst ab0) (fst ab1)) * B (snd ab0) (snd ab1)
+
+let product_rel_map :
+  (A0 : U<0>) (A1 : U<0>)
+  (A : A0 -> A1 -> U<0>) (A' : A0 -> A1 -> U<0>)
+  (fA : (a0 : A0) (a1 : A1) -> (A a0 a1) -> A' a0 a1)
+  (B0 : U<0>) (B1 : U<0>)
+  (B : B0 -> B1 -> U<0>) (B' : B0 -> B1 -> U<0>)
+  (fB : (b0 : B0) (b1 : B1) -> (B b0 b1) -> B' b0 b1)
+  (ab0 : A0 * B0) (ab1 : A1 * B1)
+  -> (product_rel A0 A1 A B0 B1 B ab0 ab1)
+  -> (product_rel A0 A1 A' B0 B1 B' ab0 ab1)
+  =
+  fun A0 A1 A A' fA B0 B1 B B' fB ab0 ab1 r ->
+  < fA (fst ab0) (fst ab1) (fst r)
+  , fB (snd ab0) (snd ab1) (snd r)
+  >
+
+let product_rel_comp :
+  (A0 : U<0>) (A1 : U<0>) (A2 : U<0>)
+  (A01 : A0 -> A1 -> U<0>) (A12 : A1 -> A2 -> U<0>)
+  (B0 : U<0>) (B1 : U<0>) (B2 : U<0>)
+  (B01 : B0 -> B1 -> U<0>) (B12 : B1 -> B2 -> U<0>)
+  (ab0 : A0 * B0) (ab2 : A2 * B2)
+  -> (rel_comp (A0 * B0) (A1 * B1) (A2 * B2)
+       (product_rel A0 A1 A01 B0 B1 B01)
+       (product_rel A1 A2 A12 B1 B2 B12)
+       ab0 ab2)
+  -> product_rel
+     A0 A2 (rel_comp A0 A1 A2 A01 A12)
+     B0 B2 (rel_comp B0 B1 B2 B01 B12)
+     ab0 ab2
+  =
+  fun A0 A1 A2 A01 A12 B0 B1 B2 B01 B12 ab0 ab2 r ->
+  < < fst (fst r)
+    , < fst (fst (snd r))
+      , fst (snd (snd r))
+      >
+    >
+  , < snd (fst r)
+    , < snd (fst (snd r))
+      , snd (snd (snd r))
+      >
+    >
+  >
+
+let product_rel_to_bridge :
+  (A : [_] U<0> {*; *}) (B : [_] U<0> {*; *})
+  (ab0 : (A @ 0) * B @ 0) (ab1 : (A @ 1) * B @ 1)
+  -> (product_rel (A @ 0) (A @ 1) (Bridge A) (B @ 0) (B @ 1) (Bridge B) ab0 ab1)
+  -> [x] (A @ x) * B @ x {ab0; ab1}
+  =
+  fun A B ab0 ab1 r -> bri x -> < fst r @ x , snd r @ x >
+
+let product_bridge_to_rel :
+  (A : [_] U<0> {*; *}) (B : [_] U<0> {*; *})
+  (ab0 : (A @ 0) * B @ 0) (ab1 : (A @ 1) * B @ 1)
+  -> ([x] (A @ x) * B @ x {ab0; ab1})
+  -> product_rel (A @ 0) (A @ 1) (Bridge A) (B @ 0) (B @ 1) (Bridge B) ab0 ab1
+  =
+  fun A B ab0 ab1 p ->
+  < bri x -> fst (p @ x) , bri x -> snd (p @ x) >
+
+--------------------------------------------------------------------------------
+-- Options
+--------------------------------------------------------------------------------
+
+let option : U<0> -> U<0> = fun A -> unit + A
+
+let option_map : (A : U<0>) (B : U<0>) -> (A -> B) -> (option A) -> option B =
+  fun A B f op ->
+  case op at _ -> option B with
+  | inl _ -> inl triv
+  | inr a -> inr (f a)
+
+let option_rel : (A0 : U<0>) (A1 : U<0>) (A : A0 -> A1 -> U<0>)
+  -> (option A0) -> (option A1) -> U<0>
+  =
+  fun A0 A1 A op0 ->
+  case op0 at _ -> (option A1) -> U<0> with
+  | inl _ -> fun op1 ->
+    case op1 at _ -> U<0> with
+    | inl _ -> unit
+    | inr _ -> void
+  | inr a0 -> fun op1 ->
+    case op1 at _ -> U<0> with
+    | inl _ -> void
+    | inr a1 -> A a0 a1
+
+let option_rel_map : (A0 : U<0>) (A1 : U<0>)
+  (A : A0 -> A1 -> U<0>) (A' : A0 -> A1 -> U<0>)
+  (f : (a0 : A0) (a1 : A1) -> (A a0 a1) -> A' a0 a1)
+  (op0 : option A0) (op1 : option A1)
+  -> (option_rel A0 A1 A op0 op1)
+  -> option_rel A0 A1 A' op0 op1
+  =
+  fun A0 A1 A A' f op0 ->
+  case op0 at op0 ->
+    (op1 : option A1)
+    -> (option_rel A0 A1 A op0 op1)
+    -> option_rel A0 A1 A' op0 op1
+  with
+  | inl _ -> fun op1 r -> r
+  | inr a0 -> fun op1 ->
+    case op1 at op1 ->
+      (option_rel A0 A1 A (inr a0) op1)
+      -> option_rel A0 A1 A' (inr a0) op1
+    with
+    | inl _ -> fun v -> v
+    | inr a1 -> f a0 a1
+
+let option_rel_comp :
+  (A0 : U<0>) (A1 : U<0>) (A2 : U<0>)
+  (A01 : A0 -> A1 -> U<0>) (A12 : A1 -> A2 -> U<0>)
+  (op0 : option A0) (op2 : option A2)
+  -> (rel_comp (option A0) (option A1) (option A2)
+       (option_rel A0 A1 A01) (option_rel A1 A2 A12) op0 op2)
+  -> option_rel A0 A2 (rel_comp A0 A1 A2 A01 A12) op0 op2
+  =
+  fun A0 A1 A2 A01 A12 op0 ->
+  case op0 at op0 ->
+    (op2 : option A2)
+    -> (rel_comp (option A0) (option A1) (option A2)
+         (option_rel A0 A1 A01) (option_rel A1 A2 A12) op0 op2)
+    -> option_rel A0 A2 (rel_comp A0 A1 A2 A01 A12) op0 op2
+  with
+  | inl _ -> fun op2 ->
+    case op2 at op2 ->
+      (rel_comp (option A0) (option A1) (option A2)
+        (option_rel A0 A1 A01) (option_rel A1 A2 A12) (inl triv) op2)
+      -> option_rel A0 A2 (rel_comp A0 A1 A2 A01 A12) (inl triv) op2
+    with
+    | inl _ -> fun _ -> triv
+    | inr a2 -> fun r ->
+      (case (fst r) at op1 ->
+          (option_rel A0 A1 A01 (inl triv) op1)
+          -> (option_rel A1 A2 A12 op1 (inr a2))
+          -> void
+        with
+        | inl _ -> fun _ v -> v
+        | inr _ -> fun v _ -> v)
+        (fst (snd r)) (snd (snd r))
+  | inr a0 -> fun op2 ->
+    case op2 at op2 ->
+      (rel_comp (option A0) (option A1) (option A2)
+        (option_rel A0 A1 A01) (option_rel A1 A2 A12) (inr a0) op2)
+      -> option_rel A0 A2 (rel_comp A0 A1 A2 A01 A12) (inr a0) op2
+    with
+    | inl _ -> fun r ->
+      (case (fst r) at op1 ->
+          (option_rel A0 A1 A01 (inr a0) op1)
+          -> (option_rel A1 A2 A12 op1 (inl triv))
+          -> void
+        with
+        | inl _ -> fun v _ -> v
+        | inr _ -> fun _ v -> v)
+        (fst (snd r)) (snd (snd r))
+    | inr a2 -> fun r ->
+      (case (fst r) at op1 ->
+          (option_rel A0 A1 A01 (inr a0) op1)
+          -> (option_rel A1 A2 A12 op1 (inr a2))
+          -> rel_comp A0 A1 A2 A01 A12 a0 a2
+        with
+        | inl _ -> fun v _ -> abort v at _ -> rel_comp A0 A1 A2 A01 A12 a0 a2
+        | inr a1 -> fun r01 r12 -> <a1, <r01, r12>>)
+        (fst (snd r)) (snd (snd r))
+
+let option_rel_to_bridge : (A : [_] U<0> {*; *})
+  (op0 : option (A @ 0)) (op1 : option (A @ 1))
+  -> (option_rel (A @ 0) (A @ 1) (Bridge A) op0 op1)
+  -> [x] option (A @ x) {op0; op1}
+  =
+  fun A op0 ->
+  case op0 at op0 ->
+    (op1 : option (A @ 1))
+    -> (option_rel (A @ 0) (A @ 1) (Bridge A) op0 op1)
+    -> [x] option (A @ x) {op0; op1}
+  with
+  | inl _ -> fun op1 ->
+    case op1 at op1 ->
+      (option_rel (A @ 0) (A @ 1) (Bridge A) (inl triv) op1)
+      -> [x] option (A @ x) {inl triv; op1}
+    with
+    | inl _ -> fun _ -> bri _ -> inl triv
+    | inr a1 -> fun v -> abort v at _ -> [x] option (A @ x) {inl triv; inr a1}
+  | inr a0 -> fun op1 ->
+    case op1 at op1 ->
+      (option_rel (A @ 0) (A @ 1) (Bridge A) (inr a0) op1)
+      -> [x] option (A @ x) {inr a0; op1}
+    with
+    | inl _ -> fun v -> abort v at _ -> [x] option (A @ x) {inr a0; inl triv}
+    | inr a1 -> fun b -> bri x -> inr (b @ x)
+
+let option_id : (A : U<0>) -> (option A) -> option A =
+  fun A op ->
+  case op at _ -> option A with
+  | inl _ -> inl triv
+  | inr a -> inr a
+
+let option_eta : (A : U<0>) (op : option A)
+  -> Id (option A) (option_id A op) op
+  =
+  fun A op ->
+  case op at op -> Id (option A) (option_id A op) op with
+  | inl _ -> refl (inl triv)
+  | inr a -> refl (inr a)
+
+let option_bridge_to_rel : (A : [_] U<0> {*; *})
+  (op0 : option (A @ 0)) (op1 : option (A @ 1))
+  -> [x] option (A @ x) {op0; op1}
+  -> option_rel (A @ 0) (A @ 1) (Bridge A) op0 op1
+  =
+  fun A op0 op1 p ->
+  let G : [x] U<0> {*; *} =
+    ra (option (A @ 0)) (option (A @ 1)) (option_rel (A @ 0) (A @ 1) (Bridge A))
+  in
+  let t : [x] G @ x {option_id (A @ 0) op0; option_id (A @ 1) op1} =
+    bri x ->
+    case p @ x at _ -> G @ x with
+    | inl _ -> gel x {inl triv; inl triv} triv
+    | inr a ->
+      extent x of a in x -> A @ x at x _ -> G @ x with
+      | a0 -> inr a0
+      | a1 -> inr a1
+      | a0 a1 ax x -> gel x {inr a0; inr a1} ax
+  in
+  let t' : [x] G @ x {op0; op1} =
+    subst_ends (bri x -> G @ x) t
+      op0 (option_eta (A @ 0) op0)
+      op1 (option_eta (A @ 1) op1)
+  in
+  gelproj (option (A @ 0)) (option (A @ 1)) (option_rel (A @ 0) (A @ 1) (Bridge A)) t'
+
+--------------------------------------------------------------------------------
+-- Lists
+--------------------------------------------------------------------------------
+
+let list_map : (A : U<0>) (B : U<0>) -> (A -> B) -> (list A) -> list B =
+  fun A B f l ->
+  listrec l at _ -> list B with
+  | nil -> nil
+  | cons a as, bs -> cons (f a) bs
+
+let split : (A : U<0>) -> (list A) -> option (A * list A) =
+  fun A as ->
+  listrec as at _ -> option (A * list A) with
+  | nil -> inl triv
+  | cons a as, _ -> inr <a, as>
+
+let snoc : (A : U<0>) -> (list A) -> A -> list A =
+  fun A bs a ->
+  listrec bs at _ -> list A with
+  | nil -> cons a nil
+  | cons b bs, bs' -> cons b bs'
+
+let rev : (A : U<0>) -> (list A) -> list A =
+  fun A as ->
+  listrec as at _ -> list A with
+  | nil -> nil
+  | cons a as, as' -> snoc A as' a
+
+let append : (A : U<0>) -> (list A) -> (list A) -> list A =
+  fun A as bs ->
+  listrec as at _ -> list A with
+  | nil -> bs
+  | cons a as, cs -> cons a cs
+
+let append_nil : (A : U<0>) (as : list A) ->
+  Id (list A) as (append A as nil)
+  =
+  fun A as ->
+  listrec as at as -> Id (list A) as (append A as nil) with
+  | nil -> refl nil
+  | cons a as, eq ->
+    cong (list A) (list A) (fun t -> cons a t) as (append A as nil) eq
+
+let snoc_append : (A : U<0>)
+  (as : list A) (bs : list A) (b : A)
+  -> Id (list A) (snoc A (append A as bs) b) (append A as (snoc A bs b))
+  =
+  fun A as bs b ->
+  listrec as at as -> Id (list A) (snoc A (append A as bs) b) (append A as (snoc A bs b)) with
+  | nil -> refl (snoc A bs b)
+  | cons a as, eq ->
+    cong (list A) (list A) (fun t -> cons a t)
+      (snoc A (append A as bs) b)
+      (append A as (snoc A bs b))
+      eq
+
+let snoc_rev : (A : U<0>) (as : list A) (b : A)
+  -> Id (list A) (snoc A (rev A as) b) (rev A (cons b as))
+  =
+  fun A as b -> refl (rev A (cons b as))
+
+--------------------------------------------------------------------------------
+-- Lemmas about the result type of "pop"
+--------------------------------------------------------------------------------
+
+let pop_result_map : (A : U<0>) (B : U<0>) (C : U<0>) (f : B -> C)
+  -> (option (A * B)) -> option (A * C)
+  =
+  fun A B C f ->
+  option_map (A * B) (A * C) (fun a_b -> <fst a_b, f (snd a_b)>)
+
+let pop_result_map_conc : (A : U<0>) (B : U<0>) (C : U<0>) (D : U<0>)
+  (g : C -> D) (f : B -> C) (r : option (A * B))
+  -> Id (option (A * D))
+     (pop_result_map A B D (fun b -> g (f b)) r)
+     (pop_result_map A C D g (pop_result_map A B C f r))
+  =
+  fun A B C D g f r ->
+  case r at r ->
+    Id (option (A * D))
+      (pop_result_map A B D (fun b -> g (f b)) r)
+      (pop_result_map A C D g (pop_result_map A B C f r))
+  with
+  | inl _ -> refl (inl triv)
+  | inr a_b -> refl (inr <fst a_b, g (f (snd a_b))>)
+
+-- annoying formulation thanks to lack of funext ;)
+let pop_result_map_id : (A : U<0>) (B : U<0>)
+  (f : B -> B) (eq : (b : B) -> Id B b (f b)) (r : option (A * B))
+  -> Id (option (A * B)) r (pop_result_map A B B f r)
+  =
+  fun A B f eq r ->
+  case r at r -> Id (option (A * B)) r (pop_result_map A B B f r) with
+  | inl _ -> refl (inl triv)
+  | inr a_b ->
+    cong B (option (A * B)) (fun b -> inr <fst a_b, b>)
+      (snd a_b)
+      (f (snd a_b))
+      (eq (snd a_b))
+
+let pop_result_rel :
+  (A0 : U<0>) (A1 : U<0>) (A : A0 -> A1 -> U<0>)
+  (B : U<0>) (C : U<0>) (R : B -> C -> U<0>)
+  -> (option (A0 * B)) -> (option (A1 * C)) -> U<0>
+  =
+  fun A0 A1 A B C R ->
+  option_rel (A0 * B) (A1 * C) (product_rel A0 A1 A B C R)
+
+let pop_result_rel_map :
+  (A0 : U<0>) (A1 : U<0>) (A : A0 -> A1 -> U<0>) (A' : A0 -> A1 -> U<0>)
+  (fA : (a0 : A0) (a1 : A1) -> (A a0 a1) -> A' a0 a1)
+  (B0 : U<0>) (B1 : U<0>) (B : B0 -> B1 -> U<0>) (B' : B0 -> B1 -> U<0>)
+  (fB : (b0 : B0) (b1 : B1) -> (B b0 b1) -> B' b0 b1)
+  (r0 : option (A0 * B0)) (r1 : option (A1 * B1))
+  -> (pop_result_rel A0 A1 A B0 B1 B r0 r1)
+  -> pop_result_rel A0 A1 A' B0 B1 B' r0 r1
+  =
+  fun A0 A1 A A' fA B0 B1 B B' fB ->
+  option_rel_map
+    (A0 * B0) (A1 * B1) (product_rel A0 A1 A B0 B1 B) (product_rel A0 A1 A' B0 B1 B')
+    (product_rel_map A0 A1 A A' fA B0 B1 B B' fB)
+
+let pop_result_rel_comp :
+  (A0 : U<0>) (A1 : U<0>) (A2 : U<0>)
+  (A01 : A0 -> A1 -> U<0>) (A12 : A1 -> A2 -> U<0>)
+  (B0 : U<0>) (B1 : U<0>) (B2 : U<0>)
+  (B01 : B0 -> B1 -> U<0>) (B12 : B1 -> B2 -> U<0>)
+  (r0 : option (A0 * B0)) (r2 : option (A2 * B2))
+  -> (rel_comp (option (A0 * B0)) (option (A1 * B1)) (option (A2 * B2))
+       (pop_result_rel A0 A1 A01 B0 B1 B01)
+       (pop_result_rel A1 A2 A12 B1 B2 B12)
+       r0 r2)
+  -> pop_result_rel A0 A2 (rel_comp A0 A1 A2 A01 A12) B0 B2 (rel_comp B0 B1 B2 B01 B12) r0 r2
+  =
+  fun A0 A1 A2 A01 A12 B0 B1 B2 B01 B12 r0 r2 t ->
+  option_rel_map
+    (A0 * B0) (A2 * B2)
+    (rel_comp (A0 * B0) (A1 * B1) (A2 * B2)
+      (product_rel A0 A1 A01 B0 B1 B01)
+      (product_rel A1 A2 A12 B1 B2 B12))
+    (product_rel A0 A2 (rel_comp A0 A1 A2 A01 A12) B0 B2 (rel_comp B0 B1 B2 B01 B12))
+    (product_rel_comp A0 A1 A2 A01 A12 B0 B1 B2 B01 B12)
+    r0 r2
+    (option_rel_comp
+      (A0 * B0) (A1 * B1) (A2 * B2)
+      (product_rel A0 A1 A01 B0 B1 B01)
+      (product_rel A1 A2 A12 B1 B2 B12)
+      r0 r2 t)
+
+let pop_result_rel_to_bridge : (A : [_] U<0> {*; *}) (B : [_] U<0> {*; *})
+  (r0 : option ((A @ 0) * B @ 0)) (r1 : option ((A @ 1) * B @ 1))
+  -> (pop_result_rel (A @ 0) (A @ 1) (Bridge A) (B @ 0) (B @ 1) (Bridge B) r0 r1)
+  -> [x] option ((A @ x) * B @ x) {r0; r1}
+  =
+  fun A B r0 r1 rel ->
+  option_rel_to_bridge
+    (bri x -> (A @ x) * B @ x)
+    r0 r1
+    (option_rel_map
+      ((A @ 0) * B @ 0) ((A @ 1) * B @ 1)
+      (product_rel (A @ 0) (A @ 1) (Bridge A) (B @ 0) (B @ 1) (Bridge B))
+      (fun ab0 ab1 -> [x] (A @ x) * B @ x {ab0; ab1})
+      (product_rel_to_bridge A B)
+      r0 r1
+      rel)
+
+let pop_result_bridge_to_rel : (A : [_] U<0> {*; *}) (B : [_] U<0> {*; *})
+  (r0 : option ((A @ 0) * B @ 0)) (r1 : option ((A @ 1) * B @ 1))
+  -> [x] option ((A @ x) * B @ x) {r0; r1}
+  -> pop_result_rel (A @ 0) (A @ 1) (Bridge A) (B @ 0) (B @ 1) (Bridge B) r0 r1
+  =
+  fun A B r0 r1 p ->
+  option_rel_map
+    ((A @ 0) * B @ 0) ((A @ 1) * B @ 1)
+    (fun ab0 ab1 -> [x] (A @ x) * B @ x {ab0; ab1})
+    (product_rel (A @ 0) (A @ 1) (Bridge A) (B @ 0) (B @ 1) (Bridge B))
+    (product_bridge_to_rel A B)
+    r0 r1
+    (option_bridge_to_rel (bri x -> (A @ x) * B @ x) r0 r1 p)
+
+-- TODO generalize
+let pop_result_revgraph : (A : U<0>) (B : U<0>) (C : U<0>) (g : C -> B)
+  (rb : option (A * B)) (rc : option (A * C))
+  -> (Id (option (A * B)) rb (pop_result_map A C B g rc))
+  -> pop_result_rel A A (rel_id A) B C (cospan_to_rel B C B (fun b -> b) g) rb rc
+  =
+  fun A B C g rb rc eq ->
+  based1_J (option (A * B)) (pop_result_map A C B g rc)
+    (fun rb _ -> pop_result_rel A A (rel_id A) B C (cospan_to_rel B C B (fun b -> b) g) rb rc)
+    (case rc at rc ->
+        pop_result_rel A A (rel_id A) B C (cospan_to_rel B C B (fun b -> b) g) (pop_result_map A C B g rc) rc
+      with
+      | inl _ -> triv
+      | inr a_c -> <refl (fst a_c), refl (g (snd a_c))>)
+    rb
+    eq
+
+--------------------------------------------------------------------------------
+-- Abstract type of queues
+--------------------------------------------------------------------------------
+
+let QUEUE : (A : U<0>) -> U<1> =
+  fun A ->
+  (Q : U<0>)
+  * Q
+  * (A -> Q -> Q)
+  * (Q -> option (A * Q))
+
+let QUEUE' : U<1> =
+  (A : U<0>) * QUEUE A
+
+let ty : (A : U<0>) -> (QUEUE A) -> U<0> =
+  fun A Q -> fst Q
+
+let empty : (A : U<0>) (Q : QUEUE A) -> ty A Q =
+  fun A Q -> fst (snd Q)
+
+let push : (A : U<0>) (Q : QUEUE A) -> A -> (ty A Q) -> ty A Q =
+  fun A Q -> fst (snd (snd Q))
+
+let pop : (A : U<0>) (Q : QUEUE A) -> (ty A Q) -> option (A * ty A Q) =
+  fun A Q -> snd (snd (snd Q))
+
+let queue_rel : (A0 : U<0>) (A1 : U<0>) (A : A0 -> A1 -> U<0>)
+  -> (QUEUE A0) -> (QUEUE A1) -> U<1>
+  =
+  fun A0 A1 A Q0 Q1 ->
+  (R : (ty A0 Q0) -> (ty A1 Q1) -> U<0>)
+  * (Remp : R (empty A0 Q0) (empty A1 Q1))
+  * (Rpush : (a0 : A0) (a1 : A1) (a : A a0 a1) (q0 : ty A0 Q0) (q1 : ty A1 Q1)
+      -> (R q0 q1) -> R (push A0 Q0 a0 q0) (push A1 Q1 a1 q1))
+  * ((q0 : ty A0 Q0) (q1 : ty A1 Q1)
+      -> (R q0 q1)
+      -> pop_result_rel A0 A1 A (ty A0 Q0) (ty A1 Q1) R
+           (pop A0 Q0 q0) (pop A1 Q1 q1))
+
+let queue_rel_comp :
+  (A0 : U<0>) (A1 : U<0>) (A2 : U<0>)
+  (A01 : A0 -> A1 -> U<0>) (A12 : A1 -> A2 -> U<0>)
+  (Q0 : QUEUE A0) (Q1 : QUEUE A1) (Q2 : QUEUE A2)
+  -> (queue_rel A0 A1 A01 Q0 Q1)
+  -> (queue_rel A1 A2 A12 Q1 Q2)
+  -> queue_rel A0 A2 (rel_comp A0 A1 A2 A01 A12) Q0 Q2
+  =
+  fun A0 A1 A2 A01 A12 Q0 Q1 Q2 Q01 Q12 ->
+  < rel_comp (fst Q0) (fst Q1) (fst Q2) (fst Q01) (fst Q12)
+  , < < fst (snd Q1)
+      , < fst (snd Q01)
+        , fst (snd Q12)
+        >
+      >
+    , < fun a0 a2 a q0 q2 q ->
+        < fst (snd (snd Q1)) (fst a) (fst q)
+        , < fst (snd (snd Q01)) a0 (fst a) (fst (snd a)) q0 (fst q) (fst (snd q))
+          , fst (snd (snd Q12)) (fst a) a2 (snd (snd a)) (fst q) q2 (snd (snd q))
+          >
+        >
+      , fun q0 q2 q ->
+        pop_result_rel_comp
+          A0 A1 A2 A01 A12
+          (fst Q0) (fst Q1) (fst Q2) (fst Q01) (fst Q12)
+          (snd (snd (snd Q0)) q0)
+          (snd (snd (snd Q2)) q2)
+          < snd (snd (snd Q1)) (fst q)
+          , < snd (snd (snd Q01)) q0 (fst q) (fst (snd q))
+            , snd (snd (snd Q12)) (fst q) q2 (snd (snd q))
+            >
+          >
+      >
+    >
+  >
+
+let queue_rel_to_bridge : (A0 : U<0>) (A1 : U<0>) (A : A0 -> A1 -> U<0>)
+  (Q0 : QUEUE A0) (Q1 : QUEUE A1) (Q : queue_rel A0 A1 A Q0 Q1)
+  -> [x] QUEUE (ra A0 A1 A @ x) {Q0; Q1}
+  =
+  fun A0 A1 A Q0 Q1 Q ->
+  let ty0 = ty A0 Q0 in
+  let ty1 = ty A1 Q1 in
+  let R = fst Q in
+  let Remp = fst (snd Q) in
+  let Rpush = fst (snd (snd Q)) in
+  let Rpop = snd (snd (snd Q)) in
+  let AG : [_] U<0> {A0; A1} = ra A0 A1 A in
+  let QG : [_] U<0> {ty0; ty1} = ra ty0 ty1 R in
+  bri x ->
+  < QG @ x
+  , < gel x {empty A0 Q0; empty A1 Q1} Remp
+    , < fun a q ->
+        extent x of <a,q> in x -> (AG @ x) * QG @ x at x _ -> QG @ x with
+        | aq0 -> push A0 Q0 (fst aq0) (snd aq0)
+        | aq1 -> push A1 Q1 (fst aq1) (snd aq1)
+        | aq0 aq1 aqx x ->
+          gel x {push A0 Q0 (fst aq0) (snd aq0); push A1 Q1 (fst aq1) (snd aq1)}
+            (Rpush
+              (fst aq0) (fst aq1)
+              (gelproj A0 A1 A (bri x -> fst (aqx @ x)))
+              (snd aq0) (snd aq1)
+              (gelproj ty0 ty1 R (bri x -> snd (aqx @ x))))
+      , fun q ->
+        extent x of q in x -> QG @ x at x _ -> option ((AG @ x) * QG @ x) with
+        | q0 -> pop A0 Q0 q0
+        | q1 -> pop A1 Q1 q1
+        | q0 q1 qx x ->
+          pop_result_rel_to_bridge AG QG (pop A0 Q0 q0) (pop A1 Q1 q1)
+            (pop_result_rel_map
+              A0 A1 A (Bridge AG)
+              (fun a0 a1 a -> bri x -> gel x {a0; a1} a)
+              ty0 ty1 R (Bridge QG)
+              (fun q0 q1 r -> bri x -> gel x {q0; q1} r)
+              (pop A0 Q0 q0) (pop A1 Q1 q1)
+              (Rpop q0 q1 (gelproj ty0 ty1 R qx)))
+            @ x
+      >
+    >
+  >
+
+let queue_bridge_to_rel : (A : [_] U<0> {*; *}) (Q : [x] QUEUE (A @ x) {*; *})
+  -> queue_rel (A @ 0) (A @ 1) (Bridge A) (Q @ 0) (Q @ 1)
+  =
+  fun A Q ->
+  < Bridge (bri x -> fst (Q @ x))
+  , < bri x -> fst (snd (Q @ x))
+    , < fun a0 a1 a q0 q1 q -> bri x ->
+        fst (snd (snd (Q @ x))) (a @ x) (q @ x)
+      , fun q0 q1 q ->
+        pop_result_bridge_to_rel A (bri x -> fst (Q @ x))
+          (snd (snd (snd (Q @ 0))) q0)
+          (snd (snd (snd (Q @ 1))) q1)
+          (bri x -> snd (snd (snd (Q @ x))) (q @ x))
+      >
+    >
+  >
+
+--------------------------------------------------------------------------------
+-- Queue implementation with a single list
+--------------------------------------------------------------------------------
+
+let queue1 : U<0> -> U<0> =
+  fun A -> list A
+
+let empty1 : (A : U<0>) -> queue1 A =
+  fun A -> nil
+
+let push1 : (A : U<0>) -> A -> (queue1 A) -> queue1 A =
+  fun A a as -> snoc A as a
+
+let pop1 : (A : U<0>) -> (queue1 A) -> option (A * queue1 A) =
+  split
+
+--------------------------------------------------------------------------------
+-- Queue implementation with a pair of lists
+--------------------------------------------------------------------------------
+
+let queue2 : U<0> -> U<0> =
+  fun A -> (list A) * list A
+
+let empty2 : (A : U<0>) -> queue2 A =
+  fun A -> <nil, nil>
+
+let push2 : (A : U<0>) -> A -> (queue2 A) -> queue2 A =
+  fun A a q ->
+  <cons a (fst q), snd q>
+
+let pop2 : (A : U<0>) -> (queue2 A) -> option (A * queue2 A) =
+  fun A q ->
+  listrec (snd q) at _ -> option (A * queue2 A) with
+  | nil ->
+    pop_result_map A (list A) (queue2 A)
+      (fun as -> <nil, as>)
+      (split A (rev A (fst q)))
+  | cons a as, _ -> inr <a, <fst q, as>>
+
+--------------------------------------------------------------------------------
+-- Homomorphism between the two implementations
+--------------------------------------------------------------------------------
+
+let flatten : (A : U<0>) -> (queue2 A) -> list A =
+   fun A q -> append A (snd q) (rev A (fst q))
+
+let flatten_push : (A : U<0>) (a : A) (q : queue2 A)
+  -> Id (list A) (push1 A a (flatten A q)) (flatten A (push2 A a q))
+  =
+  fun A a q ->
+  trans (list A)
+    (snoc A (append A (snd q) (rev A (fst q))) a)
+    (append A (snd q) (snoc A (rev A (fst q)) a))
+    (append A (snd q) (rev A (cons a (fst q))))
+    (snoc_append A (snd q) (rev A (fst q)) a)
+    (cong (list A) (list A) (fun t -> append A (snd q) t)
+      (snoc A (rev A (fst q)) a)
+      (rev A (cons a (fst q)))
+      (snoc_rev A (fst q) a))
+
+let flatten_pop_lemma : (A : U<0>) (as : list A)
+  -> Id (option (A * list A))
+     (pop1 A (flatten A <as,nil>))
+     (pop_result_map A (queue2 A) (list A) (flatten A) (pop2 A <as,nil>))
+  =
+  fun A as ->
+  trans (option (A * list A))
+    (pop1 A (flatten A <as,nil>))
+    (pop_result_map A (list A) (list A) (fun as -> flatten A <nil,as>) (split A (rev A as)))
+    (pop_result_map A (queue2 A) (list A) (flatten A) (pop2 A <as,nil>))
+    (pop_result_map_id A (list A) (fun as -> append A as nil) (append_nil A) (split A (rev A as)))
+    (pop_result_map_conc A (list A) (queue2 A) (list A)
+      (flatten A) (fun as -> <nil,as>)
+      (split A (rev A as)))
+
+let flatten_pop : (A : U<0>) (q : queue2 A)
+  -> Id (option (A * list A))
+     (pop1 A (flatten A q))
+     (pop_result_map A (queue2 A) (list A) (flatten A) (pop2 A q))
+  =
+  fun A q ->
+  let lem : (bs : list A) (as : list A)
+    -> Id (option (A * list A))
+       (pop1 A (flatten A <as,bs>))
+       (pop_result_map A (queue2 A) (list A) (flatten A) (pop2 A <as,bs>))
+    =
+    fun bs ->
+    listrec bs at bs ->
+      (as : list A)
+      -> Id (option (A * list A))
+         (pop1 A (flatten A <as,bs>))
+         (pop_result_map A (queue2 A) (list A) (flatten A) (pop2 A <as,bs>))
+    with
+    | nil -> flatten_pop_lemma A
+    | cons b bs, _ -> fun as -> refl (inr <b, flatten A <as,bs>>)
+  in
+  lem (snd q) (fst q)
+
+--------------------------------------------------------------------------------
+-- The two implementations are connected by a bridge in QUEUE
+--------------------------------------------------------------------------------
+
+let queue_struct1 : (A : U<0>) -> QUEUE A =
+  fun A -> <queue1 A, <empty1 A, <push1 A, pop1 A>>>
+
+let queue_struct2 : (A : U<0>) -> QUEUE A =
+  fun A -> <queue2 A, <empty2 A, <push2 A, pop2 A>>>
+
+let queue12_rel : (A : U<0>)
+  -> queue_rel A A (rel_id A) (queue_struct1 A) (queue_struct2 A)
+  =
+  fun A ->
+  < fun q1 q2 -> Id (list A) q1 (flatten A q2)
+  , < refl nil
+    , < fun a1 a2 eqa q1 q2 relq ->
+        trans (list A)
+          (push1 A a1 q1)
+          (push1 A a2 q1)
+          (flatten A (push2 A a2 q2))
+          (cong A (list A) (fun a -> push1 A a q1) a1 a2 eqa)
+          (trans (list A)
+            (push1 A a2 q1)
+            (push1 A a2 (flatten A q2))
+            (flatten A (push2 A a2 q2))
+            (cong (list A) (list A) (push1 A a2) q1 (flatten A q2) relq)
+            (flatten_push A a2 q2))
+      , fun q1 q2 relq ->
+        pop_result_revgraph A (queue1 A) (queue2 A) (flatten A)
+          (pop1 A q1)
+          (pop2 A q2)
+          (trans (option (A * list A))
+            (pop1 A q1)
+            (pop1 A (flatten A q2))
+            (pop_result_map A (queue2 A) (queue1 A) (flatten A) (pop2 A q2))
+            (cong (list A) (option (A * list A)) (pop1 A) q1 (flatten A q2) relq)
+            (flatten_pop A q2))
+      >
+    >
+  >
+
+let queue12 : (A : [_] U<0> {*; *})
+  -> [x] (QUEUE (A @ x)) {queue_struct1 (A @ 0); queue_struct2 (A @ 1)}
+  =
+  fun A ->
+  let rel : queue_rel (A @ 0) (A @ 1) (Bridge A) (queue_struct1 (A @ 0)) (queue_struct2 (A @ 1)) =
+    subst
+      ((A @ 0) -> (A @ 1) -> U<0>)
+      (fun R -> queue_rel (A @ 0) (A @ 1) R (queue_struct1 (A @ 0)) (queue_struct2 (A @ 1)))
+      (rel_comp (A @ 0) (A @ 1) (A @ 1) (Bridge A) (rel_id (A @ 1)))
+      (Bridge A)
+      (rel_unitr (A @ 0) (A @ 1) (Bridge A))
+      (queue_rel_comp
+        (A @ 0) (A @ 1) (A @ 1) (Bridge A) (rel_id (A @ 1))
+        (queue_struct1 (A @ 0))
+        (queue_struct1 (A @ 1))
+        (queue_struct2 (A @ 1))
+        (queue_bridge_to_rel A (bri x -> queue_struct1 (A @ x)))
+        (queue12_rel (A @ 1)))
+  in
+  subst
+    ([_] U<0> {A @ 0; A @ 1})
+    (fun T -> [x] (QUEUE (T @ x)) {queue_struct1 (A @ 0); queue_struct2 (A @ 1)})
+    (ra (A @ 0) (A @ 1) (Bridge A))
+    (bri x -> A @ x)
+    (ra_eta (A @ 0) (A @ 1) (bri x -> A @ x))
+    (queue_rel_to_bridge
+      (A @ 0) (A @ 1) (Bridge A)
+      (queue_struct1 (A @ 0))
+      (queue_struct2 (A @ 1))
+      rel)
+      
+--------------------------------------------------------------------------------
+-- Bridge-discreteness of bool (one direction)
+--------------------------------------------------------------------------------
+
+let shannon : bool -> bool =
+  fun b ->
+  if b at _ -> bool with | tt -> tt | ff -> ff
+
+let bool_eta : (b : bool) -> Id bool (shannon b) b =
+  fun b ->
+  if b at b -> Id bool (shannon b) b with
+  | tt -> refl tt
+  | ff -> refl ff
+
+let bridge_to_id : (b0 : bool) (b1 : bool) -> [_] bool {b0; b1} -> Id bool b0 b1 =
+  fun b0 b1 p ->
+  let lemma : Id bool (shannon b0) (shannon b1) =
+    gelproj bool bool (fun c d -> Id bool c d)
+      (bri x ->
+       if (p @ x) at _ -> ra bool bool (rel_id bool) @ x with
+       | tt -> gel x {tt; tt} (refl tt)
+       | ff -> gel x {ff; ff} (refl ff))
+  in
+  trans bool b0 (shannon b1) b1
+    (trans bool b0 (shannon b0) (shannon b1)
+      (symm bool (shannon b0) b0 (bool_eta b0))
+      lemma)
+    (bool_eta b1)
+
+let example1 : (A : U<0>) (f : (QUEUE A) -> bool)
+  -> Id bool (f (queue_struct1 A)) (f (queue_struct2 A))
+  =
+  fun A f ->
+  bridge_to_id (f (queue_struct1 A)) (f (queue_struct2 A))
+    (bri x -> f (queue12 (bri _ -> A) @ x))
+
+let example2 : (f : ((A : U<0>) -> (QUEUE A)) -> bool)
+  -> Id bool (f queue_struct1) (f queue_struct2)
+  =
+  fun f ->
+  bridge_to_id (f queue_struct1) (f queue_struct2)
+    (bri x ->
+      f
+        (fun A ->
+          extent x of A in _ -> U<0> at _ A -> QUEUE A with
+          | A0 -> queue_struct1 A0
+          | A1 -> queue_struct2 A1
+          | _ _ A x -> queue12 A @ x))
+

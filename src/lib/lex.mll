@@ -38,7 +38,6 @@ let keywords =
     ("let", LET);
     ("in", IN);
     ("with", WITH);
-    ("end", END);
     ("if", IF);
     ("rec", REC);
     ("fst", FST);
