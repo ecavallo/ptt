@@ -7,9 +7,7 @@ type modality =
   | IdParametric
   | Components
   | Discrete
-  | Global
   | DiscreteComponents
-  | DiscreteGlobal
 
 val equal_mode : mode -> mode -> bool
 val equal_modality : modality -> modality -> bool

@@ -12,7 +12,6 @@
 %token BRI ATSIGN EXTENT
 %token GEL ENGEL UNGEL
 %token GLOBAL ENGLOBE UNGLOBE
-%token CODISC ENCODISC UNCODISC
 %token DISC ENDISC UNDISC
 %token UNIT TRIV
 %token NAT ZERO SUC REC
@@ -24,7 +23,7 @@
 %token UNIV
 %token QUIT NORMALIZE
 %token PAR PT
-%token CMP GLB DSC
+%token CMP DSC
 %token EOF
 
 %start <Concrete_syntax.signature> sign
@@ -63,10 +62,8 @@ modality:
   | PAR { Mode.IdParametric }
   | PT  { Mode.IdPointwise }
   | CMP { Mode.Components }
-  | GLB { Mode.Global }
   | DSC { Mode.Discrete }
   | CMP DOT DSC { Mode.DiscreteComponents }
-  | GLB DOT DSC { Mode.DiscreteGlobal }
 
 endpoints:
   | LCU; endpoints = separated_list(SEMI, term); RCU { endpoints };
@@ -220,9 +217,6 @@ term:
          mot = Binder {name = mot_name; body = mot_body};
          gel = Binder {name = gel_name; body = gel_body};
          case = Binder {name = case_name; body = case_body}} }
-  | CODISC; t = atomic { Codisc t }
-  | ENCODISC; t = atomic { Encodisc t }
-  | UNCODISC; t = atomic { Uncodisc t }
   | GLOBAL; t = atomic { Global t }
   | ENGLOBE; t = atomic { Englobe t }
   | UNGLOBE; t = atomic { Unglobe t }
