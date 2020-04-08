@@ -52,9 +52,6 @@ let keywords =
     ("Gel", GEL);
     ("gel", ENGEL);
     ("ungel", UNGEL);
-    ("Codisc", CODISC);
-    ("codisc", ENCODISC);
-    ("uncodisc", UNCODISC);
     ("Global", GLOBAL);
     ("glob", ENGLOBE);
     ("unglob", UNGLOBE);
@@ -69,7 +66,6 @@ let keywords =
     ("par", PAR);
     ("pt", PT);
     ("cmp", CMP);
-    ("glb", GLB);
     ("dsc", DSC);
     ("quit", QUIT);
   ]

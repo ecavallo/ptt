@@ -51,9 +51,6 @@ and t =
   | Gel of dim * t list * bindern
   | Engel of ident * t list * t
   | Ungel of {width : int; mot : binder; gel : binder; case : binder}
-  | Codisc of t
-  | Encodisc of t
-  | Uncodisc of t
   | Global of t
   | Englobe of t
   | Unglobe of t

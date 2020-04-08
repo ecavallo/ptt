@@ -21,7 +21,6 @@ type t =
   | Extent of dim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS *) t list * (* BINDS & BBINDS *) t
   | Gel of dim * t list * (* BINDS n *) t | Engel of idx * t list * t
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
-  | Codisc of t | Encodisc of t | Uncodisc of t
   | Global of t | Englobe of t | Unglobe of t
   | Disc of t | Endisc of t | Letdisc of Mode.modality * (* BINDS *) t * (* BINDS *) t * t
   | Uni of uni_level
