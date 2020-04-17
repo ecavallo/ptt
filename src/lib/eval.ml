@@ -16,6 +16,7 @@ let eval_dim r (env : D.env) =
 
 let rec do_clos size clo a =
   match clo with
+  | D.ConstClos t -> t
   | D.Clos {term; env} -> eval term (a :: env) size
   | D.Pseudo {var; term; ends} ->
     begin
@@ -40,6 +41,8 @@ and do_clos_extent size (D.ClosN {term; env}) tN t r =
 
 and do_consts size clo width =
   match clo with
+  | D.ConstClos t ->
+    List.init width (fun _ -> t)
   | D.Clos {term; env} ->
     List.init width (fun o -> eval term (D.Dim (D.Const o) :: env) size)
   | D.Pseudo {ends; _} -> ends
@@ -176,6 +179,16 @@ and do_letdisc size m mot case d =
     let inner_tp = do_disc_tp tp in
     D.Neutral {tp = do_clos size mot (D.Tm d); term = D.(Letdisc (m, inner_tp, mot, case) @: term)}
   | _ -> raise (Eval_failed "Not an endisc or neutral in do_letdisc")
+
+and do_letdiscbridge size m ends mot case d =
+  match d with
+  | D.Endisc t -> do_clos size case (D.Tm t)
+  | D.Neutral {tp; term} ->
+    let inner_tp = do_disc_tp tp in
+    let final_tp =
+      do_clos size mot (D.Tm (D.BLam (D.Pseudo {var = size; term = d; ends}))) in
+    D.Neutral {tp = final_tp; term = D.(Letdiscbridge (m, inner_tp, ends, mot, case, size) @: term)}
+  | _ -> raise (Eval_failed "Not an endisc or neutral in do_letdiscbridge")
 
 and do_list_tp tp =
   match tp with
@@ -438,3 +451,11 @@ and eval t (env : D.env) size =
       (D.Clos {term = mot; env})
       (D.Clos {term = case; env})
       (eval d env size)
+  | Syn.Letdiscbridge (m, width, mot, case, d) ->
+    do_letdiscbridge
+      size
+      m
+      (do_consts size (D.Clos {term = d; env}) width)
+      (D.Clos {term = mot; env})
+      (D.Clos {term = case; env})
+      (eval d (D.Dim (D.DVar size) :: env) (size + 1))

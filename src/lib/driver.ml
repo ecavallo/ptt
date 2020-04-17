@@ -198,6 +198,18 @@ let rec bind env = function
        bind (Term mot_name :: env) mot_body,
        bind (Term case_name :: env) case_body,
        bind env disc)
+  | CS.Letdiscbridge
+      {modality;
+       width;
+       mot = Binder {name = mot_name; body = mot_body};
+       case = Binder {name = case_name; body = case_body};
+       disc = Binder {name = disc_name; body = disc_body}} ->
+    S.Letdiscbridge
+      (modality,
+       width,
+       bind (Term mot_name :: env) mot_body,
+       bind (Term case_name :: env) case_body,
+       bind (Term disc_name :: env) disc_body)
   | CS.Uni i -> S.Uni i
 
 and bind_spine env = function

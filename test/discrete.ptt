@@ -144,3 +144,56 @@ let pt id_param_global : (F : Global ((A : U<0>) -> A -> A)) (A : U<0>) (a : A)
     (glob ((unglob F) (Disc A) (disc a)))
     (glob (disc a))
     (glob (id_param1 (unglob F) (Disc A) (disc a)))
+
+--------------------------------------------------------------------------------
+-- Discrete types are bridge-discrete
+--------------------------------------------------------------------------------
+
+let id_to_bridge : (A : U<0>) (a : A) (b : A)
+  -> (Id A a b) -> [_] A {a; b}
+  =
+  fun A a b eq ->
+  match eq at a b _ -> [_] A {a; b} with
+  | refl a -> bri _ -> a
+
+let pt disc_bridge_to_id : (A : U<0>)
+  -> Global ((a : Disc A) (b : Disc A) (p : [_] Disc A {a; b}) -> Id (Disc A) a b)
+  =
+  fun A ->
+  glob
+    (fun a b p ->
+      undisc{par} x : 2 -> p @ x at p -> Id (Disc A) (p @ 0) (p @ 1) with
+      | disc a -> refl (disc a))
+
+let pt disc_id_to_bridge_to_id : (A : U<0>)
+  -> Global
+     ((a : Disc A) (b : Disc A) (eq : Id (Disc A) a b)
+       -> Id (Id (Disc A) a b) ((unglob (disc_bridge_to_id A)) a b (id_to_bridge (Disc A) a b eq)) eq)
+  =
+  fun A ->
+  glob
+    (fun a b eq ->
+      match eq at a b eq ->
+        Id (Id (Disc A) a b) ((unglob (disc_bridge_to_id A)) a b (id_to_bridge (Disc A) a b eq)) eq
+      with
+      | refl d ->
+        undisc{par} d at d ->
+          Id (Id (Disc A) d d) ((unglob (disc_bridge_to_id A)) d d (bri _ -> d)) (refl d)
+        with
+        | disc a -> refl (refl (disc a)))
+
+let pt disc_bridge_to_id_to_bridge : (A : U<0>)
+  -> Global
+     ((a : Disc A) (b : Disc A) (p : [_] Disc A {a; b})
+       -> Id ([_] Disc A {a; b}) (id_to_bridge (Disc A) a b ((unglob (disc_bridge_to_id A)) a b p)) p)
+  =
+  fun A ->
+  glob
+    (fun a b p ->
+      undisc{par} x : 2 -> p @ x at p ->
+        Id ([_] Disc A {p @ 0; p @ 1})
+          (id_to_bridge (Disc A) (p @ 0) (p @ 1)
+            ((unglob (disc_bridge_to_id A)) (p @ 0) (p @ 1) (bri x -> p @ x)))
+          (bri x -> p @ x)
+      with
+      | disc a -> refl (bri _ -> disc a))

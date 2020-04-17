@@ -24,6 +24,7 @@ type t =
   | Codisc of t | Encodisc of t | Uncodisc of t
   | Global of t | Englobe of t | Unglobe of t
   | Disc of t | Endisc of t | Letdisc of Mode.modality * (* BINDS *) t * (* BINDS *) t * t
+  | Letdiscbridge of Mode.modality * int * (* BINDS *) t * (* BINDS *) t * (* BBINDS *) t
   | Uni of uni_level
 
 val equal_uni_level : uni_level -> uni_level -> bool

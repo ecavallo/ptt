@@ -97,6 +97,9 @@ and reduce_extent env size es =
     | D.Uncodisc :: s -> E.do_uncodisc (go env size (e, s))
     | D.Unglobe :: s -> E.do_unglobe (go env size (e, s))
     | D.Letdisc (m, _, mot, case) :: s -> E.do_letdisc size m mot case (go env size (e, s))
+    | D.Letdiscbridge (m, _, ends, mot, case, i) :: s ->
+      let es' = D.instantiate_spine D.instantiate_extent_head size i (e, s) in
+      E.do_letdiscbridge size m ends mot case (go (DVar size :: env) (size + 1) es')
     | D.Quasi q :: s ->
       begin
         match q with 
@@ -368,6 +371,20 @@ and read_back_ne env size (h, s) =
            {term = E.do_clos (size + 1) case (D.Tm case_arg);
             tp = E.do_clos (size + 1) mot (D.Tm (D.Endisc case_arg))}) in
     Syn.Letdisc (m, mot', case', read_back_ne env size (h, s))
+  | D.Letdiscbridge (m, tp, ends, mot, case, i) ::  s ->
+    let width = List.length ends in
+    let empty_bdy = List.init width (fun _ -> None) in
+    let (mot_arg, mot_env) = mk_var (D.Bridge (D.ConstClos tp, empty_bdy)) env size in
+    let mot' = read_back_tp mot_env (size + 1) (E.do_clos (size + 1) mot (D.Tm mot_arg)) in
+    let (case_arg, case_env) = mk_var tp env size in
+    let case' = read_back_nf
+      case_env
+      (size + 1)
+      (D.Normal
+        {term = E.do_clos (size + 1) case (D.Tm case_arg);
+         tp = E.do_clos (size + 1) mot (D.Tm (D.BLam (D.ConstClos (D.Endisc case_arg))))}) in
+    let ne' = D.instantiate_ne size i (h, s) in
+    Syn.Letdiscbridge (m, width, mot', case', read_back_ne (DVar size :: env) (size + 1) ne')
   | D.Quasi _ :: _ ->
     failwith "Invariant: this can never happen"
 
@@ -668,6 +685,25 @@ and check_ne env size (h1, s1) (h2, s2) =
         {term = E.do_clos (size + 1) case2 (D.Tm case_arg);
          tp = E.do_clos (size + 1) mot2 (D.Tm (D.Endisc case_arg))}) &&
     check_ne env size (h1, s1) (h2, s2)
+  | D.Letdiscbridge (_, tp, ends, mot1, case1, i1) :: s1,
+    D.Letdiscbridge (_, _, _, mot2, case2, i2) :: s2 ->
+    let width = List.length ends in
+    let empty_bdy = List.init width (fun _ -> None) in
+    let (mot_arg, mot_env) = mk_var (D.Bridge (D.ConstClos tp, empty_bdy)) env size in
+    check_tp ~subtype:false mot_env (size + 1)
+      (E.do_clos (size + 1) mot1 (D.Tm mot_arg))
+      (E.do_clos (size + 1) mot2 (D.Tm mot_arg)) &&
+    let (case_arg, case_env) = mk_var tp env size in
+    check_nf case_env (size + 1)
+      (D.Normal
+        {term = E.do_clos (size + 1) case1 (D.Tm case_arg);
+         tp = E.do_clos (size + 1) mot1 (D.Tm (D.BLam (D.ConstClos (D.Endisc case_arg))))})
+      (D.Normal
+        {term = E.do_clos (size + 1) case2 (D.Tm case_arg);
+         tp = E.do_clos (size + 1) mot2 (D.Tm (D.BLam (D.ConstClos (D.Endisc case_arg))))}) &&
+    let ne1' = D.instantiate_ne size i1 (h1, s1) in
+    let ne2' = D.instantiate_ne size i2 (h2, s2) in
+    check_ne (DVar size :: env) (size + 1) ne1' ne2'
   | _ -> false
 
 and check_extent_head env size

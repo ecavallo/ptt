@@ -13,6 +13,7 @@ type env_entry =
 and env = env_entry list
 [@@deriving show, eq]
 and clos =
+  | ConstClos of t
   | Clos of {term : Syntax.t; env : env}
   | Pseudo of {var : lvl; term : t; ends : t list}
 [@@deriving show, eq]
@@ -78,6 +79,7 @@ and cell =
   | Uncodisc
   | Unglobe
   | Letdisc of Mode.modality * t * clos * clos
+  | Letdiscbridge of Mode.modality * t * t list * clos * clos * (* BBINDER *) lvl
   | Quasi of quasi_cell
 [@@deriving show, eq]
 and quasi_cell = 
@@ -126,6 +128,7 @@ and instantiate_env r i env =
   List.map (instantiate_entry r i) env
 
 and instantiate_clos r i = function
+  | ConstClos t -> ConstClos (instantiate r i t)
   | Clos {term; env} ->
     Clos {term; env = instantiate_env r i env}
   | Pseudo {var; term; ends} ->
@@ -256,6 +259,18 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
          instantiate_clos r i mot,
          instantiate_clos r i case)
       @: go r i (h, s)
+    | Letdiscbridge (m, tp, ends, mot, case, j) :: s ->
+      let j' = if i = j then j else max (r + 1) j in
+      let ne = if i = j then (h, s) else go r i (go j' j (h, s))
+      in
+      Letdiscbridge
+        (m,
+         instantiate r i tp,
+         List.map (instantiate r i) ends,
+         instantiate_clos r i mot,
+         instantiate_clos r i case,
+         j')
+      @: ne
   in
   go
 

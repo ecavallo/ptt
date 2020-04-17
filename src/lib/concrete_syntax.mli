@@ -60,6 +60,7 @@ and t =
   | Disc of t
   | Endisc of t
   | Letdisc of {modality : Mode.modality; mot : binder; case : binder; disc : t}
+  | Letdiscbridge of {modality : Mode.modality; width : int; mot: binder; case : binder; disc : binder}
   | Uni of uni_level
 
 type decl =
