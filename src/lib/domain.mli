@@ -10,6 +10,7 @@ type env_entry =
   | Tm of t
 and env = env_entry list
 and clos =
+  | ConstClos of t
   | Clos of {term : Syntax.t; env : env}
   | Pseudo of {var : lvl; term : t; ends : t list}
 and clos2 = Clos2 of {term : Syntax.t; env : env}
@@ -68,6 +69,7 @@ and cell =
   | Uncodisc
   | Unglobe
   | Letdisc of Mode.modality * t * clos * clos
+  | Letdiscbridge of Mode.modality * t * t list * clos * clos * (* BBINDER *) lvl
   | Quasi of quasi_cell
 and quasi_cell = 
   | PiDom

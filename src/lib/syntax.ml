@@ -28,6 +28,7 @@ type t =
   | Codisc of t | Encodisc of t | Uncodisc of t
   | Global of t | Englobe of t | Unglobe of t
   | Disc of t | Endisc of t | Letdisc of Mode.modality * (* BINDS *) t * (* BINDS *) t * t
+  | Letdiscbridge of Mode.modality * int * (* BINDS *) t * (* BINDS *) t * (* BBINDS *) t
   | Uni of uni_level
 [@@deriving eq]
 
@@ -109,6 +110,7 @@ let unsubst_bvar i t =
     | Disc t -> Disc (go depth t)
     | Endisc t -> Endisc (go depth t)
     | Letdisc (m, mot, case, d) -> Letdisc (m, go (depth + 1) mot, go (depth + 1) case, go depth d)
+    | Letdiscbridge (m, width, mot, case, d) -> Letdiscbridge (m, width, go (depth + 1) mot, go (depth + 1) case, go (depth + 1) d)
     | Uni j -> Uni j
   in
   try
@@ -239,6 +241,9 @@ let rec pp fmt =
   | Letdisc (m, mot, case, d) ->
     fprintf fmt "letdisc(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
       Mode.pp_modality m pp mot pp case pp d
+  | Letdiscbridge (m, width, mot, case, d) ->
+    fprintf fmt "letdisc(@[<hov>@[<hov>%a@],@ @[<hov>%d@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
+      Mode.pp_modality m width pp mot pp case pp d
   | Uni i -> fprintf fmt "U<%d>" i
 
 let show t =

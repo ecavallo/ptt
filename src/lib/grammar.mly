@@ -235,6 +235,15 @@ term:
          mot = Binder {name = mot_name; body = mot_body};
          case = Binder {name = case_name; body = case_body};
          disc} }
+  | UNDISC; LCU; modality = modality; RCU; disc_name = name; COLON; width = NUMERAL; RIGHT_ARROW; disc_body = term;
+    AT; mot_name = name; RIGHT_ARROW; mot_body = term; WITH;
+    PIPE; ENDISC; case_name = name; RIGHT_ARROW; case_body = term
+    { Letdiscbridge
+        {modality;
+         width;
+         mot = Binder {name = mot_name; body = mot_body};
+         case = Binder {name = case_name; body = case_body};
+         disc = Binder {name = disc_name; body = disc_body}} }
   
 tele_cell:
   | LPR name = name; COLON ty = term; RPR

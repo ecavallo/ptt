@@ -644,9 +644,10 @@ and synth_quasi ~mode ~env ~size ~term =
       | t -> tp_error (Expecting_of ("Global", t))
     end
   | Letdisc (m, mot, case, d) ->
-    assert_mode_equal mode (M.src m);
+    assert_mode_equal (M.src m) mode;
+    assert_mode_equal (M.dst m) Mode.Parametric;
     begin
-      match synth ~mode:(M.dst m) ~env:(Lock m :: env) ~size ~term:d with
+      match synth ~mode:Mode.Parametric ~env:(Lock m :: env) ~size ~term:d with
       | Disc tp ->
         let sem_env = env_to_sem_env env in
         let (_, mot_env) = mk_modal_var m (D.Disc tp) env size in
@@ -655,6 +656,23 @@ and synth_quasi ~mode ~env ~size ~term =
         check ~mode ~env:case_env ~size:(size + 1) ~term:case
           ~tp:(E.eval mot (D.Tm (D.Endisc case_arg) :: sem_env) (size + 1));
         E.eval mot (D.Tm (E.eval d sem_env size) :: sem_env) size
+      | t -> tp_error (Expecting_of ("Disc", t))
+    end
+  | Letdiscbridge (m, width, mot, case, d) ->
+    assert_mode_equal (M.src m) mode;
+    assert_mode_equal (M.dst m) Mode.Parametric;
+    let (_, var_env) = mk_bvar width (Lock m :: env) size in
+    begin
+      match synth ~mode:Mode.Parametric ~env:var_env ~size:(size + 1) ~term:d with
+      | D.Disc tp ->
+        let sem_env = env_to_sem_env env in
+        let mot_hyp = D.Bridge (D.ConstClos (D.Disc tp), List.init width (fun _ -> None)) in
+        let (_, mot_env) = mk_modal_var m mot_hyp env size in
+        check_tp ~mode ~env:mot_env ~size:(size + 1) ~term:mot;
+        let (case_arg, case_env) = mk_modal_var (M.compose M.Components m) tp env size in
+        check ~mode ~env:case_env ~size:(size + 1) ~term:case
+          ~tp:(E.eval mot (D.Tm (D.BLam (D.ConstClos (D.Endisc case_arg))) :: sem_env) (size + 1));
+        E.eval mot (D.Tm (D.BLam (D.Clos {term = d; env = sem_env})) :: sem_env) size
       | t -> tp_error (Expecting_of ("Disc", t))
     end
   | _ -> tp_error (Cannot_synth_term term)
