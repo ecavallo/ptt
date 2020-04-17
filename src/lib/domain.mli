@@ -42,6 +42,8 @@ and t =
   | Id of t * t * t
   | Gel of lvl * t list * closN
   | Engel of lvl * t list * t
+  | Codisc of t
+  | Encodisc of t
   | Global of t
   | Englobe of t
   | Disc of t
@@ -63,6 +65,7 @@ and cell =
   | Abort of clos
   | J of clos3 * clos * t * t * t
   | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
+  | Uncodisc
   | Unglobe
   | Letdisc of Mode.modality * t * clos * clos
   | Quasi of quasi_cell
@@ -81,6 +84,7 @@ and quasi_cell =
   | BridgeEndpoint of ne * int
   | GelRel of t list
   | GelBridge of t list
+  | CodiscTp
   | GlobalTp
   | DiscTp
 and spine = cell list

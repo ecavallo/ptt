@@ -49,6 +49,8 @@ and t =
   | Id of t * t * t
   | Gel of lvl * t list * closN
   | Engel of lvl * t list * t
+  | Codisc of t
+  | Encodisc of t
   | Global of t
   | Englobe of t
   | Disc of t
@@ -73,6 +75,7 @@ and cell =
   | Abort of clos
   | J of clos3 * clos * t * t * t
   | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
+  | Uncodisc
   | Unglobe
   | Letdisc of Mode.modality * t * clos * clos
   | Quasi of quasi_cell
@@ -92,6 +95,7 @@ and quasi_cell =
   | BridgeEndpoint of ne * int
   | GelRel of t list
   | GelBridge of t list
+  | CodiscTp
   | GlobalTp
   | DiscTp
 [@@deriving show, eq]
@@ -167,6 +171,8 @@ and instantiate r i = function
   | Id (ty, t, u) -> Id (instantiate r i ty, instantiate r i t, instantiate r i u)
   | Gel (j, ts, t) -> Gel (instantiate_bvar r i j, List.map (instantiate r i) ts, instantiate_closN r i t)
   | Engel (j, ts, t) -> Engel (instantiate_bvar r i j, List.map (instantiate r i) ts, instantiate r i t)
+  | Codisc t -> Codisc (instantiate r i t)
+  | Encodisc t -> Encodisc (instantiate r i t)
   | Global t -> Global (instantiate r i t)
   | Englobe t -> Englobe (instantiate r i t)
   | Disc t -> Disc (instantiate r i t)
@@ -242,6 +248,7 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
       @: ne
     | Quasi q :: s -> Quasi (instantiate_quasi_cell r i q) @: go r i (h, s)
     | Unglobe :: s -> Unglobe @: go r i (h, s)
+    | Uncodisc :: s -> Uncodisc @: go r i (h, s)
     | Letdisc (m, tp, mot, case) :: s ->
       Letdisc
         (m,
@@ -268,6 +275,7 @@ and instantiate_quasi_cell r i =
   | BridgeEndpoint (t, o) -> BridgeEndpoint (instantiate_ne r i t, o)
   | GelRel ts -> GelRel (List.map (instantiate r i) ts)
   | GelBridge ts -> GelBridge (List.map (instantiate r i) ts)
+  | CodiscTp -> CodiscTp
   | GlobalTp -> GlobalTp
   | DiscTp -> DiscTp
 

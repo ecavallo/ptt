@@ -378,6 +378,22 @@ and check_inert ~mode ~env ~size ~term ~tp =
         check ~mode ~env:res_env ~size ~term ~tp:(E.do_closN size rel ts')
       | t -> tp_error (Misc ("Expecting Gel but found\n" ^ D.show t))
     end
+  | Codisc term ->
+    assert_mode_equal mode Parametric;
+    begin
+      match tp with
+      | D.Uni _ ->
+        check ~mode:Pointwise ~env:(Lock M.Global :: env) ~size ~term ~tp;
+      | t -> tp_error (Expecting_universe t)
+    end
+  | Encodisc term ->
+    assert_mode_equal mode Parametric;
+    begin
+      match tp with
+      | D.Codisc tp ->
+        check ~mode:Pointwise ~env:(Lock M.Global :: env) ~size ~term ~tp;
+      | t -> tp_error (Expecting_of ("Codisc", t))
+    end
   | Global term ->
     assert_mode_equal mode Pointwise;
     begin
@@ -613,6 +629,13 @@ and synth_quasi ~mode ~env ~size ~term =
         E.eval mot (D.Tm (D.BLam (D.Clos {term; env = sem_env})) :: sem_env) size
       | t -> tp_error (Expecting_of ("Gel", t))
     end
+  | Uncodisc term ->
+    assert_mode_equal mode Pointwise;
+    begin
+      match synth ~mode:Parametric ~env:(Lock M.Discrete :: env) ~size ~term with
+      | Codisc tp -> tp
+      | t -> tp_error (Expecting_of ("Codisc", t))
+    end
   | Unglobe term ->
     assert_mode_equal mode Parametric;
     begin
@@ -682,6 +705,9 @@ and check_tp ~mode ~env ~size ~term =
     let ends' = List.map (fun term -> E.eval term sem_env size) ends in
     let (_, rel_env) = mk_vars ~mode ends' res_env size in
     check_tp ~mode ~env:rel_env ~size:(size + width) ~term:rel
+  | Codisc tp ->
+    assert_mode_equal mode Parametric;
+    check_tp ~mode:Pointwise ~env:(Lock M.Global :: env) ~size ~term:tp
   | Global tp ->
     assert_mode_equal mode Pointwise;
     check_tp ~mode:Parametric ~env:(Lock M.Discrete :: env) ~size ~term:tp
