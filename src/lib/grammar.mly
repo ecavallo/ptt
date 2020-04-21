@@ -59,14 +59,15 @@ dim:
   | r = name { DVar r }
   | n = NUMERAL { Const n };
 
-modality:
-  | PAR { Mode.IdParametric }
-  | PT  { Mode.IdPointwise }
+generating_modality:
   | CMP { Mode.Components }
   | GLB { Mode.Global }
   | DSC { Mode.Discrete }
-  | CMP DOT DSC { Mode.DiscreteComponents }
-  | GLB DOT DSC { Mode.DiscreteGlobal }
+
+modality:
+  | { Mode.Id }
+  | gen = generating_modality { gen }
+  | gen = generating_modality; DOT; m = modality { Mode.compose m gen }
 
 endpoints:
   | LCU; endpoints = separated_list(SEMI, term); RCU { endpoints };

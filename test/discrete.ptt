@@ -46,7 +46,7 @@ let into_disc : bool -> Disc bool =
 
 let out_disc : (Disc bool) -> bool =
   fun d ->
-  undisc{par} d at _ -> bool with | disc b -> unglob (into_global b)
+  undisc{} d at _ -> bool with | disc b -> unglob (into_global b)
 
 let out_into_disc : (b : bool) -> Id bool (out_disc (into_disc b)) b =
   fun b ->
@@ -56,7 +56,7 @@ let out_into_disc : (b : bool) -> Id bool (out_disc (into_disc b)) b =
 
 let into_out_disc : (d : Disc bool) -> Id (Disc bool) (into_disc (out_disc d)) d =
   fun d ->
-  undisc{par} d at d -> Id (Disc bool) (into_disc (out_disc d)) d with
+  undisc{} d at d -> Id (Disc bool) (into_disc (out_disc d)) d with
   | disc b ->
     unglob
       (if b at b -> Global (Id (Disc bool) (into_disc (unglob (into_global b))) (disc b)) with
@@ -71,9 +71,9 @@ let pt Code : (A : U<0>) -> Global ((Disc A) -> (Disc A) -> U<0>) =
   fun A ->
     glob
       (fun d0 ->
-        undisc{par} d0 at _ -> (Disc A) -> U<0> with
+        undisc{} d0 at _ -> (Disc A) -> U<0> with
         | disc a0 -> fun d1 ->
-          undisc{par} d1 at _ -> U<0> with
+          undisc{} d1 at _ -> U<0> with
           | disc a1 -> Disc (Id A a0 a1))
 
 let pt encode_refl : (A : U<0>)
@@ -82,7 +82,7 @@ let pt encode_refl : (A : U<0>)
   fun A ->
     glob
       (fun d ->
-        undisc{par} d at d -> (unglob (Code A)) d d with
+        undisc{} d at d -> (unglob (Code A)) d d with
         | disc a -> disc (refl a))
 
 let pt encode : (A : U<0>)
@@ -162,7 +162,7 @@ let pt disc_bridge_to_id : (A : U<0>)
   fun A ->
   glob
     (fun a b p ->
-      undisc{par} x : 2 -> p @ x at p -> Id (Disc A) (p @ 0) (p @ 1) with
+      undisc{} x : 2 -> p @ x at p -> Id (Disc A) (p @ 0) (p @ 1) with
       | disc a -> refl (disc a))
 
 let pt disc_id_to_bridge_to_id : (A : U<0>)
@@ -177,7 +177,7 @@ let pt disc_id_to_bridge_to_id : (A : U<0>)
         Id (Id (Disc A) a b) ((unglob (disc_bridge_to_id A)) a b (id_to_bridge (Disc A) a b eq)) eq
       with
       | refl d ->
-        undisc{par} d at d ->
+        undisc{} d at d ->
           Id (Id (Disc A) d d) ((unglob (disc_bridge_to_id A)) d d (bri _ -> d)) (refl d)
         with
         | disc a -> refl (refl (disc a)))
@@ -190,7 +190,7 @@ let pt disc_bridge_to_id_to_bridge : (A : U<0>)
   fun A ->
   glob
     (fun a b p ->
-      undisc{par} x : 2 -> p @ x at p ->
+      undisc{} x : 2 -> p @ x at p ->
         Id ([_] Disc A {p @ 0; p @ 1})
           (id_to_bridge (Disc A) (p @ 0) (p @ 1)
             ((unglob (disc_bridge_to_id A)) (p @ 0) (p @ 1) (bri x -> p @ x)))
