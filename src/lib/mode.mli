@@ -1,10 +1,11 @@
+exception Mode_mismatch
+
 type mode =
   | Pointwise
   | Parametric
 
 type modality =
-  | IdPointwise
-  | IdParametric
+  | Id
   | Components
   | Discrete
   | Global
@@ -20,8 +21,7 @@ val pp_modality : Format.formatter -> modality -> unit
 val show_mode : mode -> string
 val show_modality : modality -> string
 
-val id : mode -> modality
-val src : modality -> mode
-val dst : modality -> mode
+val src : mode -> modality -> mode
+val dst : mode -> modality -> mode
 val compose : modality -> modality -> modality
 val leq : modality -> modality -> bool
