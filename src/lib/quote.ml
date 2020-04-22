@@ -130,7 +130,7 @@ and reduce_extent env size es =
 and read_back_nf env size nf =
   match nf with
   (* Functions *)
-  | D.Normal {tp = D.Pi (src, dest); term = f} ->
+  | D.Normal {tp = D.Pi (_, src, dest); term = f} ->
     let (arg, arg_env) = mk_var src env size in
     let nf = D.Normal
         {tp = E.do_clos (size + 1) dest (D.Tm arg);
@@ -212,10 +212,11 @@ and read_back_tp env size d =
   | D.Bool -> Syn.Bool
   | D.Coprod (t1, t2) -> Syn.Coprod (read_back_tp env size t1, read_back_tp env size t2)
   | D.Void -> Syn.Void
-  | D.Pi (src, dest) ->
+  | D.Pi (m, src, dest) ->
     let (arg, arg_env) = mk_var src env size in
     Syn.Pi
-      (read_back_tp env size src,
+      (m,
+       read_back_tp env size src,
        read_back_tp arg_env (size + 1) (E.do_clos (size + 1) dest (D.Tm arg)))
   | D.Sg (fst, snd) ->
     let (arg, arg_env) = mk_var fst env size in
@@ -425,8 +426,9 @@ and read_back_extent_head env size ({var = i; dom; mot; ctx; endcase; varcase} :
 let rec check_nf env size nf1 nf2 =
   match nf1, nf2 with
   (* Functions *)
-  | D.Normal {tp = D.Pi (src1, dest1); term = f1},
-    D.Normal {tp = D.Pi (_, dest2); term = f2} ->
+  | D.Normal {tp = D.Pi (m1, src1, dest1); term = f1},
+    D.Normal {tp = D.Pi (m2, _, dest2); term = f2} ->
+    Mode.equal_modality m1 m2 &&
     let (arg, arg_env) = mk_var src1 env size in
     let nf1 = D.Normal {tp = E.do_clos (size + 1) dest1 (D.Tm arg); term = E.do_ap (size + 1) f1 arg} in
     let nf2 = D.Normal {tp = E.do_clos (size + 1) dest2 (D.Tm arg); term = E.do_ap (size + 1) f2 arg} in
@@ -760,7 +762,8 @@ and check_tp ~subtype env size d1 d2 =
     check_tp ~subtype env size tp1 tp2 &&
     check_nf env size (D.Normal {tp = tp1; term = left1}) (D.Normal {tp = tp1; term = left2}) &&
     check_nf env size (D.Normal {tp = tp1; term = right1}) (D.Normal {tp = tp1; term = right2})
-  | D.Pi (src, dest), D.Pi (src', dest') ->
+  | D.Pi (m, src, dest), D.Pi (m', src', dest') ->
+    Mode.equal_modality m m' &&
     let (arg, arg_env) = mk_var src' env size in
     check_tp ~subtype env size src' src &&
     check_tp ~subtype arg_env (size + 1)

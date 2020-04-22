@@ -2,14 +2,24 @@
 -- Discrete modality tests
 --------------------------------------------------------------------------------
 
-let par _ : Disc unit = disc triv
+let _ : (cmp | A : U<0>) (cmp | a : A) -> Disc A =
+  fun A a -> disc a
+
+let pt discproj : (A : U<0>) -> (dsc | Disc A) -> A =
+  fun A d -> undisc{dsc} d at _ -> A with | disc a -> a
+
+let par _ : (cmp | A : U<0>) -> (Disc A) -> Codisc A =
+  fun A d -> codisc (discproj A d)
+
+--------------------------------------------------------------------------------
+-- Global (Disc A) ≃ A
+--------------------------------------------------------------------------------
 
 let pt into : (A : U<0>) -> A -> Global (Disc A) =
   fun A a -> glob (disc a)
 
 let pt out : (A : U<0>) -> (Global (Disc A)) -> A =
-  fun A g ->
-  undisc{dsc} (unglob g) at _ -> A with | disc a -> a
+  fun A g -> discproj A (unglob g)
 
 let pt out_into : (A : U<0>) (a : A) -> Id A (out A (into A a)) a =
   fun A a -> refl a
@@ -19,13 +29,9 @@ let pt into_out : (A : U<0>) (g : Global (Disc A))
   =
   fun A g ->
   undisc{dsc} (unglob g) at d ->
-    Id (Global (Disc A)) (glob (disc (undisc{dsc} d at _ -> A with | disc a -> a))) (glob d)
+    Id (Global (Disc A)) (glob (disc (discproj A d))) (glob d)
   with
   | disc a -> refl (glob (disc a))
-
-let par _ : (Disc U<0>) -> Codisc U<0> =
-  fun d ->
-  codisc (undisc{dsc} d at _ -> U<0> with | disc a -> a)
 
 --------------------------------------------------------------------------------
 -- Booleans
@@ -67,83 +73,66 @@ let into_out_disc : (d : Disc bool) -> Id (Disc bool) (into_disc (out_disc d)) d
 -- Identity types in Disc
 --------------------------------------------------------------------------------
 
-let pt Code : (A : U<0>) -> Global ((Disc A) -> (Disc A) -> U<0>) =
-  fun A ->
-    glob
-      (fun d0 ->
-        undisc{} d0 at _ -> (Disc A) -> U<0> with
-        | disc a0 -> fun d1 ->
-          undisc{} d1 at _ -> U<0> with
-          | disc a1 -> Disc (Id A a0 a1))
+let Code : (cmp | A : U<0>) -> (Disc A) -> (Disc A) -> U<0> =
+  fun A d0 ->
+  undisc{} d0 at _ -> (Disc A) -> U<0> with
+  | disc a0 -> fun d1 ->
+    undisc{} d1 at _ -> U<0> with
+    | disc a1 -> Disc (Id A a0 a1)
 
-let pt encode_refl : (A : U<0>)
-  -> Global ((d : Disc A) -> (unglob (Code A)) d d)
+let encode_refl : (cmp | A : U<0>) (d : Disc A) -> Code A d d
   =
-  fun A ->
-    glob
-      (fun d ->
-        undisc{} d at d -> (unglob (Code A)) d d with
-        | disc a -> disc (refl a))
+  fun A d ->
+  undisc{} d at d -> Code A d d with
+  | disc a -> disc (refl a)
 
-let pt encode : (A : U<0>)
-  -> Global ((d0 : Disc A) (d1 : Disc A) -> (Id (Disc A) d0 d1) -> (unglob (Code A)) d0 d1)
+let encode : (cmp | A : U<0>) (d0 : Disc A) (d1 : Disc A)
+  -> (Id (Disc A) d0 d1) -> Code A d0 d1
   =
-  fun A ->
-    glob
-      (fun d0 d1 eq ->
-        match eq at d0 d1 _ -> (unglob (Code A)) d0 d1 with
-        | refl d -> (unglob (encode_refl A)) d)
+  fun A d0 d1 eq ->
+  match eq at d0 d1 _ -> Code A d0 d1 with
+  | refl d -> encode_refl A d
 
 let pt disc_injective : (A : U<0>) (a0 : A) (a1 : A)
-  -> (Global (Id (Disc A) (disc a0) (disc a1)))
+  -> (dsc | Id (Disc A) (disc a0) (disc a1))
   -> Id A a0 a1
   =
   fun A a0 a1 g ->
-  undisc{dsc} ((unglob (encode A)) (disc a0) (disc a1) (unglob g)) at _ -> Id A a0 a1 with
+  undisc{dsc} (encode A (disc a0) (disc a1) g) at _ -> Id A a0 a1 with
   | disc eq -> eq
 
--- TODO prove without using Codisc
-let pt cong_undisc : (A : U<0>)
-  (gd0 : Global (Disc A)) (gd1 : Global (Disc A))
-  (eq : Global (Id (Disc A) (unglob gd0) (unglob gd1)))
-  -> Id A (out A gd0) (out A gd1)
+-- can this be proven without using Codisc?
+let pt cong_discproj : (A : U<0>)
+  (dsc | d0 : Disc A) (dsc | d1 : Disc A) (dsc | eq : Id (Disc A) d0 d1)
+  -> Id A (discproj A d0) (discproj A d1)
   =
   fun A d0 d1 eq ->
   uncodisc
-    (match (unglob eq) at d0 d1 _ ->
-        Codisc
-          (Id A
-            (undisc{dsc} d0 at _ -> A with | disc a -> a)
-            (undisc{dsc} d1 at _ -> A with | disc a -> a))
+    (match eq at d0 d1 _ -> Codisc (Id A (discproj A d0) (discproj A d1))
       with
-      | refl d -> codisc (refl (undisc{dsc} d at _ -> A with | disc a -> a)))
+      | refl d -> codisc (refl (discproj A d)))
 
 --------------------------------------------------------------------------------
 -- Polymorphic endofunction
 --------------------------------------------------------------------------------
 
-let pt readOff : (Global ((A : U<0>) -> A -> A)) -> (A : U<0>) -> A -> A =
-  fun F A a -> undisc{dsc} ((unglob F) (Disc A) (disc a)) at _ -> A with | disc a -> a
-
-normalize def readOff
+let pt readOff : (dsc | ((A : U<0>) -> A -> A)) -> (A : U<0>) -> A -> A =
+  fun F A a -> discproj A (F (Disc A) (disc a))
 
 let gelproj : (A : U<0>) (P : A -> U<0>) (a : A) -> [x] Gel x {A} (a -> P a) {a} -> P a =
   fun A P a p ->
   ungel x : 1 -> p @ x at _ -> P a with | gel r -> r
 
-let id_param1 : (F : (A : U<0>) -> A -> A) -> (A : U<0>) (a : A) -> Id A (F A a) a =
+let id_param : (F : (A : U<0>) -> A -> A) -> (A : U<0>) (a : A) -> Id A (F A a) a =
   fun F A a ->
   let P : A -> U<0> = fun b -> Id A b a in
   gelproj A (fun b -> P b) (F A a) (bri x -> F (Gel x {A} (b -> P b)) (gel x {a} (refl a)))
 
-let pt id_param_global : (F : Global ((A : U<0>) -> A -> A)) (A : U<0>) (a : A)
-  -> Id A (readOff F A a) a
+let pt id_param' : (dsc | F : (A : U<0>) -> A -> A)
+  (A : U<0>) (a : A) -> Id A (readOff F A a) a
   =
   fun F A a ->
-  cong_undisc A
-    (glob ((unglob F) (Disc A) (disc a)))
-    (glob (disc a))
-    (glob (id_param1 (unglob F) (Disc A) (disc a)))
+  cong_discproj A (F (Disc A) (disc a)) (disc a) (id_param F (Disc A) (disc a))
 
 --------------------------------------------------------------------------------
 -- Discrete types are bridge-discrete
@@ -156,44 +145,36 @@ let id_to_bridge : (A : U<0>) (a : A) (b : A)
   match eq at a b _ -> [_] A {a; b} with
   | refl a -> bri _ -> a
 
-let pt disc_bridge_to_id : (A : U<0>)
-  -> Global ((a : Disc A) (b : Disc A) (p : [_] Disc A {a; b}) -> Id (Disc A) a b)
+let disc_bridge_to_id : (cmp | A : U<0>)
+  (a : Disc A) (b : Disc A) (p : [_] Disc A {a; b}) -> Id (Disc A) a b
   =
-  fun A ->
-  glob
-    (fun a b p ->
-      undisc{} x : 2 -> p @ x at p -> Id (Disc A) (p @ 0) (p @ 1) with
-      | disc a -> refl (disc a))
+  fun A a b p ->
+  undisc{} x : 2 -> p @ x at p -> Id (Disc A) (p @ 0) (p @ 1) with
+  | disc a -> refl (disc a)
 
-let pt disc_id_to_bridge_to_id : (A : U<0>)
-  -> Global
-     ((a : Disc A) (b : Disc A) (eq : Id (Disc A) a b)
-       -> Id (Id (Disc A) a b) ((unglob (disc_bridge_to_id A)) a b (id_to_bridge (Disc A) a b eq)) eq)
+let disc_id_to_bridge_to_id : (cmp | A : U<0>)
+  (a : Disc A) (b : Disc A) (eq : Id (Disc A) a b)
+  -> Id (Id (Disc A) a b) (disc_bridge_to_id A a b (id_to_bridge (Disc A) a b eq)) eq
   =
-  fun A ->
-  glob
-    (fun a b eq ->
-      match eq at a b eq ->
-        Id (Id (Disc A) a b) ((unglob (disc_bridge_to_id A)) a b (id_to_bridge (Disc A) a b eq)) eq
-      with
-      | refl d ->
-        undisc{} d at d ->
-          Id (Id (Disc A) d d) ((unglob (disc_bridge_to_id A)) d d (bri _ -> d)) (refl d)
-        with
-        | disc a -> refl (refl (disc a)))
+  fun A a b eq ->
+  match eq at a b eq ->
+    Id (Id (Disc A) a b) (disc_bridge_to_id A a b (id_to_bridge (Disc A) a b eq)) eq
+  with
+  | refl d ->
+    undisc{} d at d ->
+      Id (Id (Disc A) d d) (disc_bridge_to_id A d d (bri _ -> d)) (refl d)
+    with
+    | disc a -> refl (refl (disc a))
 
-let pt disc_bridge_to_id_to_bridge : (A : U<0>)
-  -> Global
-     ((a : Disc A) (b : Disc A) (p : [_] Disc A {a; b})
-       -> Id ([_] Disc A {a; b}) (id_to_bridge (Disc A) a b ((unglob (disc_bridge_to_id A)) a b p)) p)
+let disc_bridge_to_id_to_bridge : (cmp | A : U<0>)
+  (a : Disc A) (b : Disc A) (p : [_] Disc A {a; b})
+  -> Id ([_] Disc A {a; b}) (id_to_bridge (Disc A) a b (disc_bridge_to_id A a b p)) p
   =
-  fun A ->
-  glob
-    (fun a b p ->
-      undisc{} x : 2 -> p @ x at p ->
-        Id ([_] Disc A {p @ 0; p @ 1})
-          (id_to_bridge (Disc A) (p @ 0) (p @ 1)
-            ((unglob (disc_bridge_to_id A)) (p @ 0) (p @ 1) (bri x -> p @ x)))
-          (bri x -> p @ x)
-      with
-      | disc a -> refl (bri _ -> disc a))
+  fun A a b p ->
+  undisc{} x : 2 -> p @ x at p ->
+    Id ([_] Disc A {p @ 0; p @ 1})
+      (id_to_bridge (Disc A) (p @ 0) (p @ 1)
+        (disc_bridge_to_id A (p @ 0) (p @ 1) (bri x -> p @ x)))
+      (bri x -> p @ x)
+  with
+  | disc a -> refl (bri _ -> disc a)

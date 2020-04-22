@@ -1,9 +1,7 @@
-exception Mode_mismatch
-
 type mode =
   | Pointwise
   | Parametric
-[@@deriving show{ with_path = false }, eq]
+[@@deriving eq]
 
 type modality =
   | Id
@@ -12,10 +10,28 @@ type modality =
   | Global
   | DiscreteComponents
   | DiscreteGlobal
-[@@deriving show{ with_path = false }, eq]
+[@@deriving eq]
+
+exception Mode_mismatch of string
+
+let show_mode = function
+  | Pointwise -> "pt"
+  | Parametric -> "par"
+
+let pp_mode fmt mode = Format.pp_print_string fmt (show_mode mode)
+
+let show_modality = function
+  | Id -> "."
+  | Components -> ".components"
+  | Discrete -> ".discrete"
+  | Global -> ".global"
+  | DiscreteComponents -> ".components.discrete"
+  | DiscreteGlobal -> ".global.discrete"
+
+let pp_modality fmt m = Format.pp_print_string fmt (show_modality m)
 
 let assert_mode m1 m2 =
-  if m1 = m2 then () else raise Mode_mismatch
+  if m1 = m2 then () else raise (Mode_mismatch (show_mode m1 ^ " ≠ " ^ show_mode m2))
 
 let src m = function
   | Id -> m
@@ -51,7 +67,7 @@ let compose m1 m2 =
   | DiscreteGlobal, Discrete -> Discrete
   | DiscreteGlobal, DiscreteComponents -> DiscreteComponents
   | DiscreteGlobal, DiscreteGlobal -> DiscreteGlobal
-  | _ -> raise Mode_mismatch
+  | _ -> raise (Mode_mismatch ("cannot compose " ^ show_modality m1 ^ " with " ^ show_modality m2))
 
 let leq m1 m2 =
   match m1, m2 with
@@ -69,16 +85,4 @@ let leq m1 m2 =
   | DiscreteGlobal, Id -> true
   | DiscreteGlobal, DiscreteComponents -> true
   | DiscreteGlobal, DiscreteGlobal -> true
-  | _ -> raise Mode_mismatch
-
-let show_mode = function
-  | Pointwise -> "pt"
-  | Parametric -> "par"
-
-let show_modality = function
-  | Id -> "."
-  | Components -> ".components"
-  | Discrete -> ".discrete"
-  | Global -> ".global"
-  | DiscreteComponents -> ".components.discrete"
-  | DiscreteGlobal -> ".global.discrete"
+  | _ -> raise (Mode_mismatch ("cannot compare " ^ show_modality m1 ^ " with " ^ show_modality m2))

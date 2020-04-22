@@ -18,7 +18,7 @@ type t =
   | Bool | True | False | If of (* BINDS *) t * t * t * t
   | Coprod of t * t | Inl of t | Inr of t | Case of (* BINDS *) t * (* BINDS *) t * (* BINDS *) t * t
   | Void | Abort of (* BINDS *) t * t
-  | Pi of t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
+  | Pi of Mode.modality * t * (* BINDS *) t | Lam of (* BINDS *) t | Ap of t * t
   | Sg of t * (* BINDS *) t | Pair of t * t | Fst of t | Snd of t
   | Id of t * t * t | Refl of t | J of (* BINDS 3 *) t * (* BINDS *) t * t
   | Bridge of (* BBINDS *) t * t option list | BApp of t * dim | BLam of (* BBINDS *) t
@@ -75,7 +75,7 @@ let unsubst_bvar i t =
       Case (go (depth + 1) mot, go (depth + 1) inl, go (depth + 1) inr, go depth co)
     | Void -> Void
     | Abort (mot, vd) -> Abort (go (depth + 1) mot, go depth vd)
-    | Pi (l, r) -> Pi (go depth l, go (depth + 1) r)
+    | Pi (m, l, r) -> Pi (m, go depth l, go (depth + 1) r)
     | Lam body -> Lam (go (depth + 1) body)
     | Ap (l, r) -> Ap (go depth l, go depth r)
     | Sg (l, r) -> Sg (go depth l, go (depth + 1) r)
@@ -186,8 +186,8 @@ let rec pp fmt =
   | Void -> fprintf fmt "void"
   | Abort (mot, vd) ->
     fprintf fmt "abort(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp mot pp vd;
-  | Pi (l, r) ->
-    fprintf fmt "Pi(@[<hov>@[<hov>%a@],@ @[<hov>%a@]@])" pp l pp r;
+  | Pi (m, l, r) ->
+    fprintf fmt "Pi(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])" Mode.pp_modality m pp l pp r;
   | Lam body ->
     fprintf fmt "lam(@[<hov>%a@])" pp body
   | Ap (l, r) ->

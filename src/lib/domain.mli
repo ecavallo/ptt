@@ -34,7 +34,7 @@ and t =
   | Inl of t
   | Inr of t
   | Void
-  | Pi of t * clos
+  | Pi of Mode.modality * t * clos
   | Sg of t * clos
   | Pair of t * t
   | Bridge of clos * t option list
