@@ -1,5 +1,5 @@
 --------------------------------------------------------------------------------
--- Modality tests
+-- Codiscrete modality tests
 --------------------------------------------------------------------------------
 
 let par modal_id : Codisc ((A : U<0>) -> A -> A) =
@@ -41,34 +41,34 @@ let par into2 : (A : U<0>) -> A -> Codisc (Global A) =
 -- Polymorphic endofunction
 --------------------------------------------------------------------------------
 
-let pt readOff : (Global ((A : U<0>) -> A -> A)) -> (A : U<0>) -> A -> A =
-  fun F A a -> uncodisc ((unglob F) (Codisc A) (codisc a))
+let pt readOff : (dsc | ((A : U<0>) -> A -> A)) -> (A : U<0>) -> A -> A =
+  fun F A a -> uncodisc (F (Codisc A) (codisc a))
 
-normalize pt readOff (glob (fun A a -> a)) at (A : U<0>) -> A -> A
+normalize pt readOff (fun A a -> a) at (A : U<0>) -> A -> A
 
 let gelproj : (A : U<0>) (P : A -> U<0>) (a : A) -> [x] Gel x {A} (a -> P a) {a} -> P a =
   fun A P a p ->
   ungel x : 1 -> p @ x at _ -> P a with | gel r -> r
 
-let id_param1 : (F : (A : U<0>) -> A -> A) -> (A : U<0>) (a : A) -> Id A (F A a) a =
+let id_param : (F : (A : U<0>) -> A -> A) -> (A : U<0>) (a : A) -> Id A (F A a) a =
   fun F A a ->
   let P : A -> U<0> = fun b -> Id A b a in
   gelproj A (fun b -> P b) (F A a) (bri x -> F (Gel x {A} (b -> P b)) (gel x {a} (refl a)))
 
 let pt uncong_codisc : (A : U<0>) (a0 : A) (a1 : A)
-  -> (Global (Id (Codisc A) (codisc a0) (codisc a1)))
+  -> (dsc | Id (Codisc A) (codisc a0) (codisc a1))
   -> Id A a0 a1
   =
-  fun A a0 a1 g ->
+  fun A a0 a1 eq ->
   uncodisc
-    (match (unglob g) at b0 b1 _ -> Codisc (Id A (uncodisc b0) (uncodisc b1)) with
+    (match eq at b0 b1 _ -> Codisc (Id A (uncodisc b0) (uncodisc b1)) with
      | refl z -> codisc (refl (uncodisc z)))
 
-let pt id_param_global : (F : Global ((A : U<0>) -> A -> A)) (A : U<0>) (a : A)
-  -> Id A (readOff F A a) a
+let pt id_param' : (dsc | F : (A : U<0>) -> A -> A)
+  (A : U<0>) (a : A) -> Id A (readOff F A a) a
   =
   fun F A a ->
-  uncong_codisc A (readOff F A a) a (glob (id_param1 (unglob F) (Codisc A) (codisc a)))
+  uncong_codisc A (readOff F A a) a (id_param F (Codisc A) (codisc a))
 
 --------------------------------------------------------------------------------
 -- Polymorphic endofunction on coproduct
@@ -102,37 +102,38 @@ let case_par : (A : U<0>) (B : U<0>) (P : (Coprod_par A B) -> U<0>)
     | ff -> fun b -> g b)
     (snd c)
 
-let pt fwd : (A : U<0>) (B : U<0>)
-  -> Global ((Coprod_par (Codisc A) (Codisc B)) -> Codisc (Coprod_pt A B))
+let fwd : (cmp | A : U<0>) (cmp | B : U<0>)
+  -> (Coprod_par (Codisc A) (Codisc B)) -> Codisc (Coprod_pt A B)
   =
   fun A B ->
-  glob
-    (case_par (Codisc A) (Codisc B)
-       (fun _ -> Codisc (Coprod_pt A B))
-       (fun ca -> codisc <tt, uncodisc ca>)
-       (fun cb -> codisc <ff, uncodisc cb>))
+  case_par (Codisc A) (Codisc B)
+   (fun _ -> Codisc (Coprod_pt A B))
+   (fun ca -> codisc <tt, uncodisc ca>)
+   (fun cb -> codisc <ff, uncodisc cb>)
 
-let pt bwd : (A : U<0>) (B : U<0>)
-  -> (Coprod_pt A B)
-  -> Global (Coprod_par (Codisc A) (Codisc B))
+let bwd : (cmp | A : U<0>) (cmp | B : U<0>)
+  -> (cmp | Coprod_pt A B)
+  -> Coprod_par (Codisc A) (Codisc B)
   =
-  fun A B ->
-  case_pt A B
-    (fun _ -> Global (Coprod_par (Codisc A) (Codisc B)))
-    (fun a -> glob (<tt, codisc a>))
-    (fun b -> glob (<ff, codisc b>))
+  fun A B c ->
+  unglob
+    (case_pt A B
+      (fun _ -> Global (Coprod_par (Codisc A) (Codisc B)))
+      (fun a -> glob (<tt, codisc a>))
+      (fun b -> glob (<ff, codisc b>))
+      c)
 
-let pt readOff : (Global ((A : U<0>) (B : U<0>) -> (Coprod_par A B) -> Coprod_par A B))
+let pt readOff : (dsc | (A : U<0>) (B : U<0>) -> (Coprod_par A B) -> Coprod_par A B)
   -> (A : U<0>) (B : U<0>) -> (Coprod_pt A B) -> Coprod_pt A B
   =
   fun F A B c ->
-  uncodisc ((unglob (fwd A B)) ((unglob F) (Codisc A) (Codisc B) (unglob (bwd A B c))))
+  uncodisc (fwd A B (F (Codisc A) (Codisc B) (bwd A B c)))
 
-normalize pt readOff (glob (fun A B c -> c)) at (A : U<0>) (B : U<0>) -> (Coprod_pt A B) -> Coprod_pt A B
+normalize pt readOff (fun A B c -> c) at (A : U<0>) (B : U<0>) -> (Coprod_pt A B) -> Coprod_pt A B
 
 let pt _ :
   Id ((A : U<0>) (B : U<0>) -> (Coprod_pt A B) -> Coprod_pt A B)
-    (readOff (glob (fun A B c -> c)))
-    (fun A B c -> uncodisc ((unglob (fwd A B)) (unglob (bwd A B c))))
+    (readOff (fun A B c -> c))
+    (fun A B c -> uncodisc (fwd A B (bwd A B c)))
   =
-  refl (readOff (glob (fun A B c -> c)))
+  refl (readOff (fun A B c -> c))
