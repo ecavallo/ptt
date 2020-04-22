@@ -95,10 +95,14 @@ let assert_mode_equal m1 m2 =
   if m1 = m2 then ()
   else tp_error (Mode_mismatch (m1, m2))
 
+let modality_dst mode m =
+  try M.dst mode m
+  with M.Mode_mismatch _ -> tp_error (Misc ("Modality " ^ M.show_modality m ^ " does not have source " ^ M.show_mode mode ^ "\n"))
+
 let assert_modality_leq m1 m2 =
   if M.leq m1 m2
   then ()
-  else tp_error (Misc ("Tried to use variable behind modality: " ^ Mode.show_modality m1 ^ " ≰ " ^ Mode.show_modality m2 ^ "\n"))
+  else tp_error (Misc ("Tried to use variable behind modality: " ^ M.show_modality m1 ^ " ≰ " ^ M.show_modality m2 ^ "\n"))
 
 let synth_var ~mode env x =
   let rec go synth_mod env x =
@@ -134,7 +138,7 @@ let mk_var tp env size =
 let mk_vars tps env size =
   (List.mapi (fun i tp -> D.Neutral {tp; term = D.root (D.Var (size + i))}) tps,
    List.rev_append
-     (List.mapi (fun i tp -> Var {level = size + i; tp; modality = Mode.Id}) tps)
+     (List.mapi (fun i tp -> Var {level = size + i; tp; modality = M.Id}) tps)
      env)
 
 let restrict_env r env =
@@ -285,7 +289,26 @@ and check_inert ~mode ~env ~size ~term ~tp =
         assert_equal quote_env size term right tp
       | t -> tp_error (Expecting_of ("Id", t))
     end
-  | Pi (l, r) | Sg (l, r) ->
+  | Pi (m, l, r) ->
+    begin
+      match tp with
+      | D.Uni _ ->
+        check ~mode:(modality_dst mode m) ~env:(Lock m :: env) ~size ~term:l ~tp;
+        let l_sem = E.eval l (env_to_sem_env env) size in
+        let (_, arg_env) = mk_modal_var m l_sem env size in
+        check ~mode ~env:arg_env ~size:(size + 1) ~term:r ~tp
+      | t -> tp_error (Expecting_universe t)
+    end
+  | Lam body ->
+    begin
+      match tp with
+      | D.Pi (m, arg_tp, clos) ->
+        let (arg, arg_env) = mk_modal_var m arg_tp env size in
+        let dest_tp = E.do_clos (size + 1) clos (D.Tm arg) in
+        check ~mode ~env:arg_env ~size:(size + 1) ~term:body ~tp:dest_tp;
+      | t -> tp_error (Expecting_of ("Pi", t))
+    end
+  | Sg (l, r) ->
     begin
       match tp with
       | D.Uni _ ->
@@ -294,15 +317,6 @@ and check_inert ~mode ~env ~size ~term ~tp =
         let (_, arg_env) = mk_var l_sem env size in
         check ~mode ~env:arg_env ~size:(size + 1) ~term:r ~tp
       | t -> tp_error (Expecting_universe t)
-    end
-  | Lam body ->
-    begin
-      match tp with
-      | D.Pi (arg_tp, clos) ->
-        let (arg, arg_env) = mk_var arg_tp env size in
-        let dest_tp = E.do_clos (size + 1) clos (D.Tm arg) in
-        check ~mode ~env:arg_env ~size:(size + 1) ~term:body ~tp:dest_tp;
-      | t -> tp_error (Expecting_of ("Pi", t))
     end
   | Pair (left, right) ->
     begin
@@ -479,8 +493,8 @@ and synth_quasi ~mode ~env ~size ~term =
   | Ap (f, a) ->
     begin
       match synth ~mode ~env ~size ~term:f with
-      | Pi (src, dest) ->
-        check ~mode ~env ~size ~term:a ~tp:src;
+      | Pi (m, src, dest) ->
+        check ~mode:(modality_dst mode m) ~env:(Lock m :: env) ~size ~term:a ~tp:src;
         let a_sem = E.eval a (env_to_sem_env env) size in
         E.do_clos size dest (D.Tm a_sem)
       | t -> tp_error (Expecting_of ("Pi", t))
@@ -644,9 +658,9 @@ and synth_quasi ~mode ~env ~size ~term =
       | t -> tp_error (Expecting_of ("Global", t))
     end
   | Letdisc (m, mot, case, d) ->
-    assert_mode_equal (M.dst mode m) Mode.Parametric;
+    assert_mode_equal (modality_dst mode m) M.Parametric;
     begin
-      match synth ~mode:Mode.Parametric ~env:(Lock m :: env) ~size ~term:d with
+      match synth ~mode:M.Parametric ~env:(Lock m :: env) ~size ~term:d with
       | Disc tp ->
         let sem_env = env_to_sem_env env in
         let (_, mot_env) = mk_modal_var m (D.Disc tp) env size in
@@ -658,10 +672,10 @@ and synth_quasi ~mode ~env ~size ~term =
       | t -> tp_error (Expecting_of ("Disc", t))
     end
   | Letdiscbridge (m, width, mot, case, d) ->
-    assert_mode_equal (M.dst mode m) Mode.Parametric;
+    assert_mode_equal (modality_dst mode m) M.Parametric;
     let (_, var_env) = mk_bvar width (Lock m :: env) size in
     begin
-      match synth ~mode:Mode.Parametric ~env:var_env ~size:(size + 1) ~term:d with
+      match synth ~mode:M.Parametric ~env:var_env ~size:(size + 1) ~term:d with
       | D.Disc tp ->
         let sem_env = env_to_sem_env env in
         let mot_hyp = D.Bridge (D.ConstClos (D.Disc tp), List.init width (fun _ -> None)) in
@@ -697,7 +711,13 @@ and check_tp ~mode ~env ~size ~term =
            (fun pt ->
               check ~mode ~env ~size ~term:pt ~tp:(E.eval term (D.Dim (D.Const o) :: sem_env) size)))
       ends
-  | Pi (l, r) | Sg (l, r) ->
+  | Pi (m, l, r) ->
+    check_tp ~mode:(modality_dst mode m) ~env:(Lock m :: env) ~size ~term:l;
+    let sem_env = env_to_sem_env env in
+    let l_sem = E.eval l sem_env size in
+    let (_, var_env) = mk_modal_var m l_sem env size in
+    check_tp ~mode ~env:var_env ~size:(size + 1) ~term:r
+  | Sg (l, r) ->
     check_tp ~mode ~env ~size ~term:l;
     let sem_env = env_to_sem_env env in
     let l_sem = E.eval l sem_env size in

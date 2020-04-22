@@ -9,7 +9,7 @@ type binder = Binder of {name : ident; body : t}
 and bindern = BinderN of {names : ident list; body : t}
 and binder2 = Binder2 of {name1 : ident; name2 : ident; body : t}
 and binder3 = Binder3 of {name1 : ident; name2 : ident; name3 : ident; body : t}
-and cell = Cell of {name : ident; ty : t}
+and cell = Cell of {m : Mode.modality; name : ident; ty : t}
 and spine = Term of t | Dim of dim
 and t =
   | Var of ident

@@ -123,11 +123,13 @@ let rec bind env = function
   | CS.Sg ([], body) ->
     bind env body
   | CS.Sg (Cell cell :: tele, body) ->
-    S.Sg (bind env cell.ty, bind (Term cell.name :: env) (CS.Sg (tele, body)))
+    if cell.m = Mode.Id
+    then S.Sg (bind env cell.ty, bind (Term cell.name :: env) (CS.Sg (tele, body)))
+    else raise (Failure "Modal sigma-types are not supported")
   | CS.Pi ([], body) ->
     bind env body
   | CS.Pi (Cell cell :: tele, body) ->
-    S.Pi (bind env cell.ty, bind (Term cell.name :: env) (CS.Pi (tele, body)))
+    S.Pi (cell.m, bind env cell.ty, bind (Term cell.name :: env) (CS.Pi (tele, body)))
   | CS.Pair (l, r) -> S.Pair (bind env l, bind env r)
   | CS.Fst p -> S.Fst (bind env p)
   | CS.Snd p -> S.Snd (bind env p)

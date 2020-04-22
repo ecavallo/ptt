@@ -1,5 +1,3 @@
-exception Mode_mismatch
-
 type mode =
   | Pointwise
   | Parametric
@@ -11,6 +9,8 @@ type modality =
   | Global
   | DiscreteComponents
   | DiscreteGlobal
+
+exception Mode_mismatch of string
 
 val equal_mode : mode -> mode -> bool
 val equal_modality : modality -> modality -> bool

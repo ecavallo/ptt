@@ -259,14 +259,14 @@ and do_bridge_endpoint size tp ne o =
 
 and do_pi_dom f = 
   match f with 
-  | D.Pi (tp, _) -> tp
+  | D.Pi (_, tp, _) -> tp
   | D.Neutral {tp; term} ->
     D.Neutral {tp; term = D.(Quasi PiDom @: term)}
   | _ -> raise (Eval_failed "Not something that can become a pi type")
 
 and do_pi_cod size f a = 
   match f with 
-  | D.Pi (_,dst) -> do_clos size dst (D.Tm a)
+  | D.Pi (_, _, dst) -> do_clos size dst (D.Tm a)
   | D.Neutral {tp; term} ->
     D.Neutral {tp; term = D.(Quasi (PiCod a) @: term)}
   | _ -> raise (Eval_failed "Not something that can become a pi type")
@@ -376,8 +376,8 @@ and eval t (env : D.env) size =
   | Syn.Void -> D.Void
   | Syn.Abort (mot, vd) ->
     do_abort size (Clos {term = mot; env}) (eval vd env size)
-  | Syn.Pi (src, dest) ->
-    D.Pi (eval src env size, (Clos {term = dest; env}))
+  | Syn.Pi (m, src, dest) ->
+    D.Pi (m, eval src env size, (Clos {term = dest; env}))
   | Syn.Lam t -> D.Lam (Clos {term = t; env})
   | Syn.Ap (t1, t2) -> do_ap size (eval t1 env size) (eval t2 env size)
   | Syn.Uni i -> D.Uni i

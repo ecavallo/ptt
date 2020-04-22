@@ -41,7 +41,7 @@ and t =
   | Inl of t
   | Inr of t
   | Void
-  | Pi of t * clos
+  | Pi of Mode.modality * t * clos
   | Sg of t * clos
   | Pair of t * t
   | Bridge of clos * t option list
@@ -165,7 +165,7 @@ and instantiate r i = function
   | Inl t -> Inl (instantiate r i t)
   | Inr t -> Inr (instantiate r i t)
   | Void -> Void
-  | Pi (src, dst) -> Pi (instantiate r i src, instantiate_clos r i dst)
+  | Pi (m, src, dst) -> Pi (m, instantiate r i src, instantiate_clos r i dst)
   | Sg (src, dst) -> Sg (instantiate r i src, instantiate_clos r i dst)
   | Pair (t, u) -> Pair (instantiate r i t, instantiate r i u)
   | Bridge (dst, ts) -> Bridge (instantiate_clos r i dst, List.map (Option.map (instantiate r i)) ts)

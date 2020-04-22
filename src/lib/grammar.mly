@@ -202,9 +202,11 @@ term:
   | tele = nonempty_list(tele_cell); TIMES; cod = term
     { Sg (tele, cod) }
   | dom = atomic RIGHT_ARROW; cod = term
-    { Pi ([Cell {name = ""; ty = dom}], cod)}
+    { Pi ([Cell {m = Mode.Id; name = ""; ty = dom}], cod)}
+  | LPR; m = modality; PIPE; dom = term; RPR; RIGHT_ARROW; cod = term
+    { Pi ([Cell {m; name = ""; ty = dom}], cod)}
   | dom = atomic; TIMES; cod = term
-    { Sg ([Cell {name = ""; ty = dom}], cod)}
+    { Sg ([Cell {m = Mode.Id; name = ""; ty = dom}], cod)}
   | GEL; dim = dim; endpoints = endpoints; LPR; names = nonempty_list(name); RIGHT_ARROW; body = term; RPR
     { Gel (dim, endpoints, BinderN {names; body}) }
   | GEL; dim = dim; body = atomic
@@ -247,6 +249,8 @@ term:
          disc = Binder {name = disc_name; body = disc_body}} }
   
 tele_cell:
-  | LPR name = name; COLON ty = term; RPR
-    { Cell {name; ty} }
+  | LPR; name = name; COLON; ty = term; RPR
+    { Cell {m = Mode.Id; name; ty} }
+  | LPR; m = modality; PIPE; name = name; COLON; ty = term; RPR
+    { Cell {m; name; ty} }
 ; 
