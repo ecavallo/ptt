@@ -1,0 +1,79 @@
+--------------------------------------------------------------------------------
+-- Proof that [_] nat {} = nat (assuming univalence for Id or cubical equality)
+--------------------------------------------------------------------------------
+
+-- Consequence of univalence
+
+postulate bridgeext : (A : [_] U<1> {})
+  (p0 : [x] A @ x {}) (p1 : [x] A @ x {})
+  -> [x] Id (A @ x) (p0 @ x) (p1 @ x) {}
+  -> Id ([x] A @ x {}) p0 p1
+
+-- Identity type lemmas
+
+let cong : (A : U<0>) (B : U<0>) (f : A -> B) (a0 : A) (a1 : A)
+  -> (Id A a0 a1) -> Id B (f a0) (f a1)
+  =
+  fun A B f a0 a1 eq ->
+  match eq at x0 x1 _ -> Id B (f x0) (f x1) with
+  | refl z -> refl (f z)
+
+-- Gel type lemmas
+
+let gelproj : (A : U<0>) (p : [x] Gel x A {}) -> A =
+  fun A p ->
+  ungel x : 0 -> p @ x at _ -> A with | gel a -> a
+
+-- Main proof
+
+let loosen : nat -> [_] nat {} =
+  fun n -> bri _ -> n
+
+let nat_id : nat -> nat =
+  fun n ->
+  rec n at _ -> nat with
+  | zero -> zero
+  | suc _, n -> suc n
+
+let tighten_aux : [x] nat -> Gel x nat {} =
+  bri x -> fun n ->
+  rec n at _ -> Gel x nat with
+  | zero -> gel x zero
+  | suc _, g ->
+    extent x of g in x -> Gel x nat at x _ -> Gel x nat with
+    | p x -> gel x (suc (gelproj nat p))
+
+let tighten : (p : [_] nat {}) -> nat =
+  fun p -> gelproj nat (bri x -> tighten_aux @ x (p @ x))
+
+let tighten_loosen : (n : nat)
+  -> Id nat (tighten (loosen n)) n
+  =
+  fun n ->
+  rec n at n -> Id nat (tighten (loosen n)) n with
+  | zero -> refl zero
+  | suc m, pf -> cong nat nat (fun k -> suc k) (tighten (loosen m)) m pf
+
+let lt : [_] nat -> nat {} =
+  bri x -> fun n ->
+  extent x of n in _ -> nat at _ _ -> nat with
+  | p x -> loosen (tighten p) @ x
+
+let loosen_tighten_aux : [x] (n : nat) -> Id nat (lt @ x n) n {}
+  =
+  bri x -> fun n ->
+  rec n at n -> Id nat (lt @ x n) n with
+  | zero -> refl zero
+  | suc m, pf ->
+    extent x of <m,pf>
+    in x -> (m : nat) * Id nat (lt @ x m) m at
+    x mpf -> Id nat (lt @ x (suc (fst mpf))) (suc (fst mpf)) with
+    | mpf x ->
+      cong nat nat (fun k -> suc k) (lt @ x (fst (mpf @ x))) (fst (mpf @ x)) (snd (mpf @ x))
+
+let loosen_tighten : (p : [_] nat {})
+  -> Id ([_] nat {}) (loosen (tighten p)) p
+  =
+  fun p ->
+  bridgeext (bri _ -> nat) (loosen (tighten p)) p
+    (bri x -> loosen_tighten_aux @ x (p @ x))
