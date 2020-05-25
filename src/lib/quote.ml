@@ -94,7 +94,7 @@ and reduce_extent env size es =
     | D.Ungel (end_tms, _, _, mot, i, case) :: s ->
       let es' = D.instantiate_spine D.instantiate_extent_head size i (e, s) in
       E.do_ungel size end_tms mot (go (DVar size :: env) (size + 1) es') case
-    | D.Letcodisc (m, _, mot, case) :: s -> E.do_letcodisc size m mot case (go env size (e, s))
+    | D.Uncodisc :: s -> E.do_uncodisc (go env size (e, s))
     | D.Unglobe :: s -> E.do_unglobe (go env size (e, s))
     | D.Letdisc (m, _, mot, case) :: s -> E.do_letdisc size m mot case (go env size (e, s))
     | D.Letdiscbridge (m, _, ends, mot, case, i) :: s ->
@@ -183,8 +183,9 @@ and read_back_nf env size nf =
        List.map2 (fun tp term -> read_back_nf env size (D.Normal {tp; term})) endtps ts,
        read_back_nf env size (D.Normal {tp = applied_rel; term = t}))
   (* Codisc *)
-  | D.Normal {tp = D.Codisc tp; term = D.Encodisc term} ->
-    Syn.Encodisc (read_back_nf env size (D.Normal {tp; term}))
+  | D.Normal {tp = D.Codisc tp; term = t} ->
+    let t' = E.do_uncodisc t in
+    Syn.Encodisc (read_back_nf env size (D.Normal {tp; term = t'}))
   (* Global *)
   | D.Normal {tp = D.Global tp; term = t} ->
     let t' = E.do_unglobe t in
@@ -359,16 +360,7 @@ and read_back_ne env size (h, s) =
             tp = E.do_clos (size + 1) mot (D.Tm gel_term)}) in
     let ne' = D.instantiate_ne size i (h, s) in
     Syn.Ungel (List.length end_tms, mot', read_back_ne (DVar size :: env) (size + 1) ne', case')
-  | D.Letcodisc (m, tp, mot, case) :: s ->
-    let (mot_arg, mot_env) = mk_var (D.Codisc tp) env size in
-    let mot' = read_back_tp mot_env (size + 1) (E.do_clos (size + 1) mot (D.Tm mot_arg)) in
-    let (case_arg, case_env) = mk_var tp env size in
-    let case' =
-      read_back_nf case_env (size + 1)
-        (D.Normal
-           {term = E.do_clos (size + 1) case (D.Tm case_arg);
-            tp = E.do_clos (size + 1) mot (D.Tm (D.Encodisc case_arg))}) in
-    Syn.Letcodisc (m, mot', case', read_back_ne env size (h, s))
+  | D.Uncodisc :: s -> Syn.Uncodisc (read_back_ne env size (h, s))
   | D.Unglobe :: s -> Syn.Unglobe (read_back_ne env size (h, s))
   | D.Letdisc (m, tp, mot, case) :: s ->
     let (mot_arg, mot_env) = mk_var (D.Disc tp) env size in
@@ -498,8 +490,9 @@ let rec check_nf env size nf1 nf2 =
     let applied_rel2 = E.do_closN size rel2 ts2 in
     check_nf env size (D.Normal {tp = applied_rel1; term = t1}) (D.Normal {tp = applied_rel2; term = t2})
   (* Codisc *)
-  | D.Normal {tp = D.Codisc tp1; term = D.Encodisc t1}, D.Normal {tp = D.Codisc tp2; term = D.Encodisc t2} ->
-    check_nf env size (D.Normal {tp = tp1; term = t1}) (D.Normal {tp = tp2; term = t2})
+  | D.Normal {tp = D.Codisc tp1; term = t1}, D.Normal {tp = D.Codisc tp2; term = t2} ->
+    let t1',t2' = E.do_uncodisc t1, E.do_uncodisc t2 in
+    check_nf env size (D.Normal {tp = tp1; term = t1'}) (D.Normal {tp = tp2; term = t2'})
   (* Global *)
   | D.Normal {tp = D.Global tp1; term = t1}, D.Normal {tp = D.Global tp2; term = t2} ->
     let t1',t2' = E.do_unglobe t1, E.do_unglobe t2 in
@@ -678,20 +671,7 @@ and check_ne env size (h1, s1) (h2, s2) =
     let ne1' = D.instantiate_ne size i1 (h1, s1) in
     let ne2' = D.instantiate_ne size i2 (h2, s2) in
     check_ne (DVar size :: env) (size + 1) ne1' ne2'
-  | D.Letcodisc (_, tp, mot1, case1) :: s1, D.Letcodisc (_, _, mot2, case2) :: s2 ->
-    let (mot_arg, mot_env) = mk_var (D.Codisc tp) env size in
-    check_tp ~subtype:false mot_env (size + 1)
-      (E.do_clos (size + 1) mot1 (D.Tm mot_arg))
-      (E.do_clos (size + 1) mot2 (D.Tm mot_arg)) &&
-    let (case_arg, case_env) = mk_var tp env size in
-    check_nf case_env (size + 1)
-      (D.Normal
-        {term = E.do_clos (size + 1) case1 (D.Tm case_arg);
-         tp = E.do_clos (size + 1) mot1 (D.Tm (D.Encodisc case_arg))})
-      (D.Normal
-        {term = E.do_clos (size + 1) case2 (D.Tm case_arg);
-         tp = E.do_clos (size + 1) mot2 (D.Tm (D.Encodisc case_arg))}) &&
-    check_ne env size (h1, s1) (h2, s2)
+  | D.Uncodisc :: s1, D.Uncodisc :: s2 -> check_ne env size (h1, s1) (h2, s2)
   | D.Unglobe :: s1, D.Unglobe :: s2 -> check_ne env size (h1, s1) (h2, s2)
   | D.Letdisc (_, tp, mot1, case1) :: s1, D.Letdisc (_, _, mot2, case2) :: s2 ->
     let (mot_arg, mot_env) = mk_var (D.Disc tp) env size in

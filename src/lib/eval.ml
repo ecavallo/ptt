@@ -158,13 +158,12 @@ and do_ungel size ends mot gel case =
     | _ -> raise (Eval_failed "Not a gel or neutral in do_ungel")
   end
 
-and do_letcodisc size m mot case d =
-  match d with
-  | D.Encodisc t -> do_clos size case (D.Tm t)
+and do_uncodisc t =
+  match t with
+  | D.Encodisc t -> t
   | D.Neutral {tp; term} ->
-    let inner_tp = do_codisc_tp tp in
-    D.Neutral {tp = do_clos size mot (D.Tm d); term = D.(Letcodisc (m, inner_tp, mot, case) @: term)}
-  | _ -> raise (Eval_failed "Not an encodisc or neutral in do_letcodisc")
+    D.Neutral {tp = do_codisc_tp tp; term = D.(Uncodisc @: term)}
+  | _ -> raise (Eval_failed "Couldn't uncodisc argument in do_uncodisc")
 
 and do_unglobe t =
   match t with
@@ -439,13 +438,7 @@ and eval t (env : D.env) size =
       (D.Clos {term = case; env})
   | Syn.Codisc t -> D.Codisc (eval t env size)
   | Syn.Encodisc t -> D.Encodisc (eval t env size)
-  | Syn.Letcodisc (m, mot, case, d) ->
-    do_letcodisc
-      size
-      m
-      (D.Clos {term = mot; env})
-      (D.Clos {term = case; env})
-      (eval d env size)
+  | Syn.Uncodisc t -> do_uncodisc (eval t env size)
   | Syn.Global t -> D.Global (eval t env size)
   | Syn.Englobe t -> D.Englobe (eval t env size)
   | Syn.Unglobe t -> do_unglobe (eval t env size)

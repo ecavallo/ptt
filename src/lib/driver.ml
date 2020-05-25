@@ -184,16 +184,7 @@ let rec bind env = function
        bind (Term case_name :: env) case_body)
   | CS.Codisc t -> S.Codisc (bind env t)
   | CS.Encodisc t -> S.Encodisc (bind env t)
-  | CS.Letcodisc
-      {modality;
-       mot = Binder {name = mot_name; body = mot_body};
-       case = Binder {name = case_name; body = case_body};
-       codisc} ->
-    S.Letcodisc
-      (modality,
-       bind (Term mot_name :: env) mot_body,
-       bind (Term case_name :: env) case_body,
-       bind env codisc)
+  | CS.Uncodisc t -> S.Uncodisc (bind env t)
   | CS.Global t -> S.Global (bind env t)
   | CS.Englobe t -> S.Englobe (bind env t)
   | CS.Unglobe t -> S.Unglobe (bind env t)
