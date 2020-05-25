@@ -1,0 +1,71 @@
+--------------------------------------------------------------------------------
+-- Codiscrete modality tests
+--------------------------------------------------------------------------------
+
+let par modal_id : Codisc ((A : U<0>) -> A -> A) =
+  codisc (fun A a -> a)
+
+let pt modal_id : (A : U<0>) -> A -> A =
+  fun A a -> a
+
+let pt _ : (Global U<0>) -> U<0> =
+  fun A -> Global (unglob A)
+
+let par _ : (Codisc U<0>) -> U<0> =
+  fun A -> Codisc (uncodisc A)
+
+let pt into : (A : U<0>) -> A -> Global (Codisc A) =
+  fun A a -> glob (codisc a)
+
+let pt out : (A : U<0>) -> (Global (Codisc A)) -> A =
+  fun A p -> uncodisc (unglob p)
+
+let pt into_out : (A : U<0>) (p : Global (Codisc A))
+  -> Id (Global (Codisc A)) (into A (out A p)) p
+  =
+  fun A p -> refl p
+
+let pt out_into : (A : U<0>) (a : A)
+  -> Id A (out A (into A a)) a
+  =
+  fun A a -> refl a
+
+let par into2 : (A : U<0>) -> A -> Codisc (Global A) =
+  fun A a -> codisc (glob a)
+
+-- Should not check
+-- let par out2 : (A : U<0>) -> (Codisc (Global A)) -> A =
+--   fun A a -> unglob (uncodisc a)
+
+--------------------------------------------------------------------------------
+-- Polymorphic endofunction
+--------------------------------------------------------------------------------
+
+let pt readOff : (dsc | ((A : U<0>) -> A -> A)) -> (A : U<0>) -> A -> A =
+  fun F A a -> uncodisc (F (Codisc A) (codisc a))
+
+normalize pt readOff (fun A a -> a) at (A : U<0>) -> A -> A
+
+let gelproj : (A : U<0>) (P : A -> U<0>) (a : A) -> [x] Gel x {A} (a -> P a) {a} -> P a =
+  fun A P a p ->
+  ungel x : 1 -> p @ x at _ -> P a with | gel r -> r
+
+let id_param : (F : (A : U<0>) -> A -> A) -> (A : U<0>) (a : A) -> Id A (F A a) a =
+  fun F A a ->
+  let P : A -> U<0> = fun b -> Id A b a in
+  gelproj A (fun b -> P b) (F A a) (bri x -> F (Gel x {A} (b -> P b)) (gel x {a} (refl a)))
+
+let pt uncong_codisc : (A : U<0>) (a0 : A) (a1 : A)
+  -> (dsc | Id (Codisc A) (codisc a0) (codisc a1))
+  -> Id A a0 a1
+  =
+  fun A a0 a1 eq ->
+  uncodisc
+    (match eq at b0 b1 _ -> Codisc (Id A (uncodisc b0) (uncodisc b1)) with
+     | refl z -> codisc (refl (uncodisc z)))
+
+let pt id_param' : (dsc | F : (A : U<0>) -> A -> A)
+  (A : U<0>) (a : A) -> Id A (readOff F A a) a
+  =
+  fun F A a ->
+  uncong_codisc A (readOff F A a) a (id_param F (Codisc A) (codisc a))
