@@ -25,7 +25,7 @@ type t =
   | Extent of dim * (* BBINDS *) t * (* BBINDS & BINDS *) t * t * (* BINDS *) t list * (* BINDS n & BBINDS *) t
   | Gel of dim * t list * (* BINDS n *) t | Engel of idx * t list * t
   | Ungel of int * (* BINDS *) t * (* BBINDS *) t * (* BINDS *) t
-  | Codisc of t | Encodisc of t | Uncodisc of t
+  | Codisc of t | Encodisc of t | Letcodisc of Mode.modality * (* BINDS *) t * (* BINDS *) t * t
   | Global of t | Englobe of t | Unglobe of t
   | Disc of t | Endisc of t | Letdisc of Mode.modality * (* BINDS *) t * (* BINDS *) t * t
   | Letdiscbridge of Mode.modality * int * (* BINDS *) t * (* BINDS *) t * (* BBINDS *) t
@@ -106,7 +106,7 @@ let unsubst_bvar i t =
     | Unglobe t -> Unglobe (go depth t)
     | Codisc t -> Codisc (go depth t)
     | Encodisc t -> Encodisc (go depth t)
-    | Uncodisc t -> Uncodisc (go depth t)
+    | Letcodisc (m, mot, case, d) -> Letcodisc (m, go (depth + 1) mot, go (depth + 1) case, go depth d)
     | Disc t -> Disc (go depth t)
     | Endisc t -> Endisc (go depth t)
     | Letdisc (m, mot, case, d) -> Letdisc (m, go (depth + 1) mot, go (depth + 1) case, go depth d)
@@ -232,8 +232,9 @@ let rec pp fmt =
     fprintf fmt "Codisc(@[<hov>%a@])" pp t
   | Encodisc t ->
     fprintf fmt "encodisc(@[<hov>%a@])" pp t
-  | Uncodisc t ->
-    fprintf fmt "uncodisc(@[<hov>%a@])" pp t
+  | Letcodisc (m, mot, case, d) ->
+    fprintf fmt "letcodisc(@[<hov>@[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@],@ @[<hov>%a@]@])"
+      Mode.pp_modality m pp mot pp case pp d
   | Disc t ->
     fprintf fmt "Disc(@[<hov>%a@])" pp t
   | Endisc t ->

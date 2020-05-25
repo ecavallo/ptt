@@ -66,7 +66,7 @@ and cell =
   | Abort of clos
   | J of clos3 * clos * t * t * t
   | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
-  | Uncodisc
+  | Letcodisc of Mode.modality * t * clos * clos
   | Unglobe
   | Letdisc of Mode.modality * t * clos * clos
   | Letdiscbridge of Mode.modality * t * t list * clos * clos * (* BBINDER *) lvl

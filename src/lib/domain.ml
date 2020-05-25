@@ -76,7 +76,7 @@ and cell =
   | Abort of clos
   | J of clos3 * clos * t * t * t
   | Ungel of t list * t * t * clos * (* BBINDER *) lvl * clos
-  | Uncodisc
+  | Letcodisc of Mode.modality * t * clos * clos
   | Unglobe
   | Letdisc of Mode.modality * t * clos * clos
   | Letdiscbridge of Mode.modality * t * t list * clos * clos * (* BBINDER *) lvl
@@ -250,8 +250,14 @@ and instantiate_spine : 'a. (lvl -> lvl -> 'a -> 'a) -> lvl -> lvl -> 'a * spine
          instantiate_clos r i case)
       @: ne
     | Quasi q :: s -> Quasi (instantiate_quasi_cell r i q) @: go r i (h, s)
+    | Letcodisc (m, tp, mot, case) :: s ->
+      Letcodisc
+        (m,
+         instantiate r i tp,
+         instantiate_clos r i mot,
+         instantiate_clos r i case)
+      @: go r i (h, s)
     | Unglobe :: s -> Unglobe @: go r i (h, s)
-    | Uncodisc :: s -> Uncodisc @: go r i (h, s)
     | Letdisc (m, tp, mot, case) :: s ->
       Letdisc
         (m,
