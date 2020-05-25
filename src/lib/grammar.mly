@@ -225,7 +225,13 @@ term:
          case = Binder {name = case_name; body = case_body}} }
   | CODISC; t = atomic { Codisc t }
   | ENCODISC; t = atomic { Encodisc t }
-  | UNCODISC; t = atomic { Uncodisc t }
+  | UNCODISC; LCU; modality = modality; RCU; codisc = atomic; AT; mot_name = name; RIGHT_ARROW; mot_body = term; WITH;
+    PIPE; ENCODISC; case_name = name; RIGHT_ARROW; case_body = term
+    { Letcodisc
+        {modality;
+         mot = Binder {name = mot_name; body = mot_body};
+         case = Binder {name = case_name; body = case_body};
+         codisc} }
   | GLOBAL; t = atomic { Global t }
   | ENGLOBE; t = atomic { Englobe t }
   | UNGLOBE; t = atomic { Unglobe t }

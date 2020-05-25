@@ -643,11 +643,18 @@ and synth_quasi ~mode ~env ~size ~term =
         E.eval mot (D.Tm (D.BLam (D.Clos {term; env = sem_env})) :: sem_env) size
       | t -> tp_error (Expecting_of ("Gel", t))
     end
-  | Uncodisc term ->
-    assert_mode_equal mode Pointwise;
+  | Letcodisc (m, mot, case, d) ->
+    assert_mode_equal (modality_dst mode m) M.Parametric;
     begin
-      match synth ~mode:Parametric ~env:(Lock M.Discrete :: env) ~size ~term with
-      | Codisc tp -> tp
+      match synth ~mode:M.Parametric ~env:(Lock m :: env) ~size ~term:d with
+      | Codisc tp ->
+        let sem_env = env_to_sem_env env in
+        let (_, mot_env) = mk_modal_var m (D.Codisc tp) env size in
+        check_tp ~mode ~env:mot_env ~size:(size + 1) ~term:mot;
+        let (case_arg, case_env) = mk_modal_var (M.compose M.Components m) tp env size in
+        check ~mode ~env:case_env ~size:(size + 1) ~term:case
+          ~tp:(E.eval mot (D.Tm (D.Encodisc case_arg) :: sem_env) (size + 1));
+        E.eval mot (D.Tm (E.eval d sem_env size) :: sem_env) size
       | t -> tp_error (Expecting_of ("Codisc", t))
     end
   | Unglobe term ->
