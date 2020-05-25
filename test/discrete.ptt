@@ -101,24 +101,13 @@ let pt disc_injective : (A : U<0>) (a0 : A) (a1 : A)
   undisc{dsc} (encode A (disc a0) (disc a1) g) at _ -> Id A a0 a1 with
   | disc eq -> eq
 
-let pt codiscproj : (A : U<0>) -> (dsc | Codisc A) -> A =
-  fun A d -> uncodisc{dsc} d at _ -> A with | codisc a -> a
-
-let pt global_id : (dsc | A : U<0>) (dsc | a0 : A) (dsc | a1 : A)
-  -> (Global (Id A a0 a1))
-  -> Id (Global A) (glob a0) (glob a1)
-  =
-  fun A a0 a1 g ->
-  codiscproj (Id (Global A) (glob a0) (glob a1))
-    (match (unglob g) at a0 a1 _ -> Codisc (Id (Global A) (glob a0) (glob a1)) with
-      | refl a -> codisc (refl (glob a)))
-
+-- can this be proven without using Codisc?
 let pt cong_discproj : (A : U<0>)
   (dsc | d0 : Disc A) (dsc | d1 : Disc A) (dsc | eq : Id (Disc A) d0 d1)
   -> Id A (discproj A d0) (discproj A d1)
   =
   fun A d0 d1 eq ->
-  codiscproj (Id A (discproj A d0) (discproj A d1))
+  uncodisc
     (match eq at d0 d1 _ -> Codisc (Id A (discproj A d0) (discproj A d1))
       with
       | refl d -> codisc (refl (discproj A d)))

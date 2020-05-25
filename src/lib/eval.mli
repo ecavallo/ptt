@@ -16,7 +16,7 @@ val do_fst : Domain.t -> Domain.t
 val do_snd : Domain.lvl -> Domain.t -> Domain.t
 val do_j : Domain.lvl -> Domain.clos3 -> Domain.clos -> Domain.t -> Domain.t
 val do_ungel : Domain.lvl -> Domain.t list -> Domain.clos -> Domain.t -> Domain.clos -> Domain.t
-val do_letcodisc : Domain.lvl -> Mode.modality -> Domain.clos -> Domain.clos -> Domain.t -> Domain.t
+val do_uncodisc : Domain.t -> Domain.t
 val do_unglobe : Domain.t -> Domain.t
 val do_letdisc : Domain.lvl -> Mode.modality -> Domain.clos -> Domain.clos -> Domain.t -> Domain.t
 val do_letdiscbridge : Domain.lvl -> Mode.modality -> Domain.t list -> Domain.clos -> Domain.clos -> Domain.t -> Domain.t

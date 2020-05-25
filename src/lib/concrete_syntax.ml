@@ -53,7 +53,7 @@ and t =
   | Ungel of {width : int; mot : binder; gel : binder; case : binder}
   | Codisc of t
   | Encodisc of t
-  | Letcodisc of {modality : Mode.modality; mot : binder; case : binder; codisc : t}
+  | Uncodisc of t
   | Global of t
   | Englobe of t
   | Unglobe of t
