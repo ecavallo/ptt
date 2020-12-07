@@ -110,7 +110,13 @@ let synth_var ~mode env x =
     | _, [] -> tp_error (Misc "Tried to access non-existent variable\n")
     | x, Restrict j :: env ->
       if x < j
-      then tp_error (Misc "Tried to use restricted term variable\n")
+      then
+        if M.dst M.Parametric synth_mod = M.Pointwise
+        then
+          if M.leq synth_mod M.Components
+          then go synth_mod env x
+          else tp_error (Misc "Tried to use restricted term variable\n")
+        else tp_error (Misc "Tried to use restricted term variable\n")
       else go synth_mod env x
     | x, Lock m :: env -> go (M.compose synth_mod m) env x
     | 0, Var {tp; modality; _} :: _ ->

@@ -145,36 +145,19 @@ let id_to_bridge : (A : U<0>) (a : A) (b : A)
   match eq at a b _ -> [_] A {a; b} with
   | refl a -> bri _ -> a
 
+let disc_to_gel : (cmp | A : U<0>)
+  -> [x] (Disc A) -> Gel x {Disc A; Disc A} (d0 d1 -> Id (Disc A) d0 d1) {*;*}
+  =
+  fun A -> bri x -> fun d ->
+  undisc{} d at _ -> Gel x {Disc A; Disc A} (d0 d1 -> Id (Disc A) d0 d1) with
+  | disc a -> gel x {disc a; disc a} (refl (disc a))
+
+let disc_id : (cmp | A : U<0>) -> (Disc A) -> Disc A
+  =
+  fun A d -> undisc{} d at _ -> Disc A with | disc a -> disc a
+
 let disc_bridge_to_id : (cmp | A : U<0>)
-  (a : Disc A) (b : Disc A) (p : [_] Disc A {a; b}) -> Id (Disc A) a b
+  (a : Disc A) (b : Disc A) (p : [_] Disc A {a; b}) -> Id (Disc A) (disc_id A a) (disc_id A b)
   =
   fun A a b p ->
-  undisc{} x : 2 -> p @ x at p -> Id (Disc A) (p @ 0) (p @ 1) with
-  | disc a -> refl (disc a)
-
-let disc_id_to_bridge_to_id : (cmp | A : U<0>)
-  (a : Disc A) (b : Disc A) (eq : Id (Disc A) a b)
-  -> Id (Id (Disc A) a b) (disc_bridge_to_id A a b (id_to_bridge (Disc A) a b eq)) eq
-  =
-  fun A a b eq ->
-  match eq at a b eq ->
-    Id (Id (Disc A) a b) (disc_bridge_to_id A a b (id_to_bridge (Disc A) a b eq)) eq
-  with
-  | refl d ->
-    undisc{} d at d ->
-      Id (Id (Disc A) d d) (disc_bridge_to_id A d d (bri _ -> d)) (refl d)
-    with
-    | disc a -> refl (refl (disc a))
-
-let disc_bridge_to_id_to_bridge : (cmp | A : U<0>)
-  (a : Disc A) (b : Disc A) (p : [_] Disc A {a; b})
-  -> Id ([_] Disc A {a; b}) (id_to_bridge (Disc A) a b (disc_bridge_to_id A a b p)) p
-  =
-  fun A a b p ->
-  undisc{} x : 2 -> p @ x at p ->
-    Id ([_] Disc A {p @ 0; p @ 1})
-      (id_to_bridge (Disc A) (p @ 0) (p @ 1)
-        (disc_bridge_to_id A (p @ 0) (p @ 1) (bri x -> p @ x)))
-      (bri x -> p @ x)
-  with
-  | disc a -> refl (bri _ -> disc a)
+  ungel x : 2 -> disc_to_gel A @ x (p @ x) at _ -> Id (Disc A) (disc_id A a) (disc_id A b) with | gel q -> q
