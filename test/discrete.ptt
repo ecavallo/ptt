@@ -8,8 +8,38 @@ let _ : (cmp | A : U<0>) (cmp | a : A) -> Disc A =
 let pt discproj : (A : U<0>) -> (dsc | Disc A) -> A =
   fun A d -> undisc{dsc} d at _ -> A with | disc a -> a
 
+let pt projeta : (A : U<0>) (dsc | d : Disc A)
+    -> Global (Id (Disc A) (disc (discproj A d)) d)
+    =
+    fun A d ->
+    undisc{dsc} d at d -> Global (Id (Disc A) (disc (discproj A d)) d) with
+    | disc a -> glob (refl (disc a))
+
 let par _ : (cmp | A : U<0>) -> (Disc A) -> Codisc A =
   fun A d -> codisc (discproj A d)
+
+let pt go : (A : U<0>) (B : U<0>) -> (A -> B) -> Global ((Disc A) -> Disc B)
+  =
+  fun A B f ->
+  glob (fun d -> undisc{} d at _ -> Disc B with | disc a -> disc (f a))
+
+let pt stop : (A : U<0>) (B : U<0>) -> (Global ((Disc A) -> Disc B)) -> (A -> B)
+  =
+  fun A B u a ->
+  discproj B ((unglob u) (disc a))
+
+let pt inv1 : (A : U<0>) (B : U<0>) (f : A -> B)
+  -> Id (A -> B) (stop A B (go A B f)) f
+  =
+  fun A B f -> refl f
+
+let pt inv2 : (A : U<0>) (B : U<0>) (u : Global ((Disc A) -> Disc B)) (dsc | d : Disc A)
+  -> Global (Id (Disc B) ((unglob (go A B (stop A B u))) d) ((unglob u) d))
+  =
+  fun A B u d ->
+  glob
+    (undisc{} d at d -> Id (Disc B) ((unglob (go A B (stop A B u))) d) ((unglob u) d) with
+      | disc a -> unglob (projeta B ((unglob u) (disc a))))
 
 --------------------------------------------------------------------------------
 -- Global (Disc A) ≃ A
