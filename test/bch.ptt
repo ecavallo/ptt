@@ -5,10 +5,7 @@
 
 -- It's not obvious how to specify dependent Path-types or G-types in this way,
 -- because we cannot express the separated product of a context with an
--- interval. It's also likely that interpreting parametric type theory in the
--- naive way will not give the same definition of fibration as in the BCH
--- paper. (See Section 9.3 in Swan, "Lifting Problems in Grothendieck
--- Fibrations".)
+-- interval.
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
